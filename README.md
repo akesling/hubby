@@ -23,3 +23,16 @@ Non-goals:
 * Support *your distributed consensus algorithm of choice*
 * Low latency.  Hubby promises your latency will be high.  Leader election
   should be done deliberately and without rushing ;).
+
+Project structure:
+* The [`/hubby`](https://crates.io/crates/hubby) crate represents the
+  server/service. It will contain a gRPC library to surface from any "embedding"
+  server and a standalone server binary for general use.
+* The [`/hubby-core`](https://crates.io/crates/hubby-core) crate represents the
+  core sans-I/O library for the Hubby service.
+
+Where does the name come from?
+2) Hubby is a supportive partner in your distributed systems journey.
+1) Chubby-style locking services generally represent consensus and
+    configuration hubs for distributed systems -- thus hub-by.
+3) Hubby has an edit distance of one from the originating paper.
