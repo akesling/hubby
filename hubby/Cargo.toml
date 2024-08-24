@@ -1,6 +1,13 @@
 [package]
 name = "hubby"
 version = "0.1.0"
+authors = ["Alex Kesling <alex@kesling.co>"]
+license = "Apache-2.0"
+description = "Hubby lock service"
+
 edition = "2021"
+workspace = ".."
+readme = "../README.md"
+repository = "https://github.com/akesling/hubby"
 
 [dependencies]
