@@ -1,0 +1,27 @@
+# Project
+/local/
+/build/
+/dist/
+/run/
+/srv/
+
+# Rust
+target/
+**/*.rs.bk
+.cargo/
+
+# Vim
+*.swp
+*.swo
+
+# Bazel outs
+bazel-*
+
+# macOS
+.DS_Store
+
+# npm
+node_modules/
+
+# Python
+__pycache__

@@ -1,0 +1,12 @@
+[workspace]
+
+members = [
+    "hubby",
+    "hubby-core",
+]
+
+resolver="2"
+
+[workspace.dependencies]
+
+[workspace.dev-dependencies]
