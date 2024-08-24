@@ -1,6 +1,6 @@
 [package]
 name = "hubby"
-version = "0.1.2"
+version = "0.1.3"
 authors = ["Alex Kesling <alex@kesling.co>"]
 license = "Apache-2.0"
 description = "Hubby lock service"

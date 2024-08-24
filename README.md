@@ -1,5 +1,5 @@
-What if the Google's Chubby were implemented as a self-sufficient Rust library
-and "trivially" useful binary?  This is the question I asked myself, and this
+What if Google's Chubby were implemented as a self-sufficient Rust library and
+"trivially" useful binary?  This is the question I asked myself, and this
 project is some dabbling in answering it.
 
 At this time, nothing works and this project is aspirational.  From there,
