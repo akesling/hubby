@@ -1,0 +1,13 @@
+[package]
+name = "jarl"
+version = "0.1.0"
+authors = ["Alex Kesling <alex@kesling.co>"]
+license = "Apache-2.0"
+description = "Jarl (Just another Raft library)"
+
+edition = "2021"
+workspace = ".."
+readme = "./README.md"
+repository = "https://github.com/akesling/hubby"
+
+[dependencies]

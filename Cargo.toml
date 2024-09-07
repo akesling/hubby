@@ -3,6 +3,7 @@
 members = [
     "hubby",
     "hubby-core",
+    "jarl",
 ]
 
 resolver="2"
