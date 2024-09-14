@@ -51,8 +51,11 @@ pub mod node {
         // * If there exists an N such that N > commitIndex, a majority of matchIndex[i] ≥ N, and
         //   log[N].term == currentTerm: set commitIndex = N (§5.3, §5.4).
 
-        fn issue_append_entries(&self) -> crate::msg::AppendEntries<VALUE> {
-            todo!("Implement `issue_append_entries`")
+        fn fill_append_entries<'e>(
+            &'e self,
+            append_msg: &mut crate::msg::AppendEntries<'e, VALUE>,
+        ) {
+            todo!("Implement `fill_append_entries`")
         }
     }
 
