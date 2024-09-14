@@ -1,7 +1,7 @@
-[Jarl](https://github.com/akesling/hubby/jarl) may be just another Raft library,
+[Jarl](https://github.com/akesling/hubby/jarl) may be Just Another Raft Library,
 but it makes a point to be literally _just_ another Raft library.  There's no
-I/O, no standard library, no dependencies, no internal allocations... literally
-_just_ an interface for managing consensus of a "virtual" cell.
+I/O, no standard library, no dependencies, no internal allocations, no async...
+literally _just_ a state machine for managing consensus of a "virtual" cell.
 
 The library is a single Rust file.  As simple as it gets.
 
