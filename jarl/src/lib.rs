@@ -140,3 +140,6 @@ pub mod log {
         todo!("Implement append entries!")
     }
 }
+
+#[cfg(test)]
+mod test {}
