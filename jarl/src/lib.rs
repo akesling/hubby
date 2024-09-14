@@ -1,18 +1,11 @@
 #![no_std]
 
 pub mod node {
-    pub enum State {
-        Leader,
-        Candidate,
-        Follower,
-    }
-
     pub struct Id(u32);
 
-    pub struct Node<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE, SNAPSHOT> {
+    struct Node<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE, SNAPSHOT> {
         id: Id,
 
-        state: State,
         term: u32,
 
         next_index: u32,
@@ -23,31 +16,91 @@ pub mod node {
 
         initialized: bool,
     }
+
+    impl<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE, SNAPSHOT>
+        Node<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>
+    {
+        // * If commitIndex > lastApplied: increment lastApplied, apply log[lastApplied] to state
+        //   machine (§5.3)
+        // * If RPC request or response contains term T > currentTerm: set currentTerm = T, convert
+        //   to follower (§5.1)
+    }
+
+    pub struct Leader<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE, SNAPSHOT>(
+        Node<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>,
+    );
+    pub struct Candidate<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE, SNAPSHOT>(
+        Node<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>,
+    );
+    pub struct Follower<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE, SNAPSHOT>(
+        Node<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>,
+    );
+
+    impl<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE, SNAPSHOT>
+        Leader<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>
+    {
+        // * Upon election: send initial empty AppendEntries RPCs (heartbeat) to each server; repeat
+        //   during idle periods to prevent election timeouts (§5.2)
+        // * If command received from client: append entry to local log, respond after entry
+        //   applied to state machine (§5.3)
+        // * If last log index ≥ nextIndex for a follower: send AppendEntries RPC with log entries
+        //   starting at nextIndex
+        // * If successful: update nextIndex and matchIndex for follower (§5.3)
+        // * If AppendEntries fails because of log inconsistency: decrement nextIndex and retry
+        //   (§5.3)
+        // * If there exists an N such that N > commitIndex, a majority of matchIndex[i] ≥ N, and
+        //   log[N].term == currentTerm: set commitIndex = N (§5.3, §5.4).
+
+        fn issue_append_entries(&self) -> crate::msg::AppendEntries<VALUE> {
+            todo!("Implement `issue_append_entries`")
+        }
+    }
+
+    impl<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE, SNAPSHOT>
+        Follower<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>
+    {
+        // * Respond to RPCs from candidates and leaders
+        // * If election timeout elapses without receiving AppendEntries RPC from current leader or
+        //   granting vote to candidate: convert to candidate
+    }
+
+    impl<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE, SNAPSHOT>
+        Candidate<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>
+    {
+        // * On conversion to candidate, start election:
+        // * Increment currentTerm
+        // * Vote for self
+        // * Reset election timer
+        // * Send RequestVote RPCs to all other servers
+        // * If votes received from majority of servers: become leader
+        // * If AppendEntries RPC received from new leader: convert to follower
+        // * If election timeout elapses: start new election
+    }
 }
 
 pub mod msg {
     pub struct AppendEntries<'e, VALUE> {
-        leader: crate::node::Id,
-        term: u32,
-        high_watermark: u32,
-        entries: &'e [crate::log::Entry<VALUE>],
+        pub leader: crate::node::Id,
+        pub term: u32,
+        pub high_watermark: u32,
+        pub entries: &'e [crate::log::Entry<VALUE>],
     }
 
     pub struct AppendResponse {
-        term: u32,
-        success: bool,
+        pub term: u32,
+        pub success: bool,
     }
 
     pub struct RequestVote {
-        term: u32,
-        candidate: crate::node::Id,
-        last_index: u32,
-        last_term: u32,
+        pub term: u32,
+        pub candidate: crate::node::Id,
+        pub last_index: u32,
+        pub last_term: u32,
     }
 
     pub struct VoteResponse {
-        term: u32,
-        granted: bool,
+        pub term: u32,
+        pub granted: bool,
     }
 }
 
@@ -57,9 +110,9 @@ pub mod log {
     }
 
     pub struct Entry<VALUE> {
-        term: u32,
-        index: u32,
-        value: VALUE,
+        pub term: u32,
+        pub index: u32,
+        pub value: VALUE,
     }
     pub type Log<VALUE, const MAX_LOG: usize> = [crate::log::Entry<VALUE>; MAX_LOG];
 
@@ -72,8 +125,8 @@ pub mod log {
     ///
     /// ```Invoked by leader to replicate log entries (§5.3); also used as heartbeat (§5.2).```
     ///
-    /// `entries` includes the entry immediately previous to the append state.  This differs from the
-    /// Raft paper in that it includes the value of that entry along with the term and index.
+    /// `entries` includes the entry immediately previous to the append state.  This differs from
+    /// the Raft paper in that it includes the value of that entry along with the term and index.
     ///
     pub fn append_entries<'e, VALUE: Clone>(
         msg: &crate::msg::AppendEntries<'e, VALUE>,
