@@ -1,30 +1,30 @@
 #![no_std]
+//! # Raft state machine
+//!
+//! (Figure 4 from [Raft paper](https://raft.github.io/raft.pdf))
+//! ```text
+//! Starting state = [Follower]
+//! ===========================
+//!
+//! *******************          ┌───────────┐   **************
+//! * Times out,      *          │           ┼──>* Times out, *
+//! * starts election *─────────>│ Candidate │   * tries new  *
+//! *                 *          │           │<──* election   *
+//! *******************          └─┬───────┬─┘   **************
+//!       ^                        v       │
+//!  ┌────┴─────┐   *********************  │
+//!  │ Follower │<──* Discovers current *  │
+//!  └──────────┘   * leader or         *  │
+//!       ^         * new term          *  │
+//!       │         *********************  v
+//!       │                               ******************
+//! ********************    ┌────────┐    * Receives votes *
+//! * Discovers server *<───┼ Leader │<───* from majority  *
+//! * with higher term *    └────────┘    * of nodes       *
+//! ********************                  ******************
+//! ```
 
 pub mod node {
-    /// # Raft state machine
-    ///
-    /// (Figure 4 from [Raft paper](https://raft.github.io/raft.pdf))
-    /// ```
-    /// Starting state = [Follower]
-    /// ===========================
-    ///
-    /// *******************          ┌───────────┐   **************
-    /// * Times out,      *          │           ┼──>* Times out, *
-    /// * starts election *─────────>│ Candidate │   * tries new  *
-    /// *                 *          │           │<──* election   *
-    /// *******************          └─┬───────┬─┘   **************
-    ///       ^                        v       │
-    ///  ┌────┴─────┐   *********************  │
-    ///  │ Follower │<──* Discovers current *  │
-    ///  └──────────┘   * leader or         *  │
-    ///       ^         * new term          *  │
-    ///       │         *********************  v
-    ///       │                               ******************
-    /// ********************    ┌────────┐    * Receives votes *
-    /// * Discovers server *<───┼ Leader │<───* from majority  *
-    /// * with higher term *    └────────┘    * of nodes       *
-    /// ********************                  ******************
-    /// ```
     pub struct Id(u32);
 
     struct Node<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE, SNAPSHOT> {

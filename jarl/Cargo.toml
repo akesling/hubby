@@ -1,6 +1,6 @@
 [package]
 name = "jarl"
-version = "0.1.3"
+version = "0.1.4"
 authors = ["Alex Kesling <alex@kesling.co>"]
 license = "Apache-2.0"
 description = "Jarl (Just another Raft library)"
