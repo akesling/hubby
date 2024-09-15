@@ -1,6 +1,30 @@
 #![no_std]
 
 pub mod node {
+    /// # Raft state machine
+    ///
+    /// (Figure 4 from [Raft paper](https://raft.github.io/raft.pdf))
+    /// ```
+    /// Starting state = [Follower]
+    /// ===========================
+    ///
+    /// *******************          ┌───────────┐   **************
+    /// * Times out,      *          │           ┼──>* Times out, *
+    /// * starts election *─────────>│ Candidate │   * tries new  *
+    /// *                 *          │           │<──* election   *
+    /// *******************          └─┬───────┬─┘   **************
+    ///       ^                        v       │
+    ///  ┌────┴─────┐   *********************  │
+    ///  │ Follower │<──* Discovers current *  │
+    ///  └──────────┘   * leader or         *  │
+    ///       ^         * new term          *  │
+    ///       │         *********************  v
+    ///       │                               ******************
+    /// ********************    ┌────────┐    * Receives votes *
+    /// * Discovers server *<───┼ Leader │<───* from majority  *
+    /// * with higher term *    └────────┘    * of nodes       *
+    /// ********************                  ******************
+    /// ```
     pub struct Id(u32);
 
     struct Node<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE, SNAPSHOT> {
@@ -142,4 +166,44 @@ pub mod log {
 }
 
 #[cfg(test)]
-mod test {}
+mod cell_semantics_test {
+    /*********************************************************************************************/
+    /* Follower **********************************************************************************/
+    /*********************************************************************************************/
+
+    #[ignore]
+    #[test]
+    fn follower_becomes_candidate_upon_heartbeat_timeout() {}
+
+    #[ignore]
+    #[test]
+    fn follower_increments_term_upon_new_leader_message() {}
+
+    /*********************************************************************************************/
+    /* Candidate *********************************************************************************/
+    /*********************************************************************************************/
+
+    #[ignore]
+    #[test]
+    fn candidate_becomes_leader_when_receive_majority_vote() {}
+
+    #[ignore]
+    #[test]
+    fn candidate_starts_new_election_when_election_times_out_without_majority() {}
+
+    #[ignore]
+    #[test]
+    fn candidate_becomes_follower_upon_new_leader_message() {}
+
+    /*********************************************************************************************/
+    /* Leader ************************************************************************************/
+    /*********************************************************************************************/
+
+    #[ignore]
+    #[test]
+    fn fresh_leader_issues_empty_append_entries() {}
+
+    #[ignore]
+    #[test]
+    fn leader_becomes_follower_upon_new_leader_message_with_higher_term() {}
+}
