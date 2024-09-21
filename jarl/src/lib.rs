@@ -25,9 +25,18 @@
 //! ```
 
 pub mod node {
-    pub struct Id(u32);
+    #[derive(Debug)]
+    pub struct Id(pub u32);
 
-    struct Node<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE, SNAPSHOT> {
+    #[derive(Debug)]
+    pub enum NodeState {
+        Follower,
+        Candidate,
+        Leader,
+    }
+
+    #[derive(Debug)]
+    pub struct Node<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE: Default, SNAPSHOT> {
         id: Id,
 
         term: u32,
@@ -41,28 +50,78 @@ pub mod node {
         initialized: bool,
     }
 
-    impl<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE, SNAPSHOT>
+    impl<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE: Default, SNAPSHOT>
         Node<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>
     {
+        pub fn new(id: Id) -> Follower<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>
+        where
+            SNAPSHOT: Default,
+        {
+            Follower(Node {
+                id,
+                term: 0,
+                next_index: 0,
+                match_indexes: [0; CELL_SIZE],
+                log: crate::log::Log::<VALUE, MAX_LOG>::new(),
+                snapshot: Default::default(),
+                initialized: false,
+            })
+        }
         // * If commitIndex > lastApplied: increment lastApplied, apply log[lastApplied] to state
         //   machine (§5.3)
         // * If RPC request or response contains term T > currentTerm: set currentTerm = T, convert
         //   to follower (§5.1)
     }
 
-    pub struct Leader<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE, SNAPSHOT>(
+    #[derive(Debug)]
+    pub struct Follower<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE: Default, SNAPSHOT>(
         Node<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>,
     );
-    pub struct Candidate<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE, SNAPSHOT>(
+    #[derive(Debug)]
+    pub struct Candidate<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE: Default, SNAPSHOT>(
         Node<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>,
     );
-    pub struct Follower<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE, SNAPSHOT>(
+    #[derive(Debug)]
+    pub struct Leader<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE: Default, SNAPSHOT>(
         Node<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>,
     );
 
-    impl<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE, SNAPSHOT>
+    impl<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE: Default, SNAPSHOT>
+        Follower<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>
+    {
+        pub fn get_state(&self) -> NodeState {
+            NodeState::Follower
+        }
+
+        // * Respond to RPCs from candidates and leaders
+        // * If election timeout elapses without receiving AppendEntries RPC from current leader or
+        //   granting vote to candidate: convert to candidate
+    }
+
+    impl<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE: Default, SNAPSHOT>
+        Candidate<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>
+    {
+        pub fn get_state() -> NodeState {
+            NodeState::Candidate
+        }
+
+        // * On conversion to candidate, start election:
+        //   * Increment currentTerm
+        //   * Vote for self
+        //   * Reset election timer
+        //   * Send RequestVote RPCs to all other servers
+        // * If votes received from majority of servers: become leader
+        // * If AppendEntries RPC received from new leader: convert to follower
+        // * If election timeout elapses: start new election
+    }
+
+    impl<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE: Default, SNAPSHOT>
         Leader<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>
     {
+        pub fn get_state() -> NodeState {
+            NodeState::Leader
+        }
+
         // * Upon election: send initial empty AppendEntries RPCs (heartbeat) to each server; repeat
         //   during idle periods to prevent election timeouts (§5.2)
         // * If command received from client: append entry to local log, respond after entry
@@ -82,31 +141,10 @@ pub mod node {
             todo!("Implement `fill_append_entries`")
         }
     }
-
-    impl<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE, SNAPSHOT>
-        Follower<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>
-    {
-        // * Respond to RPCs from candidates and leaders
-        // * If election timeout elapses without receiving AppendEntries RPC from current leader or
-        //   granting vote to candidate: convert to candidate
-    }
-
-    impl<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE, SNAPSHOT>
-        Candidate<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>
-    {
-        // * On conversion to candidate, start election:
-        //   * Increment currentTerm
-        //   * Vote for self
-        //   * Reset election timer
-        //   * Send RequestVote RPCs to all other servers
-        // * If votes received from majority of servers: become leader
-        // * If AppendEntries RPC received from new leader: convert to follower
-        // * If election timeout elapses: start new election
-    }
 }
 
 pub mod msg {
-    pub struct AppendEntries<'e, VALUE> {
+    pub struct AppendEntries<'e, VALUE: Default> {
         pub leader: crate::node::Id,
         pub term: u32,
         pub high_watermark: u32,
@@ -133,15 +171,26 @@ pub mod msg {
 
 pub mod log {
     pub trait Snapshot {
-        fn update_from_log<VALUE, const MAX_LOG: usize>(&mut self, log: &Log<VALUE, MAX_LOG>);
+        fn update_from_log<VALUE: Default, const MAX_LOG: usize>(
+            &mut self,
+            log: &Log<VALUE, MAX_LOG>,
+        );
     }
 
-    pub struct Entry<VALUE> {
+    #[derive(Default, Debug)]
+    pub struct Entry<VALUE: Default> {
         pub term: u32,
         pub index: u32,
         pub value: VALUE,
     }
-    pub type Log<VALUE, const MAX_LOG: usize> = [crate::log::Entry<VALUE>; MAX_LOG];
+
+    #[derive(Debug)]
+    pub struct Log<VALUE: Default, const MAX_LOG: usize>([crate::log::Entry<VALUE>; MAX_LOG]);
+    impl<VALUE: Default, const MAX_LOG: usize> Log<VALUE, MAX_LOG> {
+        pub fn new() -> Self {
+            Log(core::array::from_fn(|_| Default::default()))
+        }
+    }
 
     pub enum AppendEntriesError {
         /// Log slice provided did not have capacity to append new entries.
@@ -150,12 +199,11 @@ pub mod log {
 
     /// Append entries to node's log
     ///
-    /// ```Invoked by leader to replicate log entries (§5.3); also used as heartbeat (§5.2).```
+    /// `Invoked by leader to replicate log entries (§5.3); also used as heartbeat (§5.2).`
     ///
     /// `entries` includes the entry immediately previous to the append state.  This differs from
     /// the Raft paper in that it includes the value of that entry along with the term and index.
-    ///
-    pub fn append_entries<'e, VALUE: Clone>(
+    pub fn append_entries<'e, VALUE: Clone + Default>(
         msg: &crate::msg::AppendEntries<'e, VALUE>,
         log: &mut [Entry<VALUE>],
     ) -> Result<crate::msg::AppendResponse, AppendEntriesError> {
@@ -167,21 +215,40 @@ pub mod log {
 
 #[cfg(test)]
 mod cell_semantics_test {
-    /*********************************************************************************************/
-    /* Follower **********************************************************************************/
-    /*********************************************************************************************/
+    use super::*;
+
+    /************************************************************************/
+    /* Follower *************************************************************/
+    /************************************************************************/
+
+    #[test]
+    fn node_starts_in_follower_state() {
+        let n = node::Node::<5, 10, usize, usize>::new(node::Id(0));
+        match n.get_state() {
+            node::NodeState::Follower => (),
+            wrong_type @ _ => panic!("Node was not of follower type: {wrong_type:#?}"),
+        }
+    }
 
     #[ignore]
     #[test]
-    fn follower_becomes_candidate_upon_heartbeat_timeout() {}
+    fn follower_becomes_candidate_upon_heartbeat_timeout() {
+        let follower = node::Node::<5, 10, usize, usize>::new(node::Id(0));
+        // TODO(alex): Tick to election timeout
+        // TODO(alex): Test state change follower->candidate
+    }
 
     #[ignore]
     #[test]
     fn follower_increments_term_upon_new_leader_message() {}
 
-    /*********************************************************************************************/
-    /* Candidate *********************************************************************************/
-    /*********************************************************************************************/
+    /************************************************************************/
+    /* Candidate ************************************************************/
+    /************************************************************************/
+
+    #[ignore]
+    #[test]
+    fn candidate_candidate_sends_vote_requests_upon_new_election() {}
 
     #[ignore]
     #[test]
@@ -195,9 +262,9 @@ mod cell_semantics_test {
     #[test]
     fn candidate_becomes_follower_upon_new_leader_message() {}
 
-    /*********************************************************************************************/
-    /* Leader ************************************************************************************/
-    /*********************************************************************************************/
+    /************************************************************************/
+    /* Leader ***************************************************************/
+    /************************************************************************/
 
     #[ignore]
     #[test]
