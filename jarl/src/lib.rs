@@ -28,6 +28,22 @@ pub mod node {
     #[derive(Debug)]
     pub struct Id(pub u32);
 
+    /// NodeTime is a non-negative, unitless, monotonic time
+    ///
+    /// Practically, this will generally store a UNIX-epoch based timestamp, but it is left to the
+    /// library consumer to make that decision for themselves.
+    #[derive(Debug)]
+    pub struct NodeTime(pub u64);
+
+    #[derive(Debug)]
+    pub struct NodeTimeDuration(NodeTime);
+
+    impl NodeTimeDuration {
+        pub fn new(duration: u64) -> Self {
+            NodeTimeDuration(NodeTime(duration))
+        }
+    }
+
     #[derive(Debug)]
     pub enum NodeState {
         Follower,
@@ -35,11 +51,31 @@ pub mod node {
         Leader,
     }
 
+    pub struct CellConfig<const CELL_SIZE: usize> {
+        pub election_interval: (NodeTimeDuration, NodeTimeDuration),
+    }
+
     #[derive(Debug)]
     pub struct Node<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE: Default, SNAPSHOT> {
+        /// A cell-unique identifier for this node
         id: Id,
 
+        /// The current election term
         term: u32,
+
+        /// The maximum time seen
+        high_watermark: NodeTime,
+
+        // TODO(alex): Figure out how to keep around a source of randomness that _could_ be a
+        // deterministic random number generator for testing purposes.  This will be used for
+        // determining heartbeat and election expirations.  Raft paper recommends 150–300ms as the
+        // window for "normal" leader election periods.
+        /// The time at which a follower will become a candidate if it doesn't get
+        /// a new heartbeat / reset this before then.
+        heartbeat_expiration: NodeTime,
+
+        /// The time at which the current election expires
+        election_expiration: NodeTime,
 
         next_index: u32,
         match_indexes: [u32; CELL_SIZE],
@@ -60,6 +96,9 @@ pub mod node {
             Follower(Node {
                 id,
                 term: 0,
+                high_watermark: NodeTime(0),
+                heartbeat_expiration: NodeTime(0),
+                election_expiration: NodeTime(0),
                 next_index: 0,
                 match_indexes: [0; CELL_SIZE],
                 log: crate::log::Log::<VALUE, MAX_LOG>::new(),
@@ -67,6 +106,7 @@ pub mod node {
                 initialized: false,
             })
         }
+
         // * If commitIndex > lastApplied: increment lastApplied, apply log[lastApplied] to state
         //   machine (§5.3)
         // * If RPC request or response contains term T > currentTerm: set currentTerm = T, convert
@@ -91,6 +131,14 @@ pub mod node {
     {
         pub fn get_state(&self) -> NodeState {
             NodeState::Follower
+        }
+
+        pub fn init(&mut self, start_time: NodeTime, cell_config: &CellConfig<CELL_SIZE>) {
+            let n = &mut self.0;
+
+            n.high_watermark = start_time;
+
+            n.initialized = true;
         }
 
         // * Respond to RPCs from candidates and leaders
@@ -223,7 +271,17 @@ mod cell_semantics_test {
 
     #[test]
     fn node_starts_in_follower_state() {
-        let n = node::Node::<5, 10, usize, usize>::new(node::Id(0));
+        let mut n = node::Node::<5, 10, usize, usize>::new(node::Id(0));
+        let start_time = node::NodeTime(1);
+        n.init(
+            start_time,
+            &node::CellConfig {
+                election_interval: (
+                    node::NodeTimeDuration::new(150),
+                    node::NodeTimeDuration::new(300),
+                ),
+            },
+        );
         match n.get_state() {
             node::NodeState::Follower => (),
             wrong_type @ _ => panic!("Node was not of follower type: {wrong_type:#?}"),
@@ -233,7 +291,18 @@ mod cell_semantics_test {
     #[ignore]
     #[test]
     fn follower_becomes_candidate_upon_heartbeat_timeout() {
-        let follower = node::Node::<5, 10, usize, usize>::new(node::Id(0));
+        let mut follower = node::Node::<5, 10, usize, usize>::new(node::Id(0));
+        let start_time = node::NodeTime(1);
+        follower.init(
+            start_time,
+            &node::CellConfig {
+                election_interval: (
+                    node::NodeTimeDuration::new(150),
+                    node::NodeTimeDuration::new(300),
+                ),
+            },
+        );
+
         // TODO(alex): Tick to election timeout
         // TODO(alex): Test state change follower->candidate
     }
