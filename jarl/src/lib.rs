@@ -32,16 +32,37 @@ pub mod node {
     ///
     /// Practically, this will generally store a UNIX-epoch based timestamp, but it is left to the
     /// library consumer to make that decision for themselves.
-    #[derive(Debug)]
+    #[derive(Debug, Clone, Copy)]
     pub struct NodeTime(pub u64);
 
-    #[derive(Debug)]
+    impl core::ops::Add<NodeTimeDuration> for NodeTime {
+        type Output = Self;
+
+        fn add(self, other: NodeTimeDuration) -> Self {
+            Self(self.0 + other.0 .0)
+        }
+    }
+
+    #[derive(Debug, Clone, Copy)]
     pub struct NodeTimeDuration(NodeTime);
+
+    impl core::ops::Add for NodeTimeDuration {
+        type Output = Self;
+
+        fn add(self, other: Self) -> Self {
+            Self(NodeTime(self.0 .0 + other.0 .0))
+        }
+    }
 
     impl NodeTimeDuration {
         pub fn new(duration: u64) -> Self {
             NodeTimeDuration(NodeTime(duration))
         }
+    }
+
+    #[derive(Debug)]
+    pub enum Error {
+        ElectionStartTimeInFuture,
     }
 
     #[derive(Debug)]
@@ -53,6 +74,7 @@ pub mod node {
 
     pub struct CellConfig<const CELL_SIZE: usize> {
         pub election_interval: (NodeTimeDuration, NodeTimeDuration),
+        pub heartbeat_ttl: NodeTimeDuration,
     }
 
     #[derive(Debug)]
@@ -89,6 +111,7 @@ pub mod node {
     impl<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE: Default, SNAPSHOT>
         Node<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>
     {
+        #[inline]
         pub fn new(id: Id) -> Follower<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>
         where
             SNAPSHOT: Default,
@@ -107,6 +130,11 @@ pub mod node {
             })
         }
 
+        #[inline]
+        pub fn progress_time(&mut self, new_time: NodeTime) {
+            self.high_watermark.0 = core::cmp::max(self.high_watermark.0, new_time.0);
+        }
+
         // * If commitIndex > lastApplied: increment lastApplied, apply log[lastApplied] to state
         //   machine (§5.3)
         // * If RPC request or response contains term T > currentTerm: set currentTerm = T, convert
@@ -115,14 +143,6 @@ pub mod node {
 
     #[derive(Debug)]
     pub struct Follower<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE: Default, SNAPSHOT>(
-        Node<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>,
-    );
-    #[derive(Debug)]
-    pub struct Candidate<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE: Default, SNAPSHOT>(
-        Node<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>,
-    );
-    #[derive(Debug)]
-    pub struct Leader<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE: Default, SNAPSHOT>(
         Node<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>,
     );
 
@@ -137,14 +157,43 @@ pub mod node {
             let n = &mut self.0;
 
             n.high_watermark = start_time;
+            n.heartbeat_expiration = start_time + cell_config.heartbeat_ttl;
 
             n.initialized = true;
+        }
+
+        // TODO(alex): Figure out a less dumb return type here / way to manage type transision to
+        // Candidate.
+        pub fn progress_time(&mut self, new_time: NodeTime) -> bool {
+            let n = &mut self.0;
+            n.progress_time(new_time);
+
+            let start_election = n.heartbeat_expiration.0 <= n.high_watermark.0;
+            start_election
+        }
+
+        pub fn start_election(
+            self,
+        ) -> Result<Candidate<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>, Error> {
+            let n = self.0;
+            if n.high_watermark.0 < n.heartbeat_expiration.0 {
+                return Err(Error::ElectionStartTimeInFuture);
+            }
+
+            // TODO(alex): Increment term and perform necessary election preparation.
+
+            Ok(Candidate(n))
         }
 
         // * Respond to RPCs from candidates and leaders
         // * If election timeout elapses without receiving AppendEntries RPC from current leader or
         //   granting vote to candidate: convert to candidate
     }
+
+    #[derive(Debug)]
+    pub struct Candidate<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE: Default, SNAPSHOT>(
+        Node<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>,
+    );
 
     impl<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE: Default, SNAPSHOT>
         Candidate<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>
@@ -162,6 +211,11 @@ pub mod node {
         // * If AppendEntries RPC received from new leader: convert to follower
         // * If election timeout elapses: start new election
     }
+
+    #[derive(Debug)]
+    pub struct Leader<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE: Default, SNAPSHOT>(
+        Node<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>,
+    );
 
     impl<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE: Default, SNAPSHOT>
         Leader<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>
@@ -280,6 +334,7 @@ mod cell_semantics_test {
                     node::NodeTimeDuration::new(150),
                     node::NodeTimeDuration::new(300),
                 ),
+                heartbeat_ttl: node::NodeTimeDuration::new(300),
             },
         );
         match n.get_state() {
@@ -288,7 +343,6 @@ mod cell_semantics_test {
         }
     }
 
-    #[ignore]
     #[test]
     fn follower_becomes_candidate_upon_heartbeat_timeout() {
         let mut follower = node::Node::<5, 10, usize, usize>::new(node::Id(0));
@@ -300,11 +354,18 @@ mod cell_semantics_test {
                     node::NodeTimeDuration::new(150),
                     node::NodeTimeDuration::new(300),
                 ),
+                heartbeat_ttl: node::NodeTimeDuration::new(300),
             },
         );
 
-        // TODO(alex): Tick to election timeout
-        // TODO(alex): Test state change follower->candidate
+        let start_election = follower.progress_time(node::NodeTime(302));
+        assert!(
+            start_election,
+            "Progressing time did not trigger election start"
+        );
+        let _candidate = follower.start_election().expect(
+            "Election failed to start despite progress_time signalling it was ready to start one",
+        );
     }
 
     #[ignore]
