@@ -25,7 +25,7 @@
 //! ```
 
 pub mod node {
-    #[derive(Debug)]
+    #[derive(Debug, PartialEq, Clone, Copy)]
     pub struct Id(pub u32);
 
     /// NodeTime is a non-negative, unitless, monotonic time
@@ -99,8 +99,8 @@ pub mod node {
         /// The time at which the current election expires
         election_expiration: NodeTime,
 
-        next_index: u32,
-        match_indexes: [u32; CELL_SIZE],
+        next_index_to_replicate_per_node: [u32; CELL_SIZE],
+        max_replicated_index_per_node: [u32; CELL_SIZE],
 
         log: crate::log::Log<VALUE, MAX_LOG>,
         snapshot: SNAPSHOT,
@@ -122,8 +122,8 @@ pub mod node {
                 high_watermark: NodeTime(0),
                 heartbeat_expiration: NodeTime(0),
                 election_expiration: NodeTime(0),
-                next_index: 0,
-                match_indexes: [0; CELL_SIZE],
+                next_index_to_replicate_per_node: [0; CELL_SIZE],
+                max_replicated_index_per_node: [0; CELL_SIZE],
                 log: crate::log::Log::<VALUE, MAX_LOG>::new(),
                 snapshot: Default::default(),
                 initialized: false,
@@ -146,7 +146,7 @@ pub mod node {
         Node<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>,
     );
 
-    impl<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE: Default, SNAPSHOT>
+    impl<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE: Clone + Default, SNAPSHOT>
         Follower<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>
     {
         pub fn get_state(&self) -> NodeState {
@@ -162,7 +162,12 @@ pub mod node {
             n.initialized = true;
         }
 
-        // TODO(alex): Figure out a less dumb return type here / way to manage type transision to
+        #[inline]
+        pub fn term(&self) -> u32 {
+            self.0.term
+        }
+
+        // TODO(alex): Figure out a less dumb return type here / way to manage type transition to
         // Candidate.
         pub fn progress_time(&mut self, new_time: NodeTime) -> bool {
             let n = &mut self.0;
@@ -185,7 +190,40 @@ pub mod node {
             Ok(Candidate(n))
         }
 
-        // * Respond to RPCs from candidates and leaders
+        pub fn receive_append_entries(
+            &mut self,
+            msg: &crate::msg::AppendEntries<VALUE>,
+        ) -> crate::msg::AppendResponse {
+            let last_entry = self.0.log.last_entry();
+            // Reject messages from old leaders
+            if msg.term < self.term()
+                || last_entry
+                    .map(|le| {
+                        // Do terms and indexes match?
+                        msg.previous_log_item_term != le.term
+                            || msg.previous_log_item_index != le.index
+                    })
+                    .unwrap_or_else(|| {
+                        // Should there _be_ a previous message?
+                        msg.previous_log_item_term != 0 || msg.previous_log_item_index != 0
+                    })
+            {
+                return crate::msg::AppendResponse {
+                    term: self.term(),
+                    success: false,
+                };
+            }
+
+            if msg.term > self.term() {
+                self.0.term = msg.term
+            }
+
+            crate::log::append_entries(msg, &mut self.0.log).expect(concat!(
+                "A failure occurred when attempting to append entries in ",
+                "Follower::receive_append_entries"
+            ))
+        }
+
         // * If election timeout elapses without receiving AppendEntries RPC from current leader or
         //   granting vote to candidate: convert to candidate
     }
@@ -246,18 +284,26 @@ pub mod node {
 }
 
 pub mod msg {
+    #[derive(Debug)]
     pub struct AppendEntries<'e, VALUE: Default> {
         pub leader: crate::node::Id,
+
         pub term: u32,
-        pub high_watermark: u32,
+        pub commit_index: u32,
+
+        pub previous_log_item_index: u32,
+        pub previous_log_item_term: u32,
+
         pub entries: &'e [crate::log::Entry<VALUE>],
     }
 
+    #[derive(Debug, PartialEq)]
     pub struct AppendResponse {
         pub term: u32,
         pub success: bool,
     }
 
+    #[derive(Debug, PartialEq)]
     pub struct RequestVote {
         pub term: u32,
         pub candidate: crate::node::Id,
@@ -265,6 +311,7 @@ pub mod msg {
         pub last_term: u32,
     }
 
+    #[derive(Debug, PartialEq)]
     pub struct VoteResponse {
         pub term: u32,
         pub granted: bool,
@@ -292,8 +339,13 @@ pub mod log {
         pub fn new() -> Self {
             Log(core::array::from_fn(|_| Default::default()))
         }
+
+        pub fn last_entry(&self) -> Option<&Entry<VALUE>> {
+            self.0.get(self.0.len() - 1)
+        }
     }
 
+    #[derive(Debug)]
     pub enum AppendEntriesError {
         /// Log slice provided did not have capacity to append new entries.
         LogUnderCapacity,
@@ -305,13 +357,13 @@ pub mod log {
     ///
     /// `entries` includes the entry immediately previous to the append state.  This differs from
     /// the Raft paper in that it includes the value of that entry along with the term and index.
-    pub fn append_entries<'e, VALUE: Clone + Default>(
+    pub fn append_entries<'e, VALUE: Clone + Default, const MAX_LOG: usize>(
         msg: &crate::msg::AppendEntries<'e, VALUE>,
-        log: &mut [Entry<VALUE>],
+        log: &mut Log<VALUE, MAX_LOG>,
     ) -> Result<crate::msg::AppendResponse, AppendEntriesError> {
         let _ = msg;
         let _ = log;
-        todo!("Implement append entries!")
+        todo!("Implement append_entries!")
     }
 }
 
@@ -322,85 +374,170 @@ mod cell_semantics_test {
     /************************************************************************/
     /* Follower *************************************************************/
     /************************************************************************/
+    mod follower {
+        use super::*;
 
-    #[test]
-    fn node_starts_in_follower_state() {
-        let mut n = node::Node::<5, 10, usize, usize>::new(node::Id(0));
-        let start_time = node::NodeTime(1);
-        n.init(
-            start_time,
-            &node::CellConfig {
-                election_interval: (
-                    node::NodeTimeDuration::new(150),
-                    node::NodeTimeDuration::new(300),
-                ),
-                heartbeat_ttl: node::NodeTimeDuration::new(300),
-            },
-        );
-        match n.get_state() {
-            node::NodeState::Follower => (),
-            wrong_type @ _ => panic!("Node was not of follower type: {wrong_type:#?}"),
+        #[test]
+        fn node_starts_in_follower_state() {
+            let mut n = node::Node::<5, 10, usize, usize>::new(node::Id(0));
+            let start_time = node::NodeTime(1);
+            n.init(
+                start_time,
+                &node::CellConfig {
+                    election_interval: (
+                        node::NodeTimeDuration::new(150),
+                        node::NodeTimeDuration::new(300),
+                    ),
+                    heartbeat_ttl: node::NodeTimeDuration::new(300),
+                },
+            );
+            match n.get_state() {
+                node::NodeState::Follower => (), // Success!
+                wrong_type @ _ => panic!("Node was not of follower type: {wrong_type:#?}"),
+            }
         }
+
+        #[test]
+        fn follower_becomes_candidate_upon_heartbeat_timeout() {
+            let mut follower = node::Node::<5, 10, usize, usize>::new(node::Id(0));
+            let start_time = node::NodeTime(1);
+            follower.init(
+                start_time,
+                &node::CellConfig {
+                    election_interval: (
+                        node::NodeTimeDuration::new(150),
+                        node::NodeTimeDuration::new(300),
+                    ),
+                    heartbeat_ttl: node::NodeTimeDuration::new(300),
+                },
+            );
+
+            let start_election = follower.progress_time(node::NodeTime(302));
+            assert!(
+                start_election,
+                "Progressing time did not trigger election start"
+            );
+            let _candidate = follower.start_election().expect(
+                "Election failed to start despite progress_time signalling it was ready to start one",
+            );
+        }
+
+        #[test]
+        fn follower_increments_term_upon_new_leader_message() {
+            let follower_id = node::Id(0);
+            let leader_id = node::Id(1);
+
+            let mut follower = node::Node::<5, 10, usize, usize>::new(follower_id);
+            let start_time = node::NodeTime(1);
+            follower.init(
+                start_time,
+                &node::CellConfig {
+                    election_interval: (
+                        node::NodeTimeDuration::new(150),
+                        node::NodeTimeDuration::new(300),
+                    ),
+                    heartbeat_ttl: node::NodeTimeDuration::new(300),
+                },
+            );
+
+            assert_eq!(follower.term(), 0);
+
+            let log = &[];
+            let response = follower.receive_append_entries(&msg::AppendEntries {
+                leader: leader_id,
+                term: 1,
+                commit_index: 0,
+
+                previous_log_item_term: 0,
+                previous_log_item_index: 0,
+
+                entries: log,
+            });
+            assert_eq!(
+                response,
+                msg::AppendResponse {
+                    term: 1,
+                    success: true,
+                }
+            );
+            assert_eq!(follower.term(), 1);
+
+            let response = follower.receive_append_entries(&msg::AppendEntries {
+                leader: leader_id,
+                term: 2,
+                commit_index: 0,
+
+                previous_log_item_term: 1,
+                previous_log_item_index: 0,
+
+                entries: log,
+            });
+            assert_eq!(
+                response,
+                msg::AppendResponse {
+                    term: 2,
+                    success: true,
+                }
+            );
+            assert_eq!(follower.term(), 2);
+        }
+
+        #[ignore]
+        #[test]
+        fn follower_appends_to_log_for_current_term() {}
+
+        #[ignore]
+        #[test]
+        fn follower_election_window_resets_upon_append_receipt() {}
+
+        #[ignore]
+        #[test]
+        fn follower_rejects_append_from_old_leader() {}
+
+        #[ignore]
+        #[test]
+        fn follower_rejects_vote_request_from_old_candidate() {}
+
+        #[ignore]
+        #[test]
+        fn follower_accepts_one_candidate_per_voting_term() {}
     }
-
-    #[test]
-    fn follower_becomes_candidate_upon_heartbeat_timeout() {
-        let mut follower = node::Node::<5, 10, usize, usize>::new(node::Id(0));
-        let start_time = node::NodeTime(1);
-        follower.init(
-            start_time,
-            &node::CellConfig {
-                election_interval: (
-                    node::NodeTimeDuration::new(150),
-                    node::NodeTimeDuration::new(300),
-                ),
-                heartbeat_ttl: node::NodeTimeDuration::new(300),
-            },
-        );
-
-        let start_election = follower.progress_time(node::NodeTime(302));
-        assert!(
-            start_election,
-            "Progressing time did not trigger election start"
-        );
-        let _candidate = follower.start_election().expect(
-            "Election failed to start despite progress_time signalling it was ready to start one",
-        );
-    }
-
-    #[ignore]
-    #[test]
-    fn follower_increments_term_upon_new_leader_message() {}
 
     /************************************************************************/
     /* Candidate ************************************************************/
     /************************************************************************/
+    mod candidate {
+        use super::*;
 
-    #[ignore]
-    #[test]
-    fn candidate_candidate_sends_vote_requests_upon_new_election() {}
+        #[ignore]
+        #[test]
+        fn candidate_candidate_sends_vote_requests_upon_new_election() {}
 
-    #[ignore]
-    #[test]
-    fn candidate_becomes_leader_when_receive_majority_vote() {}
+        #[ignore]
+        #[test]
+        fn candidate_becomes_leader_when_receive_majority_vote() {}
 
-    #[ignore]
-    #[test]
-    fn candidate_starts_new_election_when_election_times_out_without_majority() {}
+        #[ignore]
+        #[test]
+        fn candidate_starts_new_election_when_election_times_out_without_majority() {}
 
-    #[ignore]
-    #[test]
-    fn candidate_becomes_follower_upon_new_leader_message() {}
+        #[ignore]
+        #[test]
+        fn candidate_becomes_follower_upon_new_leader_message() {}
+    }
 
     /************************************************************************/
     /* Leader ***************************************************************/
     /************************************************************************/
+    mod leader {
+        use super::*;
 
-    #[ignore]
-    #[test]
-    fn fresh_leader_issues_empty_append_entries() {}
+        #[ignore]
+        #[test]
+        fn fresh_leader_issues_empty_append_entries() {}
 
-    #[ignore]
-    #[test]
-    fn leader_becomes_follower_upon_new_leader_message_with_higher_term() {}
+        #[ignore]
+        #[test]
+        fn leader_becomes_follower_upon_new_leader_message_with_higher_term() {}
+    }
 }
