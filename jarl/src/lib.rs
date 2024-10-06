@@ -27,6 +27,7 @@
 pub mod node {
     #[derive(Debug, PartialEq, Clone, Copy)]
     pub struct Id(pub u32);
+    pub type Term = u32;
 
     /// NodeTime is a non-negative, unitless, monotonic time
     ///
@@ -83,7 +84,9 @@ pub mod node {
         id: Id,
 
         /// The current election term
-        term: u32,
+        term: Term,
+
+        leader_commit_index: crate::log::Index,
 
         /// The maximum time seen
         high_watermark: NodeTime,
@@ -99,8 +102,8 @@ pub mod node {
         /// The time at which the current election expires
         election_expiration: NodeTime,
 
-        next_index_to_replicate_per_node: [u32; CELL_SIZE],
-        max_replicated_index_per_node: [u32; CELL_SIZE],
+        next_index_to_replicate_per_node: [crate::log::Index; CELL_SIZE],
+        max_replicated_index_per_node: [crate::log::Index; CELL_SIZE],
 
         log: crate::log::Log<VALUE, MAX_LOG>,
         snapshot: SNAPSHOT,
@@ -119,6 +122,7 @@ pub mod node {
             Follower(Node {
                 id,
                 term: 0,
+                leader_commit_index: 0,
                 high_watermark: NodeTime(0),
                 heartbeat_expiration: NodeTime(0),
                 election_expiration: NodeTime(0),
@@ -163,7 +167,7 @@ pub mod node {
         }
 
         #[inline]
-        pub fn term(&self) -> u32 {
+        pub fn term(&self) -> Term {
             self.0.term
         }
 
@@ -214,14 +218,24 @@ pub mod node {
                 };
             }
 
-            if msg.term > self.term() {
+            let result = crate::log::append_entries(msg, &mut self.0.log).expect(concat!(
+                "A failure occurred when attempting to append entries in ",
+                "Follower::receive_append_entries"
+            ));
+
+            if !result.success {
+                return result;
+            }
+
+            if msg.term > self.0.term {
                 self.0.term = msg.term
             }
 
-            crate::log::append_entries(msg, &mut self.0.log).expect(concat!(
-                "A failure occurred when attempting to append entries in ",
-                "Follower::receive_append_entries"
-            ))
+            if msg.commit_index > self.0.leader_commit_index {
+                self.0.leader_commit_index = msg.commit_index
+            }
+
+            return result;
         }
 
         // * If election timeout elapses without receiving AppendEntries RPC from current leader or
@@ -288,37 +302,39 @@ pub mod msg {
     pub struct AppendEntries<'e, VALUE: Default> {
         pub leader: crate::node::Id,
 
-        pub term: u32,
-        pub commit_index: u32,
+        pub term: crate::node::Term,
+        pub commit_index: crate::log::Index,
 
-        pub previous_log_item_index: u32,
-        pub previous_log_item_term: u32,
+        pub previous_log_item_index: crate::log::Index,
+        pub previous_log_item_term: crate::node::Term,
 
         pub entries: &'e [crate::log::Entry<VALUE>],
     }
 
     #[derive(Debug, PartialEq)]
     pub struct AppendResponse {
-        pub term: u32,
+        pub term: crate::node::Term,
         pub success: bool,
     }
 
     #[derive(Debug, PartialEq)]
     pub struct RequestVote {
-        pub term: u32,
+        pub term: crate::node::Term,
         pub candidate: crate::node::Id,
-        pub last_index: u32,
-        pub last_term: u32,
+        pub last_index: crate::log::Index,
+        pub last_term: crate::node::Term,
     }
 
     #[derive(Debug, PartialEq)]
     pub struct VoteResponse {
-        pub term: u32,
+        pub term: crate::node::Term,
         pub granted: bool,
     }
 }
 
 pub mod log {
+    pub type Index = u32;
+
     pub trait Snapshot {
         fn update_from_log<VALUE: Default, const MAX_LOG: usize>(
             &mut self,
@@ -328,8 +344,8 @@ pub mod log {
 
     #[derive(Default, Debug)]
     pub struct Entry<VALUE: Default> {
-        pub term: u32,
-        pub index: u32,
+        pub term: crate::node::Term,
+        pub index: crate::log::Index,
         pub value: VALUE,
     }
 
@@ -343,6 +359,16 @@ pub mod log {
         pub fn last_entry(&self) -> Option<&Entry<VALUE>> {
             self.0.get(self.0.len() - 1)
         }
+
+        #[inline]
+        pub fn len(&self) -> usize {
+            self.0.len()
+        }
+
+        #[inline]
+        pub fn is_empty(&self) -> bool {
+            self.0.is_empty()
+        }
     }
 
     #[derive(Debug)]
@@ -351,12 +377,12 @@ pub mod log {
         LogUnderCapacity,
     }
 
-    /// Append entries to node's log
+    /// Append entries to provided log
     ///
     /// `Invoked by leader to replicate log entries (§5.3); also used as heartbeat (§5.2).`
     ///
-    /// `entries` includes the entry immediately previous to the append state.  This differs from
-    /// the Raft paper in that it includes the value of that entry along with the term and index.
+    /// `If an existing entry conflicts with a new one (same index but different terms), delete
+    /// the existing entry and all that follow it (§5.3)`
     pub fn append_entries<'e, VALUE: Clone + Default, const MAX_LOG: usize>(
         msg: &crate::msg::AppendEntries<'e, VALUE>,
         log: &mut Log<VALUE, MAX_LOG>,
@@ -364,6 +390,59 @@ pub mod log {
         let _ = msg;
         let _ = log;
         todo!("Implement append_entries!")
+    }
+
+    #[cfg(test)]
+    mod test {
+        use super::*;
+
+        #[test]
+        fn append_entries_works() {
+            let mut log = Log::<u32, 10 /* log length */>::new();
+            assert!(log.is_empty());
+
+            let empty_update_result = append_entries(
+                &crate::msg::AppendEntries {
+                    leader: crate::node::Id(0),
+                    term: 1,
+                    commit_index: 0,
+
+                    previous_log_item_term: 0,
+                    previous_log_item_index: 0,
+
+                    entries: &[],
+                },
+                &mut log,
+            );
+            assert!(log.is_empty());
+
+            let single_update = append_entries(
+                &crate::msg::AppendEntries {
+                    leader: crate::node::Id(0),
+                    term: 1,
+                    commit_index: 0,
+
+                    previous_log_item_term: 0,
+                    previous_log_item_index: 0,
+
+                    entries: &[Entry {
+                        term: 1,
+                        index: 1,
+                        value: 42,
+                    }],
+                },
+                &mut log,
+            );
+            assert_eq!(log.len(), 1);
+        }
+
+        #[ignore]
+        #[test]
+        fn append_overwrites_inconsistent_term_items() {}
+
+        #[ignore]
+        #[test]
+        fn append_fails_if_index_is_inconsistent() {}
     }
 }
 
