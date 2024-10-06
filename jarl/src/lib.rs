@@ -223,10 +223,6 @@ pub mod node {
                 "Follower::receive_append_entries"
             ));
 
-            if !result.success {
-                return result;
-            }
-
             if msg.term > self.0.term {
                 self.0.term = msg.term
             }
@@ -235,7 +231,10 @@ pub mod node {
                 self.0.leader_commit_index = msg.commit_index
             }
 
-            return result;
+            return crate::msg::AppendResponse {
+                term: msg.term,
+                success: true,
+            };
         }
 
         // * If election timeout elapses without receiving AppendEntries RPC from current leader or
@@ -349,6 +348,13 @@ pub mod log {
         pub value: VALUE,
     }
 
+    impl<T: PartialEq + Default> PartialEq for Entry<T> {
+        // Required method
+        fn eq(&self, other: &Self) -> bool {
+            self.term == other.term && self.index == other.index && self.value == other.value
+        }
+    }
+
     #[derive(Debug)]
     pub struct Log<VALUE: Default, const MAX_LOG: usize>([crate::log::Entry<VALUE>; MAX_LOG]);
     impl<VALUE: Default, const MAX_LOG: usize> Log<VALUE, MAX_LOG> {
@@ -383,10 +389,10 @@ pub mod log {
     ///
     /// `If an existing entry conflicts with a new one (same index but different terms), delete
     /// the existing entry and all that follow it (§5.3)`
-    pub fn append_entries<'e, VALUE: Clone + Default, const MAX_LOG: usize>(
+    pub fn append_entries<'e, 'log, VALUE: Clone + Default, const MAX_LOG: usize>(
         msg: &crate::msg::AppendEntries<'e, VALUE>,
-        log: &mut Log<VALUE, MAX_LOG>,
-    ) -> Result<crate::msg::AppendResponse, AppendEntriesError> {
+        log: &'log mut Log<VALUE, MAX_LOG>,
+    ) -> Result<(), AppendEntriesError> {
         let _ = msg;
         let _ = log;
         todo!("Implement append_entries!")
@@ -401,7 +407,7 @@ pub mod log {
             let mut log = Log::<u32, 10 /* log length */>::new();
             assert!(log.is_empty());
 
-            let empty_update_result = append_entries(
+            append_entries(
                 &crate::msg::AppendEntries {
                     leader: crate::node::Id(0),
                     term: 1,
@@ -413,10 +419,16 @@ pub mod log {
                     entries: &[],
                 },
                 &mut log,
-            );
+            )
+            .expect("Updating an empty log with empty append failed.");
             assert!(log.is_empty());
 
-            let single_update = append_entries(
+            let single_update_log = &[Entry {
+                term: 1,
+                index: 1,
+                value: 42,
+            }];
+            append_entries(
                 &crate::msg::AppendEntries {
                     leader: crate::node::Id(0),
                     term: 1,
@@ -425,14 +437,11 @@ pub mod log {
                     previous_log_item_term: 0,
                     previous_log_item_index: 0,
 
-                    entries: &[Entry {
-                        term: 1,
-                        index: 1,
-                        value: 42,
-                    }],
+                    entries: single_update_log,
                 },
                 &mut log,
-            );
+            )
+            .expect("Updating an empty log with a single entry append failed.");
             assert_eq!(log.len(), 1);
         }
 
