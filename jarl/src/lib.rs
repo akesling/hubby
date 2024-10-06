@@ -218,7 +218,7 @@ pub mod node {
                 };
             }
 
-            let result = crate::log::append_entries(msg, &mut self.0.log).expect(concat!(
+            self.0.log.append_entries(&msg.entries).expect(concat!(
                 "A failure occurred when attempting to append entries in ",
                 "Follower::receive_append_entries"
             ));
@@ -355,25 +355,61 @@ pub mod log {
         }
     }
 
+    impl<T: Clone + Default> Clone for Entry<T> {
+        // Required method
+        fn clone(&self) -> Entry<T> {
+            Entry {
+                term: self.term,
+                index: self.index,
+                value: self.value.clone(),
+            }
+        }
+    }
+
     #[derive(Debug)]
-    pub struct Log<VALUE: Default, const MAX_LOG: usize>([crate::log::Entry<VALUE>; MAX_LOG]);
+    pub struct Log<VALUE: Default, const MAX_LOG: usize> {
+        slots: [crate::log::Entry<VALUE>; MAX_LOG],
+        used: usize,
+    }
+
     impl<VALUE: Default, const MAX_LOG: usize> Log<VALUE, MAX_LOG> {
         pub fn new() -> Self {
-            Log(core::array::from_fn(|_| Default::default()))
+            Log {
+                slots: core::array::from_fn(|_| Default::default()),
+                used: 0,
+            }
         }
 
         pub fn last_entry(&self) -> Option<&Entry<VALUE>> {
-            self.0.get(self.0.len() - 1)
+            if self.used > 0 {
+                self.slots.get(self.len() - 1)
+            } else {
+                None
+            }
         }
 
         #[inline]
         pub fn len(&self) -> usize {
-            self.0.len()
+            self.used
         }
 
         #[inline]
         pub fn is_empty(&self) -> bool {
-            self.0.is_empty()
+            self.used == 0
+        }
+
+        /// Append entries to log
+        ///
+        /// `Invoked by leader to replicate log entries (§5.3); also used as heartbeat (§5.2).`
+        ///
+        /// `If an existing entry conflicts with a new one (same index but different terms), delete
+        /// the existing entry and all that follow it (§5.3)`
+        pub fn append_entries(
+            &mut self,
+            appended: &[Entry<VALUE>],
+        ) -> Result<(), AppendEntriesError> {
+            let _ = appended;
+            todo!("Implement append_entries!")
         }
     }
 
@@ -383,21 +419,6 @@ pub mod log {
         LogUnderCapacity,
     }
 
-    /// Append entries to provided log
-    ///
-    /// `Invoked by leader to replicate log entries (§5.3); also used as heartbeat (§5.2).`
-    ///
-    /// `If an existing entry conflicts with a new one (same index but different terms), delete
-    /// the existing entry and all that follow it (§5.3)`
-    pub fn append_entries<'e, 'log, VALUE: Clone + Default, const MAX_LOG: usize>(
-        msg: &crate::msg::AppendEntries<'e, VALUE>,
-        log: &'log mut Log<VALUE, MAX_LOG>,
-    ) -> Result<(), AppendEntriesError> {
-        let _ = msg;
-        let _ = log;
-        todo!("Implement append_entries!")
-    }
-
     #[cfg(test)]
     mod test {
         use super::*;
@@ -405,22 +426,10 @@ pub mod log {
         #[test]
         fn append_entries_works() {
             let mut log = Log::<u32, 10 /* log length */>::new();
-            assert!(log.is_empty());
+            assert_eq!(log.len(), 0);
 
-            append_entries(
-                &crate::msg::AppendEntries {
-                    leader: crate::node::Id(0),
-                    term: 1,
-                    commit_index: 0,
-
-                    previous_log_item_term: 0,
-                    previous_log_item_index: 0,
-
-                    entries: &[],
-                },
-                &mut log,
-            )
-            .expect("Updating an empty log with empty append failed.");
+            log.append_entries(&[])
+                .expect("Updating an empty log with empty append failed.");
             assert!(log.is_empty());
 
             let single_update_log = &[Entry {
@@ -428,21 +437,28 @@ pub mod log {
                 index: 1,
                 value: 42,
             }];
-            append_entries(
-                &crate::msg::AppendEntries {
-                    leader: crate::node::Id(0),
-                    term: 1,
-                    commit_index: 0,
-
-                    previous_log_item_term: 0,
-                    previous_log_item_index: 0,
-
-                    entries: single_update_log,
-                },
-                &mut log,
-            )
-            .expect("Updating an empty log with a single entry append failed.");
+            log.append_entries(single_update_log)
+                .expect("Updating an empty log with a single entry append failed.");
             assert_eq!(log.len(), 1);
+
+            let last_entry = log.last_entry().unwrap();
+            assert_eq!(last_entry, &single_update_log[0]);
+
+            let multi_update_log = &[
+                Entry {
+                    term: 1,
+                    index: 2,
+                    value: 13,
+                },
+                Entry {
+                    term: 2,
+                    index: 3,
+                    value: 37,
+                },
+            ];
+            log.append_entries(multi_update_log)
+                .expect("Updating a single entry log with a two entry append failed.");
+            assert_eq!(log.len(), 3);
         }
 
         #[ignore]
