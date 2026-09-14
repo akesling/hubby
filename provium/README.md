@@ -9,6 +9,13 @@ Jarl stays unchanged: no proof helper functions, annotations, dependencies, or
 runtime hooks. Its `no_std`, sans-I/O, sync/async host boundary is unaffected.
 Provium runs separately as a development tool and uses `std`.
 
+Rust dependencies must be published on crates.io and build with the existing
+Rust toolchain. Git-only backends, vendored third-party checkouts, and automatic
+Rust toolchain installation are outside this project's dependency policy.
+Lean remains the explicitly required external proof checker, invoked through elan.
+Cargo exclusively owns `target/`; Provium writes proof output and test workspaces
+to the ignored `artifacts/` directory.
+
 ## Run it
 
 From the repository root, with Rust, rustfmt, Clippy, and elan installed:
@@ -40,9 +47,9 @@ Generate or verify one project directly:
 
 ```sh
 cargo run --manifest-path provium/Cargo.toml --locked -- \
-  compile provium/examples/jarl/project.json --out provium/target/jarl
+  compile provium/examples/jarl/project.json --out provium/artifacts/jarl
 cargo run --manifest-path provium/Cargo.toml --locked -- \
-  verify provium/examples/jarl/project.json --out provium/target/jarl
+  verify provium/examples/jarl/project.json --out provium/artifacts/jarl
 ```
 
 `compile` makes no proof-success claim. `verify` regenerates everything, invokes

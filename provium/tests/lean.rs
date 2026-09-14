@@ -10,7 +10,7 @@ struct Work(PathBuf);
 impl Work {
     fn new() -> Self {
         let p = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("target")
+            .join("artifacts")
             .join(format!(
                 "proof-test-{}-{}",
                 std::process::id(),

@@ -99,6 +99,19 @@ pub fn read(path: &Path) -> Result<Project, String> {
     Ok(project)
 }
 pub fn compile(project_path: &Path, output: &Path) -> Result<Manifest, String> {
+    // Cargo owns target directories. Check before even invalidating artifacts.
+    let in_target = |path: &Path| {
+        path.components()
+            .any(|part| matches!(part, std::path::Component::Normal(name) if name == "target"))
+    };
+    if in_target(output)
+        || output
+            .ancestors()
+            .find_map(|p| p.canonicalize().ok())
+            .is_some_and(|p| in_target(&p))
+    {
+        return Err("Cargo exclusively owns target/; use an artifacts/ output directory".into());
+    }
     // Invalidate before parsing: even a rejected edit must invalidate old success.
     match fs::remove_file(output.join("verified.json")) {
         Ok(()) => {}
