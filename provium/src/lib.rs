@@ -4,4 +4,5 @@ pub mod extract;
 pub mod frontend;
 pub mod ir;
 pub mod lean;
+pub mod methods;
 pub mod project;

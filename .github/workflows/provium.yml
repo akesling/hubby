@@ -39,3 +39,4 @@ jobs:
           path: |
             provium/artifacts/jarl
             provium/artifacts/assertions
+            provium/artifacts/jarl-methods

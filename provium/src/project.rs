@@ -98,7 +98,7 @@ pub fn read(path: &Path) -> Result<Project, String> {
     }
     Ok(project)
 }
-pub fn compile(project_path: &Path, output: &Path) -> Result<Manifest, String> {
+pub(crate) fn prepare_output(output: &Path) -> Result<(), String> {
     // Cargo owns target directories. Check before even invalidating artifacts.
     let in_target = |path: &Path| {
         path.components()
@@ -118,6 +118,10 @@ pub fn compile(project_path: &Path, output: &Path) -> Result<Manifest, String> {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
         Err(e) => return Err(e.to_string()),
     }
+    Ok(())
+}
+pub fn compile(project_path: &Path, output: &Path) -> Result<Manifest, String> {
+    prepare_output(output)?;
     let config_hash = hash(io(fs::read(project_path))?);
     let project = read(project_path)?;
     let base = project_path.parent().unwrap_or_else(|| Path::new("."));
@@ -340,7 +344,7 @@ fn rustc_output(args: &[&str], target: Option<&str>) -> Result<String, String> {
     }
     String::from_utf8(result.stdout).map_err(|e| e.to_string())
 }
-fn lean_file(output: &Path, file: &str, object: Option<&str>) -> Result<String, String> {
+pub(crate) fn lean_file(output: &Path, file: &str, object: Option<&str>) -> Result<String, String> {
     let mut command = Command::new("elan");
     command
         .args([

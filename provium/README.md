@@ -219,6 +219,53 @@ to acknowledged voters, membership-transition safety, log matching, persistence
 ordering, or complete Raft safety/liveness. In particular, the commit trace is a
 trace of the extracted assignment prefix, not full `Node` execution.
 
+## Complete method bodies
+
+`verify-methods` is a separate, deliberately restricted method backend. It loads
+an actual crate module tree, resolves written fields from its struct declarations,
+and type-checks the original crate with the installed rustc. It does not accept
+manual field-type bindings or expression selectors. All explicit statements in
+each selected method must translate; an unknown call or statement rejects it.
+
+```sh
+cargo run --manifest-path provium/Cargo.toml --locked -- \
+  verify-methods provium/examples/jarl-methods/project.json \
+  --out provium/artifacts/jarl-methods
+```
+
+The initial supported body language is a sequence of literal assignments to
+`bool` and `Option<u64>` fields, rooted at a receiver with exclusive access.
+Methods must return unit and have no ordinary arguments. A consumed receiver is
+accepted only if every field is a mutable reference; custom receiver destructors
+are rejected. This avoids pretending implicit drops have no effects. Generic
+field traversal, import aliases, item macros, conditional production definitions,
+and unsupported attributes are rejected. The input crate currently must compile
+without external dependencies using Rust 2021.
+
+[The Jarl method project](examples/jarl-methods/project.json) translates the entire
+explicit body of `Ready::persisted`. Lean proves that its three persistence flags
+are cleared, that all other modeled leaf locations retain their values, and that
+the effect is algebraically idempotent. No statement after an assignment is
+excluded. This is not permission to reuse a consumed token or acknowledge a save
+that did not happen.
+
+The generated function and instruction list share a generic field-store
+semantics in `lean/Provium/State.lean`; their correspondence is checked for every
+initial store. Stores map **leaf locations**, not overlapping aggregate values,
+to cells with arbitrary opaque payloads. Rust-to-store representation, exclusive
+borrowing, field resolution, and frontend translation remain trusted. The frame
+theorem does not assert that a containing aggregate is unchanged when one of its
+fields changes. The storage backend's durability contract remains an assumption.
+
+The method manifest includes all loaded production Rust files, the complete
+selected bodies, source-resolved written types, and the remaining unproved
+**inherent methods**. That list is not a complete obligation inventory: free
+functions, trait implementations, standard-library semantics, and global protocol
+invariants also require proofs. `verified.json` explicitly records
+`whole_raft_proved: false`. The new proofs are component evidence, not a complete
+Raft proof. Both literal-mutation controls and a mutation of Jarl's actual
+acknowledgment code must fail in Lean, not merely in the parser or compiler.
+
 ## Validation and next boundary
 
 The tests compare actual compiled Rust with IR evaluation for every byte pair on
