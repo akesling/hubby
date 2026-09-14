@@ -6,8 +6,4 @@ members = [
     "jarl",
 ]
 
-resolver="2"
-
-[workspace.dependencies]
-
-[workspace.dev-dependencies]
+resolver = "2"

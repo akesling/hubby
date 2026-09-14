@@ -2,9 +2,9 @@ What if Google's Chubby were implemented as a self-sufficient Rust library and
 "trivially" useful binary?  This is the question I asked myself, and this
 project is some dabbling in answering it.
 
-At this time, nothing works and this project is aspirational.  From there,
-hopefully it will become experimental, and then... maybe, just maybe, we can get
-to a feature-complete Chubby clone that can reach "sustainable" maintenance.
+The Hubby service is aspirational. Current development focuses on
+[Jarl](jarl/README.md), the bounded, no_std, sans-I/O Raft core with runtime membership. Its API, recovery
+contract, reference host, and validation are documented in the Jarl crate.
 
 Goals:
 * [ ] A [Sans-I/O](https://sans-io.readthedocs.io/) implementation of all
@@ -25,6 +25,7 @@ Non-goals:
   should be done deliberately and without rushing ;).
 
 Project structure:
+* The `/jarl` crate contains the Raft core and its validation suite.
 * The [`/hubby`](https://crates.io/crates/hubby) crate represents the
   server/service. It will contain a gRPC library to surface from any "embedding"
   server and a standalone server binary for general use.

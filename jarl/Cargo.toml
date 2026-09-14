@@ -1,9 +1,9 @@
 [package]
 name = "jarl"
-version = "0.1.4"
+version = "0.3.0"
 authors = ["Alex Kesling <alex@kesling.co>"]
 license = "Apache-2.0"
-description = "Jarl (Just another Raft library)"
+description = "Bounded, no_std, sans-I/O Raft with runtime membership and explicit persistence"
 
 edition = "2021"
 workspace = ".."

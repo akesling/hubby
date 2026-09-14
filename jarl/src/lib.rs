@@ -1,647 +1,381 @@
 #![no_std]
-//! # Raft state machine
-//!
-//! (Figure 4 from [Raft paper](https://raft.github.io/raft.pdf))
-//! ```text
-//! Starting state = [Follower]
-//! ===========================
-//!
-//! *******************          ┌───────────┐   **************
-//! * Times out,      *          │           ┼──>* Times out, *
-//! * starts election *─────────>│ Candidate │   * tries new  *
-//! *                 *          │           │<──* election   *
-//! *******************          └─┬───────┬─┘   **************
-//!       ^                        v       │
-//!  ┌────┴─────┐   *********************  │
-//!  │ Follower │<──* Discovers current *  │
-//!  └──────────┘   * leader or         *  │
-//!       ^         * new term          *  │
-//!       │         *********************  v
-//!       │                               ******************
-//! ********************    ┌────────┐    * Receives votes *
-//! * Discovers server *<───┼ Leader │<───* from majority  *
-//! * with higher term *    └────────┘    * of nodes       *
-//! ********************                  ******************
-//! ```
-
-pub mod node {
-    #[derive(Debug, PartialEq, Clone, Copy)]
-    pub struct Id(pub u32);
-    pub type Term = u32;
-
-    /// NodeTime is a non-negative, unitless, monotonic time
-    ///
-    /// Practically, this will generally store a UNIX-epoch based timestamp, but it is left to the
-    /// library consumer to make that decision for themselves.
-    #[derive(Debug, Clone, Copy)]
-    pub struct NodeTime(pub u64);
-
-    impl core::ops::Add<NodeTimeDuration> for NodeTime {
-        type Output = Self;
-
-        fn add(self, other: NodeTimeDuration) -> Self {
-            Self(self.0 + other.0 .0)
-        }
-    }
-
-    #[derive(Debug, Clone, Copy)]
-    pub struct NodeTimeDuration(NodeTime);
-
-    impl core::ops::Add for NodeTimeDuration {
-        type Output = Self;
-
-        fn add(self, other: Self) -> Self {
-            Self(NodeTime(self.0 .0 + other.0 .0))
-        }
-    }
-
-    impl NodeTimeDuration {
-        pub fn new(duration: u64) -> Self {
-            NodeTimeDuration(NodeTime(duration))
-        }
-    }
-
-    #[derive(Debug)]
-    pub enum Error {
-        ElectionStartTimeInFuture,
-    }
-
-    #[derive(Debug)]
-    pub enum NodeState {
-        Follower,
-        Candidate,
-        Leader,
-    }
-
-    pub struct CellConfig<const CELL_SIZE: usize> {
-        pub election_interval: (NodeTimeDuration, NodeTimeDuration),
-        pub heartbeat_ttl: NodeTimeDuration,
-    }
-
-    #[derive(Debug)]
-    pub struct Node<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE: Default, SNAPSHOT> {
-        /// A cell-unique identifier for this node
-        id: Id,
-
-        /// The current election term
-        term: Term,
-
-        leader_commit_index: crate::log::Index,
-
-        /// The maximum time seen
-        high_watermark: NodeTime,
-
-        // TODO(alex): Figure out how to keep around a source of randomness that _could_ be a
-        // deterministic random number generator for testing purposes.  This will be used for
-        // determining heartbeat and election expirations.  Raft paper recommends 150–300ms as the
-        // window for "normal" leader election periods.
-        /// The time at which a follower will become a candidate if it doesn't get
-        /// a new heartbeat / reset this before then.
-        heartbeat_expiration: NodeTime,
-
-        /// The time at which the current election expires
-        election_expiration: NodeTime,
-
-        next_index_to_replicate_per_node: [crate::log::Index; CELL_SIZE],
-        max_replicated_index_per_node: [crate::log::Index; CELL_SIZE],
-
-        log: crate::log::Log<VALUE, MAX_LOG>,
-        snapshot: SNAPSHOT,
-
-        initialized: bool,
-    }
-
-    impl<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE: Default, SNAPSHOT>
-        Node<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>
-    {
-        #[inline]
-        pub fn new(id: Id) -> Follower<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>
-        where
-            SNAPSHOT: Default,
-        {
-            Follower(Node {
-                id,
-                term: 0,
-                leader_commit_index: 0,
-                high_watermark: NodeTime(0),
-                heartbeat_expiration: NodeTime(0),
-                election_expiration: NodeTime(0),
-                next_index_to_replicate_per_node: [0; CELL_SIZE],
-                max_replicated_index_per_node: [0; CELL_SIZE],
-                log: crate::log::Log::<VALUE, MAX_LOG>::new(),
-                snapshot: Default::default(),
-                initialized: false,
-            })
-        }
-
-        #[inline]
-        pub fn progress_time(&mut self, new_time: NodeTime) {
-            self.high_watermark.0 = core::cmp::max(self.high_watermark.0, new_time.0);
-        }
-
-        // * If commitIndex > lastApplied: increment lastApplied, apply log[lastApplied] to state
-        //   machine (§5.3)
-        // * If RPC request or response contains term T > currentTerm: set currentTerm = T, convert
-        //   to follower (§5.1)
-    }
-
-    #[derive(Debug)]
-    pub struct Follower<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE: Default, SNAPSHOT>(
-        Node<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>,
-    );
-
-    impl<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE: Clone + Default, SNAPSHOT>
-        Follower<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>
-    {
-        pub fn get_state(&self) -> NodeState {
-            NodeState::Follower
-        }
-
-        pub fn init(&mut self, start_time: NodeTime, cell_config: &CellConfig<CELL_SIZE>) {
-            let n = &mut self.0;
-
-            n.high_watermark = start_time;
-            n.heartbeat_expiration = start_time + cell_config.heartbeat_ttl;
-
-            n.initialized = true;
-        }
-
-        #[inline]
-        pub fn term(&self) -> Term {
-            self.0.term
-        }
-
-        // TODO(alex): Figure out a less dumb return type here / way to manage type transition to
-        // Candidate.
-        pub fn progress_time(&mut self, new_time: NodeTime) -> bool {
-            let n = &mut self.0;
-            n.progress_time(new_time);
-
-            let start_election = n.heartbeat_expiration.0 <= n.high_watermark.0;
-            start_election
-        }
-
-        pub fn start_election(
-            self,
-        ) -> Result<Candidate<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>, Error> {
-            let n = self.0;
-            if n.high_watermark.0 < n.heartbeat_expiration.0 {
-                return Err(Error::ElectionStartTimeInFuture);
-            }
-
-            // TODO(alex): Increment term and perform necessary election preparation.
-
-            Ok(Candidate(n))
-        }
-
-        pub fn receive_append_entries(
-            &mut self,
-            msg: &crate::msg::AppendEntries<VALUE>,
-        ) -> crate::msg::AppendResponse {
-            let last_entry = self.0.log.last_entry();
-            // Reject messages from old leaders
-            if msg.term < self.term()
-                || last_entry
-                    .map(|le| {
-                        // Do terms and indexes match?
-                        msg.previous_log_item_term != le.term
-                            || msg.previous_log_item_index != le.index
-                    })
-                    .unwrap_or_else(|| {
-                        // Should there _be_ a previous message?
-                        msg.previous_log_item_term != 0 || msg.previous_log_item_index != 0
-                    })
-            {
-                return crate::msg::AppendResponse {
-                    term: self.term(),
-                    success: false,
-                };
-            }
-
-            self.0.log.append_entries(&msg.entries).expect(concat!(
-                "A failure occurred when attempting to append entries in ",
-                "Follower::receive_append_entries"
-            ));
-
-            if msg.term > self.0.term {
-                self.0.term = msg.term
-            }
-
-            if msg.commit_index > self.0.leader_commit_index {
-                self.0.leader_commit_index = msg.commit_index
-            }
-
-            return crate::msg::AppendResponse {
-                term: msg.term,
-                success: true,
-            };
-        }
-
-        // * If election timeout elapses without receiving AppendEntries RPC from current leader or
-        //   granting vote to candidate: convert to candidate
-    }
-
-    #[derive(Debug)]
-    pub struct Candidate<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE: Default, SNAPSHOT>(
-        Node<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>,
-    );
-
-    impl<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE: Default, SNAPSHOT>
-        Candidate<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>
-    {
-        pub fn get_state() -> NodeState {
-            NodeState::Candidate
-        }
-
-        // * On conversion to candidate, start election:
-        //   * Increment currentTerm
-        //   * Vote for self
-        //   * Reset election timer
-        //   * Send RequestVote RPCs to all other servers
-        // * If votes received from majority of servers: become leader
-        // * If AppendEntries RPC received from new leader: convert to follower
-        // * If election timeout elapses: start new election
-    }
-
-    #[derive(Debug)]
-    pub struct Leader<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE: Default, SNAPSHOT>(
-        Node<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>,
-    );
-
-    impl<const CELL_SIZE: usize, const MAX_LOG: usize, VALUE: Default, SNAPSHOT>
-        Leader<CELL_SIZE, MAX_LOG, VALUE, SNAPSHOT>
-    {
-        pub fn get_state() -> NodeState {
-            NodeState::Leader
-        }
-
-        // * Upon election: send initial empty AppendEntries RPCs (heartbeat) to each server; repeat
-        //   during idle periods to prevent election timeouts (§5.2)
-        // * If command received from client: append entry to local log, respond after entry
-        //   applied to state machine (§5.3)
-        // * If last log index ≥ nextIndex for a follower: send AppendEntries RPC with log entries
-        //   starting at nextIndex
-        //   * If successful: update nextIndex and matchIndex for follower (§5.3)
-        //   * If AppendEntries fails because of log inconsistency: decrement nextIndex and retry
-        //     (§5.3)
-        // * If there exists an N such that N > commitIndex, a majority of matchIndex[i] ≥ N, and
-        //   log[N].term == currentTerm: set commitIndex = N (§5.3, §5.4).
-
-        fn fill_append_entries<'e>(
-            &'e self,
-            append_msg: &mut crate::msg::AppendEntries<'e, VALUE>,
-        ) {
-            todo!("Implement `fill_append_entries`")
-        }
-    }
-}
-
-pub mod msg {
-    #[derive(Debug)]
-    pub struct AppendEntries<'e, VALUE: Default> {
-        pub leader: crate::node::Id,
-
-        pub term: crate::node::Term,
-        pub commit_index: crate::log::Index,
-
-        pub previous_log_item_index: crate::log::Index,
-        pub previous_log_item_term: crate::node::Term,
-
-        pub entries: &'e [crate::log::Entry<VALUE>],
-    }
-
-    #[derive(Debug, PartialEq)]
-    pub struct AppendResponse {
-        pub term: crate::node::Term,
-        pub success: bool,
-    }
-
-    #[derive(Debug, PartialEq)]
-    pub struct RequestVote {
-        pub term: crate::node::Term,
-        pub candidate: crate::node::Id,
-        pub last_index: crate::log::Index,
-        pub last_term: crate::node::Term,
-    }
-
-    #[derive(Debug, PartialEq)]
-    pub struct VoteResponse {
-        pub term: crate::node::Term,
-        pub granted: bool,
-    }
-}
-
-pub mod log {
-    pub type Index = u32;
-
-    pub trait Snapshot {
-        fn update_from_log<VALUE: Default, const MAX_LOG: usize>(
-            &mut self,
-            log: &Log<VALUE, MAX_LOG>,
-        );
-    }
-
-    #[derive(Default, Debug)]
-    pub struct Entry<VALUE: Default> {
-        pub term: crate::node::Term,
-        pub index: crate::log::Index,
-        pub value: VALUE,
-    }
-
-    impl<T: PartialEq + Default> PartialEq for Entry<T> {
-        // Required method
-        fn eq(&self, other: &Self) -> bool {
-            self.term == other.term && self.index == other.index && self.value == other.value
-        }
-    }
-
-    impl<T: Clone + Default> Clone for Entry<T> {
-        // Required method
-        fn clone(&self) -> Entry<T> {
-            Entry {
-                term: self.term,
-                index: self.index,
-                value: self.value.clone(),
-            }
-        }
-    }
-
-    #[derive(Debug)]
-    pub struct Log<VALUE: Default, const MAX_LOG: usize> {
-        slots: [crate::log::Entry<VALUE>; MAX_LOG],
-        used: usize,
-    }
-
-    impl<VALUE: Default, const MAX_LOG: usize> Log<VALUE, MAX_LOG> {
-        pub fn new() -> Self {
-            Log {
-                slots: core::array::from_fn(|_| Default::default()),
-                used: 0,
-            }
-        }
-
-        pub fn last_entry(&self) -> Option<&Entry<VALUE>> {
-            if self.used > 0 {
-                self.slots.get(self.len() - 1)
-            } else {
-                None
-            }
-        }
-
-        #[inline]
-        pub fn len(&self) -> usize {
-            self.used
-        }
-
-        #[inline]
-        pub fn is_empty(&self) -> bool {
-            self.used == 0
-        }
-
-        /// Append entries to log
-        ///
-        /// `Invoked by leader to replicate log entries (§5.3); also used as heartbeat (§5.2).`
-        ///
-        /// `If an existing entry conflicts with a new one (same index but different terms), delete
-        /// the existing entry and all that follow it (§5.3)`
-        pub fn append_entries(
-            &mut self,
-            appended: &[Entry<VALUE>],
-        ) -> Result<(), AppendEntriesError> {
-            let _ = appended;
-            todo!("Implement append_entries!")
-        }
-    }
-
-    #[derive(Debug)]
-    pub enum AppendEntriesError {
-        /// Log slice provided did not have capacity to append new entries.
-        LogUnderCapacity,
-    }
-
-    #[cfg(test)]
-    mod test {
-        use super::*;
-
-        #[test]
-        fn append_entries_works() {
-            let mut log = Log::<u32, 10 /* log length */>::new();
-            assert_eq!(log.len(), 0);
-
-            log.append_entries(&[])
-                .expect("Updating an empty log with empty append failed.");
-            assert!(log.is_empty());
-
-            let single_update_log = &[Entry {
-                term: 1,
-                index: 1,
-                value: 42,
-            }];
-            log.append_entries(single_update_log)
-                .expect("Updating an empty log with a single entry append failed.");
-            assert_eq!(log.len(), 1);
-
-            let last_entry = log.last_entry().unwrap();
-            assert_eq!(last_entry, &single_update_log[0]);
-
-            let multi_update_log = &[
-                Entry {
-                    term: 1,
-                    index: 2,
-                    value: 13,
-                },
-                Entry {
-                    term: 2,
-                    index: 3,
-                    value: 37,
-                },
-            ];
-            log.append_entries(multi_update_log)
-                .expect("Updating a single entry log with a two entry append failed.");
-            assert_eq!(log.len(), 3);
-        }
-
-        #[ignore]
-        #[test]
-        fn append_overwrites_inconsistent_term_items() {}
-
-        #[ignore]
-        #[test]
-        fn append_fails_if_index_is_inconsistent() {}
-    }
-}
+#![forbid(unsafe_code)]
+#![warn(missing_docs)]
+#![doc = include_str!("../README.md")]
+
+mod cluster;
+pub mod host;
+mod membership;
+mod node;
+mod ready;
+mod state;
 
 #[cfg(test)]
-mod cell_semantics_test {
-    use super::*;
+extern crate std;
+#[cfg(test)]
+mod explore;
+#[cfg(test)]
+mod explore_dynamic;
 
-    /************************************************************************/
-    /* Follower *************************************************************/
-    /************************************************************************/
-    mod follower {
-        use super::*;
+pub use cluster::{Checkpoint, Cluster, ClusterState, Record, Settings};
+pub use membership::Membership;
+pub use node::Node;
+pub use ready::{Ready, Write};
+pub use state::{HardState, State};
 
-        #[test]
-        fn node_starts_in_follower_state() {
-            let mut n = node::Node::<5, 10, usize, usize>::new(node::Id(0));
-            let start_time = node::NodeTime(1);
-            n.init(
-                start_time,
-                &node::CellConfig {
-                    election_interval: (
-                        node::NodeTimeDuration::new(150),
-                        node::NodeTimeDuration::new(300),
-                    ),
-                    heartbeat_ttl: node::NodeTimeDuration::new(300),
-                },
-            );
-            match n.get_state() {
-                node::NodeState::Follower => (), // Success!
-                wrong_type @ _ => panic!("Node was not of follower type: {wrong_type:#?}"),
-            }
+/// A stable identity within one fixed cluster.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Id(pub u64);
+
+/// A log position and the election term that created it. Zero denotes genesis.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct LogId {
+    /// One-based position in the log.
+    pub index: u64,
+    /// Election term.
+    pub term: u64,
+}
+
+/// A replicated command. `None` is an internal leadership barrier.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Entry<V> {
+    /// Position of this entry.
+    pub id: LogId,
+    /// Application command, or a no-op.
+    pub value: Option<V>,
+}
+
+/// Application state after applying every entry through `last`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Snapshot<S> {
+    /// Last included entry.
+    pub last: LogId,
+    /// Application-defined snapshot contents.
+    pub value: S,
+}
+
+/// Local role. Only a leader accepts proposals.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Role {
+    /// Receives replication and votes in elections.
+    Follower,
+    /// Requests a majority of votes.
+    Candidate,
+    /// Replicates proposals to the cluster.
+    Leader,
+}
+
+/// Fixed membership and local timer settings.
+#[derive(Clone, Debug)]
+pub struct Config<const N: usize> {
+    /// This node's identity.
+    pub id: Id,
+    /// All voters, including this node. Identities must be distinct.
+    pub members: [Id; N],
+    /// Ticks between leader heartbeats; must be positive.
+    pub heartbeat_ticks: u64,
+    /// Election deadlines are sampled in `[election_ticks, 2 * election_ticks)`.
+    /// Must exceed `heartbeat_ticks` and be at most `u64::MAX / 2`.
+    pub election_ticks: u64,
+    /// Seed for deterministic election jitter. Use independent seeds per node.
+    pub seed: u64,
+}
+
+impl<const N: usize> Config<N> {
+    /// Use two-tick heartbeats and election deadlines between ten and twenty ticks.
+    pub fn new(id: Id, members: [Id; N]) -> Self {
+        Self {
+            id,
+            members,
+            heartbeat_ticks: 2,
+            election_ticks: 10,
+            seed: id.0.wrapping_add(1),
         }
+    }
+}
 
-        #[test]
-        fn follower_becomes_candidate_upon_heartbeat_timeout() {
-            let mut follower = node::Node::<5, 10, usize, usize>::new(node::Id(0));
-            let start_time = node::NodeTime(1);
-            follower.init(
-                start_time,
-                &node::CellConfig {
-                    election_interval: (
-                        node::NodeTimeDuration::new(150),
-                        node::NodeTimeDuration::new(300),
-                    ),
-                    heartbeat_ttl: node::NodeTimeDuration::new(300),
-                },
-            );
+/// A local operation could not be performed. The node remains usable.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Error {
+    /// Invalid membership, timing, or zero log capacity.
+    Config,
+    /// Malformed or inconsistent persisted state.
+    State,
+    /// Persist pending state and drain messages before the next operation.
+    Busy,
+    /// Proposals require leadership. The known leader, if any, is provided.
+    NotLeader(Option<Id>),
+    /// Log capacity is exhausted. Compact applied entries or increase capacity.
+    Full,
+    /// The requested snapshot position is not in the committed log.
+    NotCommitted,
+    /// A term or index cannot be incremented without overflow.
+    Exhausted,
+    /// Envelope identities or message contents are invalid.
+    Message,
+    /// A membership change must finish committing before another can begin.
+    Reconfiguring,
+    /// A new voter must first catch up as a learner.
+    NotCaughtUp,
+}
 
-            let start_election = follower.progress_time(node::NodeTime(302));
-            assert!(
-                start_election,
-                "Progressing time did not trigger election start"
-            );
-            let _candidate = follower.start_election().expect(
-                "Election failed to start despite progress_time signalling it was ready to start one",
-            );
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Config => f.write_str("invalid configuration"),
+            Self::State => f.write_str("invalid checkpoint"),
+            Self::Busy => f.write_str("persist state and drain messages first"),
+            Self::NotLeader(Some(id)) => write!(f, "not leader; last known leader is {}", id.0),
+            Self::NotLeader(None) => f.write_str("not leader; leader unknown"),
+            Self::Full => f.write_str("log capacity exhausted"),
+            Self::NotCommitted => f.write_str("snapshot index is outside the committed suffix"),
+            Self::Exhausted => f.write_str("term or index exhausted"),
+            Self::Message => f.write_str("invalid message"),
+            Self::Reconfiguring => f.write_str("membership change is pending"),
+            Self::NotCaughtUp => f.write_str("new voter has not caught up"),
         }
+    }
+}
 
-        #[test]
-        fn follower_increments_term_upon_new_leader_message() {
-            let follower_id = node::Id(0);
-            let leader_id = node::Id(1);
+impl core::error::Error for Error {}
 
-            let mut follower = node::Node::<5, 10, usize, usize>::new(follower_id);
-            let start_time = node::NodeTime(1);
-            follower.init(
-                start_time,
-                &node::CellConfig {
-                    election_interval: (
-                        node::NodeTimeDuration::new(150),
-                        node::NodeTimeDuration::new(300),
-                    ),
-                    heartbeat_ttl: node::NodeTimeDuration::new(300),
-                },
-            );
+/// Why a follower could not replicate a request.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Rejection {
+    /// The predecessor does not match; retry an earlier position.
+    Conflict {
+        /// Suggested next index, possibly beyond a compacted prefix.
+        next: u64,
+    },
+    /// The follower needs compaction or more log capacity.
+    Full,
+}
 
-            assert_eq!(follower.term(), 0);
+/// Maximum entries in one allocation-free replication message.
+pub const MAX_APPEND_ENTRIES: usize = 16;
 
-            let log = &[];
-            let response = follower.receive_append_entries(&msg::AppendEntries {
-                leader: leader_id,
-                term: 1,
-                commit_index: 0,
+/// A protocol message. Transport must authenticate the sending peer.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Message<V, S> {
+    /// Probe a prospective election without advancing durable terms.
+    PreVote {
+        /// Proposed next term, not the sender's durable term.
+        term: u64,
+        /// Candidate's last log position.
+        last: LogId,
+    },
+    /// Reply to an election probe; never a durable vote.
+    PreVoted {
+        /// Responder's actual durable term (possibly zero).
+        term: u64,
+        /// Proposed term from the probe being answered.
+        campaign: u64,
+        /// Whether the responder would support that election.
+        granted: bool,
+    },
+    /// Request a vote using the candidate's last log position.
+    Vote {
+        /// Candidate term.
+        term: u64,
+        /// Candidate's last entry or snapshot boundary.
+        last: LogId,
+    },
+    /// Response to a vote request.
+    Voted {
+        /// Responder's current term.
+        term: u64,
+        /// Whether the vote was granted.
+        granted: bool,
+    },
+    /// Replicate one entry, or send a heartbeat when `entry` is `None`.
+    Append {
+        /// Leader term.
+        term: u64,
+        /// Entry immediately preceding this request.
+        previous: LogId,
+        /// Optional next entry.
+        entry: Option<Entry<V>>,
+        /// Leader's committed position.
+        commit: u64,
+    },
+    /// Replicate a nonempty contiguous batch. Occupied slots form a prefix;
+    /// unused slots are `None`. The fixed upper bound needs no allocator.
+    AppendBatch {
+        /// Leader term.
+        term: u64,
+        /// Entry immediately preceding this batch.
+        previous: LogId,
+        /// At most `MAX_APPEND_ENTRIES` entries, in index order.
+        entries: [Option<Entry<V>>; MAX_APPEND_ENTRIES],
+        /// Leader's committed position.
+        commit: u64,
+    },
+    /// Install a complete application snapshot.
+    Install {
+        /// Leader term.
+        term: u64,
+        /// Snapshot and its log boundary.
+        snapshot: Snapshot<S>,
+    },
+    /// Response to append or snapshot installation.
+    Replicated {
+        /// Responder's current term.
+        term: u64,
+        /// On success, the last matched index. On rejection, the requested predecessor.
+        index: u64,
+        /// `None` means success.
+        rejection: Option<Rejection>,
+    },
+}
 
-                previous_log_item_term: 0,
-                previous_log_item_index: 0,
-
-                entries: log,
-            });
-            assert_eq!(
-                response,
-                msg::AppendResponse {
-                    term: 1,
-                    success: true,
-                }
-            );
-            assert_eq!(follower.term(), 1);
-
-            let response = follower.receive_append_entries(&msg::AppendEntries {
-                leader: leader_id,
-                term: 2,
-                commit_index: 0,
-
-                previous_log_item_term: 1,
-                previous_log_item_index: 0,
-
-                entries: log,
-            });
-            assert_eq!(
-                response,
-                msg::AppendResponse {
-                    term: 2,
-                    success: true,
-                }
-            );
-            assert_eq!(follower.term(), 2);
+impl<V, S> Message<V, S> {
+    pub(crate) fn term(&self) -> u64 {
+        match self {
+            Self::PreVote { term, .. }
+            | Self::PreVoted { term, .. }
+            | Self::Vote { term, .. }
+            | Self::Voted { term, .. }
+            | Self::Append { term, .. }
+            | Self::AppendBatch { term, .. }
+            | Self::Install { term, .. }
+            | Self::Replicated { term, .. } => *term,
         }
-
-        #[ignore]
-        #[test]
-        fn follower_appends_to_log_for_current_term() {}
-
-        #[ignore]
-        #[test]
-        fn follower_election_window_resets_upon_append_receipt() {}
-
-        #[ignore]
-        #[test]
-        fn follower_rejects_append_from_old_leader() {}
-
-        #[ignore]
-        #[test]
-        fn follower_rejects_vote_request_from_old_candidate() {}
-
-        #[ignore]
-        #[test]
-        fn follower_accepts_one_candidate_per_voting_term() {}
     }
+}
 
-    /************************************************************************/
-    /* Candidate ************************************************************/
-    /************************************************************************/
-    mod candidate {
-        use super::*;
+/// A message addressed to one peer in this cluster.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Envelope<V, S> {
+    /// Sending peer.
+    pub from: Id,
+    /// Receiving peer.
+    pub to: Id,
+    /// Protocol contents.
+    pub message: Message<V, S>,
+}
 
-        #[ignore]
-        #[test]
-        fn candidate_candidate_sends_vote_requests_upon_new_election() {}
-
-        #[ignore]
-        #[test]
-        fn candidate_becomes_leader_when_receive_majority_vote() {}
-
-        #[ignore]
-        #[test]
-        fn candidate_starts_new_election_when_election_times_out_without_majority() {}
-
-        #[ignore]
-        #[test]
-        fn candidate_becomes_follower_upon_new_leader_message() {}
+impl<V: Clone, S: Clone> Envelope<&V, &S> {
+    /// Own the payloads for an in-memory queue. Encoders can use the borrowed
+    /// envelope directly and avoid these clones.
+    pub fn cloned(&self) -> Envelope<V, S> {
+        let message = match &self.message {
+            Message::PreVote { term, last } => Message::PreVote {
+                term: *term,
+                last: *last,
+            },
+            Message::PreVoted {
+                term,
+                campaign,
+                granted,
+            } => Message::PreVoted {
+                term: *term,
+                campaign: *campaign,
+                granted: *granted,
+            },
+            Message::Vote { term, last } => Message::Vote {
+                term: *term,
+                last: *last,
+            },
+            Message::Voted { term, granted } => Message::Voted {
+                term: *term,
+                granted: *granted,
+            },
+            Message::Append {
+                term,
+                previous,
+                entry,
+                commit,
+            } => Message::Append {
+                term: *term,
+                previous: *previous,
+                commit: *commit,
+                entry: entry.as_ref().map(|e| Entry {
+                    id: e.id,
+                    value: e.value.cloned(),
+                }),
+            },
+            Message::AppendBatch {
+                term,
+                previous,
+                entries,
+                commit,
+            } => Message::AppendBatch {
+                term: *term,
+                previous: *previous,
+                commit: *commit,
+                entries: core::array::from_fn(|i| {
+                    entries[i].as_ref().map(|e| Entry {
+                        id: e.id,
+                        value: e.value.cloned(),
+                    })
+                }),
+            },
+            Message::Install { term, snapshot } => Message::Install {
+                term: *term,
+                snapshot: Snapshot {
+                    last: snapshot.last,
+                    value: snapshot.value.clone(),
+                },
+            },
+            Message::Replicated {
+                term,
+                index,
+                rejection,
+            } => Message::Replicated {
+                term: *term,
+                index: *index,
+                rejection: *rejection,
+            },
+        };
+        Envelope {
+            from: self.from,
+            to: self.to,
+            message,
+        }
     }
+}
 
-    /************************************************************************/
-    /* Leader ***************************************************************/
-    /************************************************************************/
-    mod leader {
-        use super::*;
+/// Identities of the first and last entries admitted in one atomic proposal batch.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ProposalRange {
+    /// First proposed entry.
+    pub first: LogId,
+    /// Last proposed entry, inclusive. Neither identity implies commitment.
+    pub last: LogId,
+}
 
-        #[ignore]
-        #[test]
-        fn fresh_leader_issues_empty_append_entries() {}
+/// Local diagnostics for host scheduling and monitoring. Never a read lease.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Status {
+    /// Local node identity.
+    pub id: Id,
+    /// Local role.
+    pub role: Role,
+    /// Current term, possibly awaiting persistence.
+    pub term: u64,
+    /// Last retained log identity or snapshot boundary.
+    pub last: LogId,
+    /// Committed position, possibly awaiting persistence.
+    pub commit: u64,
+    /// Number of occupied log slots.
+    pub retained: usize,
+    /// Total log slot capacity.
+    pub capacity: usize,
+    /// Whether an atomic storage update must be saved.
+    pub persistence_pending: bool,
+    /// Number of outgoing descriptors waiting for the host.
+    pub messages_pending: usize,
+}
 
-        #[ignore]
-        #[test]
-        fn leader_becomes_follower_upon_new_leader_message_with_higher_term() {}
-    }
+/// A leader's view of one replication recipient. Values can be stale.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PeerProgress {
+    /// Stable peer identity.
+    pub id: Id,
+    /// Whether this peer votes in either active configuration.
+    pub voter: bool,
+    /// Last acknowledged log position in this leader term.
+    pub matched: u64,
+    /// Next replication position.
+    pub next: u64,
 }
