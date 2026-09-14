@@ -66,10 +66,7 @@ fn complete_method_rejects_hidden_effects_and_context_changes() {
             "self.node.dirty=false;",
             "let alias=&mut self.node;alias.dirty=false;",
         ),
-        SOURCE.replace(
-            "self.node.from=None;",
-            "if self.node.dirty {self.node.from=None;}",
-        ),
+        SOURCE.replace("self.node.from=None;", "if self.node.dirty {self.flush();}"),
         format!(
             "{SOURCE} impl Drop for Ready<'_>{{fn drop(&mut self){{self.node.unrelated=true;}}}}"
         ),
@@ -232,4 +229,165 @@ fn field_resolution_does_not_confuse_foreign_and_local_structs() {
         .unwrap()
         .lower("child::Ready::persisted")
         .is_ok());
+}
+
+#[test]
+fn branches_retain_both_effects_and_reject_untyped_conditions() {
+    let w = Work::new();
+    let src = SOURCE.replace("self.node.dirty=false;self.node.from=None;", "if self.node.dirty && !false {self.node.dirty=false;} else if self.node.unrelated {self.node.from=None;} else {self.node.unrelated=true;} self.node.from=None;");
+    let m = Crate::load(&w.source(&src))
+        .unwrap()
+        .lower("Ready::persisted")
+        .unwrap();
+    assert_eq!(m.writes.len(), 4);
+    assert!(matches!(
+        m.body[0],
+        provium::methods::Statement::Branch { .. }
+    ));
+    assert_eq!(m.body.len(), 2);
+    for bad in [
+        src.replace("self.node.dirty && !false", "self.node.from"),
+        src.replace("self.node.unrelated=true;", "self.flush();"),
+        src.replace("self.node.dirty && !false", "self.check()"),
+        src.replace("self.node.dirty && !false", "{self.node.dirty=false;true}"),
+    ] {
+        assert!(
+            Crate::load(&w.source(&bad))
+                .unwrap()
+                .lower("Ready::persisted")
+                .is_err(),
+            "accepted {bad}"
+        );
+    }
+}
+
+#[test]
+#[ignore = "requires pinned Lean; scripts/verify.sh runs this"]
+fn branches_agree_with_native_rust_and_kernel_checks_order_and_frame() {
+    use std::process::Command;
+    let w = Work::new();
+    let source = SOURCE.replace(
+        "self.node.dirty=false;self.node.from=None;",
+        "if self.node.dirty {self.node.unrelated=true;} else {self.node.unrelated=false;} if self.node.unrelated && !false {self.node.dirty=false;} else {self.node.dirty=true;} self.node.from=None;",
+    );
+    let source = source.replace("fn persisted(self)", "fn persisted(mut self)").replace(
+        "if self.node.dirty {self.node.unrelated=true;} else {self.node.unrelated=false;}",
+        "self.prepare();",
+    ) + " impl Ready<'_>{fn prepare(&mut self){if self.node.dirty {self.node.unrelated=true;} else {self.node.unrelated=false;}}}";
+    let path = w.source(&source);
+    let main = r#"
+fn main() {
+ for dirty in [false,true] {
+  for unrelated in [false,true] {
+   let mut state=State{dirty,from:Some(7),unrelated};
+   Ready{node:&mut state}.persisted();
+   println!("{} {}",state.dirty,state.unrelated);
+  }
+ }
+}
+"#;
+    fs::write(&path, format!("{source}\n{main}")).unwrap();
+    let binary = w.0.join("native");
+    let built = Command::new("rustc")
+        .args(["--edition=2021", "-C", "overflow-checks=yes"])
+        .arg(&path)
+        .arg("-o")
+        .arg(&binary)
+        .output()
+        .unwrap();
+    assert!(
+        built.status.success(),
+        "{}",
+        String::from_utf8_lossy(&built.stderr)
+    );
+    let native = Command::new(binary).output().unwrap();
+    assert!(native.status.success());
+    let actual = String::from_utf8(native.stdout).unwrap();
+    w.source(&source);
+    let mut proofs = String::from("import Generated\nopen Provium.State\n");
+    for (i, ((dirty, unrelated), output)) in [false, true]
+        .into_iter()
+        .flat_map(|d| [false, true].map(move |u| (d, u)))
+        .zip(actual.lines())
+        .enumerate()
+    {
+        let values: Vec<_> = output.split_whitespace().collect();
+        assert_eq!(values.len(), 2);
+        proofs.push_str(&format!("example : let initial : Store Unit := fun key => if key = [\"node\",\"dirty\"] then .boolean {dirty} else if key = [\"node\",\"unrelated\"] then .boolean {unrelated} else .other (); (Subject.Ready_persisted initial [\"node\",\"dirty\"], Subject.Ready_persisted initial [\"node\",\"unrelated\"]) = (.boolean {}, .boolean {}) := by decide\n-- Native case {i}\n", values[0], values[1]));
+    }
+    assert_eq!(actual.lines().count(), 4);
+    proofs.push_str(
+        r#"
+theorem branch_order (s : Store α) (d : Bool) (h : s ["node","dirty"] = .boolean d) :
+ Subject.Ready_persisted s ["node","dirty"] = .boolean (!d) ∧
+ Subject.Ready_persisted s ["node","unrelated"] = .boolean d := by
+ cases d <;> simp [Subject.Ready_persisted, evalCondition, put, h]
+theorem frame (s : Store α) (key : Path)
+ (h : key ∉ writes Subject.Ready_persisted_ir) :
+ Subject.Ready_persisted s key = s key := by
+ rw [← Subject.Ready_persisted_correspondence]
+ exact execute_frame _ _ _ h
+"#,
+    );
+    fs::write(w.0.join("Proofs.lean"), proofs).unwrap();
+    let config = serde_json::json!({"crate_root":"lib.rs","namespace":"Subject","methods":["Ready::persisted"],"proofs":"Proofs.lean","obligations":[{"theorem":"branch_order","function":"Ready_persisted"},{"theorem":"frame","function":"Ready_persisted"}]});
+    let config_path = w.0.join("project.json");
+    fs::write(&config_path, config.to_string()).unwrap();
+    let out = w.0.join("out");
+    provium::methods::verify(&config_path, &out).unwrap();
+    w.source(&source.replace(
+        "if self.node.unrelated && !false",
+        "if !self.node.unrelated && !false",
+    ));
+    let error = provium::methods::verify(&config_path, &out).unwrap_err();
+    assert!(error.contains("Lean rejected Proofs.lean"), "{error}");
+    assert!(!out.join("verified.json").exists());
+}
+
+#[test]
+fn calls_are_resolved_inlined_and_bounded_without_opaque_effects() {
+    let w = Work::new();
+    let source = SOURCE
+        .replace("fn persisted(self)", "fn persisted(mut self)")
+        .replace("self.node.dirty=false;", "self.clear();")
+        + " impl Ready<'_>{fn clear(&mut self){self.node.dirty=false;}}";
+    let method = Crate::load(&w.source(&source))
+        .unwrap()
+        .lower("Ready::persisted")
+        .unwrap();
+    assert_eq!(method.writes.len(), 2);
+    assert!(
+        matches!(&method.body[0], provium::methods::Statement::Call {method,..} if method == "Ready::clear")
+    );
+    for bad in [
+        source.replace("self.node.dirty=false;", "self.clear();"),
+        source.replace("self.node.dirty=false;", "self.persisted();"),
+        source.replace("fn clear(&mut self)", "fn clear(self)"),
+        source.replace("self.clear();", "self.clear::<u64>();"),
+        source.replace("self.clear();", "self.clear(false);"),
+        source.replace("self.clear();", "self.node.clear();"),
+        source.replace("self.node.dirty=false;", "external();"),
+    ] {
+        assert!(
+            Crate::load(&w.source(&bad))
+                .unwrap()
+                .lower("Ready::persisted")
+                .is_err(),
+            "accepted {bad}"
+        );
+    }
+    let mut explosive = String::from("struct State {flag:bool} impl State {");
+    for i in 0..18 {
+        explosive.push_str(&format!(
+            "fn f{i}(&mut self){{self.f{}();self.f{}();}}",
+            i + 1,
+            i + 1
+        ));
+    }
+    explosive.push_str("fn f18(&mut self){} }");
+    let error = Crate::load(&w.source(&explosive))
+        .unwrap()
+        .lower("State::f0")
+        .unwrap_err();
+    assert!(error.contains("expansion exceeds budget"), "{error}");
 }

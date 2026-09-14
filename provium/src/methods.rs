@@ -1,4 +1,4 @@
-//! Whole-body translation for methods made exclusively of literal assignments.
+//! Whole-body translation of typed field assignments and boolean control flow.
 //! No statement is sliced away or accepted as an opaque call.
 use crate::project::{hash, Obligation, AUDIT, TOOLCHAIN};
 use quote::ToTokens;
@@ -38,6 +38,27 @@ pub enum Literal {
     Boolean(bool),
     Absent,
 }
+#[derive(Clone, Debug, Serialize)]
+pub enum Condition {
+    Boolean(bool),
+    Field(Vec<String>),
+    Not(Box<Condition>),
+    And(Box<Condition>, Box<Condition>),
+    Or(Box<Condition>, Box<Condition>),
+}
+#[derive(Clone, Debug, Serialize)]
+pub enum Statement {
+    Write(Write),
+    Call {
+        method: String,
+        body: Vec<Statement>,
+    },
+    Branch {
+        condition: Condition,
+        yes: Vec<Statement>,
+        no: Vec<Statement>,
+    },
+}
 #[derive(Debug, Serialize)]
 pub struct Method {
     pub name: String,
@@ -46,7 +67,9 @@ pub struct Method {
     pub first_line: usize,
     pub last_line: usize,
     pub rust: String,
+    /// All possible writes; execution order and guards live in `body`.
     pub writes: Vec<Write>,
+    pub body: Vec<Statement>,
 }
 struct Definition {
     module: String,
@@ -351,6 +374,19 @@ impl Crate {
         self.methods.keys().cloned().collect()
     }
     pub fn lower(&self, name: &str) -> Result<Method, String> {
+        self.lower_inner(name, &[], &std::cell::Cell::new(0))
+    }
+    fn lower_inner(
+        &self,
+        name: &str,
+        stack: &[String],
+        budget: &std::cell::Cell<usize>,
+    ) -> Result<Method, String> {
+        if stack.len() >= 32 || stack.iter().any(|n| n == name) {
+            return Err("recursive/deep method calls require termination semantics".into());
+        }
+        let mut stack = stack.to_vec();
+        stack.push(name.to_owned());
         let def = self
             .methods
             .get(name)
@@ -408,7 +444,168 @@ impl Crate {
             return Err("generic parameter shadows a primitive/prelude type".into());
         }
         let mut writes = vec![];
-        for stmt in &f.block.stmts {
+        let body = self.statements(def, &f.block.stmts, &mut writes, &stack, budget)?;
+        Ok(Method {
+            name: name.into(),
+            symbol: name.replace("::", "_"),
+            source: def.file.clone(),
+            first_line: f.span().start().line,
+            last_line: f.span().end().line,
+            rust: tokens(f),
+            writes,
+            body,
+        })
+    }
+    fn field_type<'a>(&'a self, def: &Definition, p: &[String]) -> Result<&'a Type, String> {
+        if p.is_empty() {
+            return Err("receiver replacement unsupported".into());
+        }
+        let mut current = def.receiver.clone();
+        let mut field_type = None;
+        for (index, part) in p.iter().enumerate() {
+            let structure = self
+                .structs
+                .get(&current)
+                .ok_or_else(|| format!("unresolved struct {current}"))?;
+            if structure
+                .generics
+                .type_params()
+                .any(|p| ["Option", "bool", "u64"].iter().any(|n| p.ident == *n))
+            {
+                return Err("generic parameter shadows a primitive/prelude type".into());
+            }
+            let field = structure
+                .fields
+                .iter()
+                .find(|f| f.ident.as_ref().is_some_and(|n| n == part))
+                .ok_or_else(|| format!("unknown field {current}.{part}"))?;
+            attrs(&field.attrs)?;
+            if index + 1 < p.len() {
+                let named = base_type(&field.ty)?;
+                if structure.generics.type_params().any(|p| p.ident == named) {
+                    return Err("generic field traversal requires type substitution".into());
+                }
+                current = self.resolve(&self.struct_modules[&current], &named, 0)?;
+                if structure.generics.type_params().any(|p| p.ident == current) {
+                    return Err("generic field traversal requires type substitution".into());
+                }
+            } else {
+                field_type = Some(&field.ty)
+            }
+        }
+        Ok(field_type.unwrap())
+    }
+    fn condition(&self, def: &Definition, expr: &Expr) -> Result<Condition, String> {
+        Ok(match expr {
+            Expr::Lit(l) => {
+                attrs(&l.attrs)?;
+                let syn::Lit::Bool(b) = &l.lit else {
+                    return Err("expected boolean condition".into());
+                };
+                Condition::Boolean(b.value)
+            }
+            Expr::Field(_) => {
+                let p = path(expr)?;
+                if tokens(self.field_type(def, &p)?) != "bool" {
+                    return Err("condition field must have builtin bool type".into());
+                }
+                Condition::Field(p)
+            }
+            Expr::Paren(p) => {
+                attrs(&p.attrs)?;
+                return self.condition(def, &p.expr);
+            }
+            Expr::Unary(u) if matches!(u.op, syn::UnOp::Not(_)) => {
+                attrs(&u.attrs)?;
+                Condition::Not(Box::new(self.condition(def, &u.expr)?))
+            }
+            Expr::Binary(b) => {
+                attrs(&b.attrs)?;
+                let left = Box::new(self.condition(def, &b.left)?);
+                let right = Box::new(self.condition(def, &b.right)?);
+                match b.op {
+                    syn::BinOp::And(_) => Condition::And(left, right),
+                    syn::BinOp::Or(_) => Condition::Or(left, right),
+                    _ => return Err("unsupported condition operator".into()),
+                }
+            }
+            _ => {
+                return Err(format!(
+                    "unsupported complete-method condition {}",
+                    tokens(expr)
+                ))
+            }
+        })
+    }
+    fn statements(
+        &self,
+        def: &Definition,
+        stmts: &[syn::Stmt],
+        writes: &mut Vec<Write>,
+        stack: &[String],
+        budget: &std::cell::Cell<usize>,
+    ) -> Result<Vec<Statement>, String> {
+        let mut body = vec![];
+        for stmt in stmts {
+            budget.set(budget.get() + 1);
+            if budget.get() > 100_000 {
+                return Err("method effect expansion exceeds budget".into());
+            }
+            if let syn::Stmt::Expr(Expr::MethodCall(call), Some(_)) = stmt {
+                attrs(&call.attrs)?;
+                if !path(&call.receiver)?.is_empty()
+                    || !call.args.is_empty()
+                    || call.turbofish.is_some()
+                {
+                    return Err("only receiver-local calls without arguments are supported".into());
+                }
+                let name = format!("{}::{}::{}", def.module, def.receiver, call.method)
+                    .trim_start_matches("::")
+                    .to_owned();
+                let callee = self.methods.get(&name).ok_or_else(|| {
+                    format!("unsupported complete-method statement: unresolved call {name}")
+                })?;
+                let Some(syn::FnArg::Receiver(receiver)) = callee.item.sig.inputs.first() else {
+                    return Err("call target is not an inherent receiver method".into());
+                };
+                if receiver.reference.is_none() || receiver.mutability.is_none() {
+                    return Err("inlined call requires a mutable borrowed receiver".into());
+                }
+                let lowered = self.lower_inner(&name, stack, budget)?;
+                writes.extend(lowered.writes);
+                body.push(Statement::Call {
+                    method: name,
+                    body: lowered.body,
+                });
+                if writes.len() > 100_000 {
+                    return Err("method effect expansion exceeds budget".into());
+                }
+                continue;
+            }
+            if let syn::Stmt::Expr(Expr::If(branch), _) = stmt {
+                attrs(&branch.attrs)?;
+                let condition = self.condition(def, &branch.cond)?;
+                let yes = self.statements(def, &branch.then_branch.stmts, writes, stack, budget)?;
+                let no = match &branch.else_branch {
+                    None => vec![],
+                    Some((_, expr)) => match &**expr {
+                        Expr::Block(b) if b.label.is_none() => {
+                            attrs(&b.attrs)?;
+                            self.statements(def, &b.block.stmts, writes, stack, budget)?
+                        }
+                        Expr::If(_) => self.statements(
+                            def,
+                            &[syn::Stmt::Expr(*expr.clone(), None)],
+                            writes,
+                            stack,
+                            budget,
+                        )?,
+                        _ => return Err("unsupported else expression".into()),
+                    },
+                };
+                body.push(Statement::Branch { condition, yes, no });
+                continue;
+            }
             let syn::Stmt::Expr(Expr::Assign(assign), Some(_)) = stmt else {
                 return Err(format!(
                     "unsupported complete-method statement at line {}: {}",
@@ -418,43 +615,7 @@ impl Crate {
             };
             attrs(&assign.attrs)?;
             let p = path(&assign.left)?;
-            if p.is_empty() {
-                return Err("receiver replacement unsupported".into());
-            }
-            let mut current = def.receiver.clone();
-            let mut field_type = None;
-            for (index, part) in p.iter().enumerate() {
-                let structure = self
-                    .structs
-                    .get(&current)
-                    .ok_or_else(|| format!("unresolved struct {current}"))?;
-                if structure
-                    .generics
-                    .type_params()
-                    .any(|p| ["Option", "bool", "u64"].iter().any(|n| p.ident == *n))
-                {
-                    return Err("generic parameter shadows a primitive/prelude type".into());
-                }
-                let field = structure
-                    .fields
-                    .iter()
-                    .find(|f| f.ident.as_ref().is_some_and(|n| n == part))
-                    .ok_or_else(|| format!("unknown field {current}.{part}"))?;
-                attrs(&field.attrs)?;
-                if index + 1 < p.len() {
-                    let named = base_type(&field.ty)?;
-                    if structure.generics.type_params().any(|p| p.ident == named) {
-                        return Err("generic field traversal requires type substitution".into());
-                    }
-                    current = self.resolve(&self.struct_modules[&current], &named, 0)?;
-                    if structure.generics.type_params().any(|p| p.ident == current) {
-                        return Err("generic field traversal requires type substitution".into());
-                    }
-                } else {
-                    field_type = Some(&field.ty)
-                }
-            }
-            let ty = field_type.unwrap();
+            let ty = self.field_type(def, &p)?;
             let literal = match (&*assign.right, tokens(ty).as_str()) {
                 (Expr::Lit(lit), "bool") => {
                     attrs(&lit.attrs)?;
@@ -477,22 +638,16 @@ impl Crate {
                     ))
                 }
             };
-            writes.push(Write {
+            let write = Write {
                 path: p,
                 rust_type: tokens(ty),
                 literal,
                 line: assign.span().start().line,
-            });
+            };
+            writes.push(write.clone());
+            body.push(Statement::Write(write));
         }
-        Ok(Method {
-            name: name.into(),
-            symbol: name.replace("::", "_"),
-            source: def.file.clone(),
-            first_line: f.span().start().line,
-            last_line: f.span().end().line,
-            rust: tokens(f),
-            writes,
-        })
+        Ok(body)
     }
 }
 fn lean_path(path: &[String]) -> String {
@@ -510,27 +665,80 @@ fn literal(lit: &Literal) -> String {
         Literal::Absent => ".absent".into(),
     }
 }
+fn condition(c: &Condition) -> String {
+    match c {
+        Condition::Boolean(b) => format!(".boolean {b}"),
+        Condition::Field(p) => format!(".field {}", lean_path(p)),
+        Condition::Not(c) => format!(".not ({})", condition(c)),
+        Condition::And(a, b) => format!(".and ({}) ({})", condition(a), condition(b)),
+        Condition::Or(a, b) => format!(".or ({}) ({})", condition(a), condition(b)),
+    }
+}
+fn program(body: &[Statement]) -> String {
+    match body.split_first() {
+        None => ".done".into(),
+        Some((stmt, rest)) => {
+            let first = match stmt {
+                Statement::Call { body, .. } => program(body),
+                Statement::Write(w) => {
+                    format!(".write ⟨{}, {}⟩", lean_path(&w.path), literal(&w.literal))
+                }
+                Statement::Branch {
+                    condition: c,
+                    yes,
+                    no,
+                } => format!(
+                    ".branch ({}) ({}) ({})",
+                    condition(c),
+                    program(yes),
+                    program(no)
+                ),
+            };
+            format!(".seq ({first}) ({})", program(rest))
+        }
+    }
+}
+fn executable(body: &[Statement], indent: usize) -> String {
+    let pad = " ".repeat(indent);
+    let mut text = String::new();
+    for stmt in body {
+        match stmt {
+            Statement::Call { body, .. } => {
+                text.push_str(&format!(
+                    "{pad}let state :=\n{}",
+                    executable(body, indent + 2)
+                ));
+            }
+            Statement::Write(w) => text.push_str(&format!(
+                "{pad}let state := put state {} ({})\n",
+                lean_path(&w.path),
+                literal(&w.literal)
+            )),
+            Statement::Branch {
+                condition: c,
+                yes,
+                no,
+            } => text.push_str(&format!(
+                "{pad}let state := if evalCondition ({}) state then\n{}{pad}else\n{}",
+                condition(c),
+                executable(yes, indent + 2),
+                executable(no, indent + 2)
+            )),
+        }
+    }
+    text.push_str(&format!("{pad}state\n"));
+    text
+}
 pub fn generate(methods: &[Method], namespace: &str) -> String {
     let mut text=format!("-- Generated from complete Rust method bodies; no sliced statements.\nimport Provium.State\nnamespace {namespace}\nopen Provium.State\n");
     for method in methods {
         let name = &method.symbol;
-        let writes = method
-            .writes
-            .iter()
-            .map(|w| format!("⟨{}, {}⟩", lean_path(&w.path), literal(&w.literal)))
-            .collect::<Vec<_>>()
-            .join(", ");
         text.push_str(&format!(
-            "def {name}_ir : List Write := [{writes}]\ndef {name} (state : Store α) : Store α :=\n"
+            "def {name}_ir : Program := {}\ndef {name} (state : Store α) : Store α :=\n{}",
+            program(&method.body),
+            executable(&method.body, 2)
         ));
-        for w in &method.writes {
-            text.push_str(&format!(
-                "  let state := put state {} ({})\n",
-                lean_path(&w.path),
-                literal(&w.literal)
-            ))
-        }
-        text.push_str(&format!("  state\ntheorem {name}_correspondence (state : Store α) : run {name}_ir state = {name} state := by rfl\n"));
+        text.push_str(&format!("theorem {name}_correspondence (state : Store α) : execute {name}_ir state = {name} state := by rfl\n"));
     }
     text.push_str(&format!("end {namespace}\n"));
     text

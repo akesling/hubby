@@ -201,11 +201,11 @@ condition is false. The condition, assignment target, and assigned expression al
 come from the source AST. **Its proof ends at that assignment point.** Later
 statements, effects of calls, and whole-method equivalence remain outside scope.
 
-Jarl's eight obligations establish:
+Jarl's ten scalar-rule obligations establish:
 
 | Selected rule | Proven property |
 | --- | --- |
-| Majority predicate | Strict majority and the cardinality inequality needed for majority overlap |
+| Majority predicate | Strict majority, count overlap, and a shared voter for two majorities of any finite voter list; stable/joint boundary overlap through each shared configuration |
 | Both quorum-position calculations | Index is in bounds for every positive, representable cluster size |
 | Joint commit minimum | Result is bounded by both supplied quorum indices |
 | Both follower commit minima | Result is bounded by the supplied leader and matched indices |
@@ -213,8 +213,10 @@ Jarl's eight obligations establish:
 | Current-term predicate | Acceptance requires equal supplied terms |
 
 The proofs quantify over counts, not a fixed cluster size, and run at both 32-bit
-and 64-bit `usize`. They do **not** prove that voter counts are correct, that two
-sets intersect without further set assumptions, that order statistics correspond
+and 64-bit `usize`. The intersection theorems assume that the supplied counts are filters of the
+same voter list; the joint theorem requires a majority in both configurations.
+They do **not** prove that Jarl computes those voter lists/counts correctly,
+that order statistics correspond
 to acknowledged voters, membership-transition safety, log matching, persistence
 ordering, or complete Raft safety/liveness. In particular, the commit trace is a
 trace of the extracted assignment prefix, not full `Node` execution.
@@ -233,8 +235,13 @@ cargo run --manifest-path provium/Cargo.toml --locked -- \
   --out provium/artifacts/jarl-methods
 ```
 
-The initial supported body language is a sequence of literal assignments to
-`bool` and `Option<u64>` fields, rooted at a receiver with exclusive access.
+The supported body language includes literal assignments to `bool` and
+`Option<u64>` fields, `if`/`else if`/`else`, boolean field reads, `!`, `&&`, and `||`,
+rooted at a receiver with exclusive access. Branches read the current store,
+including preceding writes. Direct receiver-local helper calls without arguments
+are resolved to inherent methods and inlined; their receivers must be `&mut self`.
+Recursion, unresolved calls, and expansion beyond the depth/node limits fail
+closed. Every branch and callee must translate, even when it appears unreachable.
 Methods must return unit and have no ordinary arguments. A consumed receiver is
 accepted only if every field is a mutable reference; custom receiver destructors
 are rejected. This avoids pretending implicit drops have no effects. Generic
@@ -249,13 +256,16 @@ the effect is algebraically idempotent. No statement after an assignment is
 excluded. This is not permission to reuse a consumed token or acknowledge a save
 that did not happen.
 
-The generated function and instruction list share a generic field-store
+The generated function and instruction tree share a generic field-store
 semantics in `lean/Provium/State.lean`; their correspondence is checked for every
 initial store. Stores map **leaf locations**, not overlapping aggregate values,
 to cells with arbitrary opaque payloads. Rust-to-store representation, exclusive
 borrowing, field resolution, and frontend translation remain trusted. The frame
 theorem does not assert that a containing aggregate is unchanged when one of its
-fields changes. The storage backend's durability contract remains an assumption.
+fields changes. A kernel-checked structural frame theorem covers all branches
+and sequential effects. Non-boolean cells have a total extension when read as a
+condition; Rust refinement requires boolean source fields to contain boolean
+cells. The storage backend's durability contract remains an assumption.
 
 The method manifest includes all loaded production Rust files, the complete
 selected bodies, source-resolved written types, and the remaining unproved
@@ -265,6 +275,9 @@ invariants also require proofs. `verified.json` explicitly records
 `whole_raft_proved: false`. The new proofs are component evidence, not a complete
 Raft proof. Both literal-mutation controls and a mutation of Jarl's actual
 acknowledgment code must fail in Lean, not merely in the parser or compiler.
+Conditional/helper-call tests compare compiled Rust outcomes with Lean, prove
+state-update ordering and framing for arbitrary stores, and require a changed
+branch to break the proof.
 
 ## Validation and next boundary
 

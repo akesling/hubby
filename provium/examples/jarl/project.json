@@ -12,6 +12,14 @@
       "function": "majority"
     },
     {
+      "theorem": "JarlProofs.majority_intersection",
+      "function": "majority"
+    },
+    {
+      "theorem": "JarlProofs.joint_transition_intersection",
+      "function": "majority"
+    },
+    {
       "theorem": "JarlProofs.majority_position_in_bounds",
       "function": "majority_position"
     },

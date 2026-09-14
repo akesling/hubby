@@ -26,6 +26,58 @@ theorem majority_cardinality_overlap (a b total : Nat)
   simp at qa qb
   omega
 
+-- A concrete shared identity, for any finite runtime voter population. The
+-- caller must connect these predicates/counts to the membership iterator;
+-- translating that iterator and its FnMut effects remains an open obligation.
+private theorem disjoint_counts (voters : List α) (a b : α → Bool)
+    (disjoint : ∀ id ∈ voters, ¬ (a id = true ∧ b id = true)) :
+    (voters.filter a).length + (voters.filter b).length ≤ voters.length := by
+  induction voters with
+  | nil => simp
+  | cons id rest ih =>
+    have hd := disjoint id (by simp)
+    have tail := ih (by intro x hx; exact disjoint x (by simp [hx]))
+    cases ha : a id <;> cases hb : b id <;>
+      simp_all <;> omega
+
+theorem majority_intersection (voters : List α) (a b : α → Bool)
+    (bounded : voters.length < 2^JarlRules.proviumUsizeBits)
+    (qa : JarlRules.majority
+      [.uint JarlRules.proviumUsizeBits (voters.filter a).length,
+       .uint JarlRules.proviumUsizeBits voters.length] = .ok (.boolean true))
+    (qb : JarlRules.majority
+      [.uint JarlRules.proviumUsizeBits (voters.filter b).length,
+       .uint JarlRules.proviumUsizeBits voters.length] = .ok (.boolean true)) :
+    ∃ id ∈ voters, a id = true ∧ b id = true := by
+  have ha := List.length_filter_le a voters
+  have hb := List.length_filter_le b voters
+  have overlap := majority_cardinality_overlap _ _ _ (by omega) (by omega) bounded qa qb
+  by_cases shared : ∃ id ∈ voters, a id = true ∧ b id = true
+  · exact shared
+  · have disjoint : ∀ id ∈ voters, ¬ (a id = true ∧ b id = true) := by
+      intro id member both
+      exact shared ⟨id, member, both⟩
+    have := disjoint_counts voters a b disjoint
+    omega
+
+-- Stable-to-joint and joint-to-stable quorums overlap through the common
+-- configuration. This does not assume that arbitrary old/new sets intersect.
+theorem joint_transition_intersection (old new : List α) (before joint after : α → Bool)
+    (ho : old.length < 2^JarlRules.proviumUsizeBits)
+    (hn : new.length < 2^JarlRules.proviumUsizeBits)
+    (qb : JarlRules.majority [.uint JarlRules.proviumUsizeBits (old.filter before).length,
+      .uint JarlRules.proviumUsizeBits old.length] = .ok (.boolean true))
+    (qjo : JarlRules.majority [.uint JarlRules.proviumUsizeBits (old.filter joint).length,
+      .uint JarlRules.proviumUsizeBits old.length] = .ok (.boolean true))
+    (qjn : JarlRules.majority [.uint JarlRules.proviumUsizeBits (new.filter joint).length,
+      .uint JarlRules.proviumUsizeBits new.length] = .ok (.boolean true))
+    (qa : JarlRules.majority [.uint JarlRules.proviumUsizeBits (new.filter after).length,
+      .uint JarlRules.proviumUsizeBits new.length] = .ok (.boolean true)) :
+    (∃ id ∈ old, before id = true ∧ joint id = true) ∧
+    (∃ id ∈ new, joint id = true ∧ after id = true) := by
+  exact ⟨majority_intersection old before joint ho qb qjo,
+    majority_intersection new joint after hn qjn qa⟩
+
 theorem majority_position_in_bounds (total : Nat)
     (positive : 0 < total) (bounded : total < 2^JarlRules.proviumUsizeBits) :
     ∃ index, JarlRules.majority_position [.uint JarlRules.proviumUsizeBits total] = .ok (.uint JarlRules.proviumUsizeBits index)

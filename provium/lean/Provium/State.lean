@@ -41,4 +41,57 @@ theorem frame (writes : List Write) (state : Store α) (key : Path)
     simp only [run]
     rw [ih _ (by intro w hw; exact untouched w (List.mem_cons_of_mem _ hw))]
     exact if_neg (untouched write (by simp))
+-- Ill-typed stores have a total extension (non-boolean cells read as false).
+-- Rust refinement only relates stores whose accessed leaves have their source type.
+inductive Condition where
+  | boolean (value : Bool)
+  | field (path : Path)
+  | not (condition : Condition)
+  | and (left right : Condition)
+  | or (left right : Condition)
+  deriving Repr
+
+def evalCondition : Condition → Store α → Bool
+  | .boolean b, _ => b
+  | .field p, state => match state p with | .boolean b => b | _ => false
+  | .not c, state => !(evalCondition c state)
+  | .and a b, state => evalCondition a state && evalCondition b state
+  | .or a b, state => evalCondition a state || evalCondition b state
+
+inductive Program where
+  | done
+  | write (effect : Write)
+  | seq (first rest : Program)
+  | branch (condition : Condition) (yes no : Program)
+  deriving Repr
+
+def execute : Program → Store α → Store α
+  | .done, state => state
+  | .write w, state => put state w.path (value w.value)
+  | .seq first rest, state => execute rest (execute first state)
+  | .branch c yes no, state =>
+    if evalCondition c state then execute yes state else execute no state
+
+def writes : Program → List Path
+  | .done => []
+  | .write w => [w.path]
+  | .seq a b => writes a ++ writes b
+  | .branch _ a b => writes a ++ writes b
+
+theorem execute_frame (program : Program) (state : Store α) (key : Path)
+    (untouched : key ∉ writes program) :
+    execute program state key = state key := by
+  induction program generalizing state with
+  | done => rfl
+  | write w =>
+    exact if_neg (by simpa [writes] using untouched)
+  | seq first rest ihfirst ihrest =>
+    simp only [writes, List.mem_append, not_or] at untouched
+    exact (ihrest _ untouched.2).trans (ihfirst _ untouched.1)
+  | branch c yes no ihyes ihno =>
+    simp only [writes, List.mem_append, not_or] at untouched
+    simp only [execute]
+    split
+    · exact ihyes _ untouched.1
+    · exact ihno _ untouched.2
 end Provium.State
