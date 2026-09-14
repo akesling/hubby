@@ -173,6 +173,32 @@ fn generated_lean_agrees_with_native_rust_boundary_results() {
             proof.push_str(&format!("{declaration} : Subject.arithmetic [.uint 8 {x}, .uint 8 {y}] = .ok (.uint 8 {result}) := by rfl\n"));
         }
     }
+    for x in [0u8, 1, 128, 255] {
+        for y in [0u8, 1, 7, 8, 255] {
+            let bits = x.wrapping_mul(y) ^ ((x & y) | (x ^ y));
+            proof.push_str(&format!("example : Subject.bits [.uint 8 {x}, .uint 8 {y}] = .ok (.uint 8 {bits}) := by rfl\n"));
+            for (name, result) in [
+                ("shl", x.checked_shl(y.into())),
+                ("shr", x.checked_shr(y.into())),
+            ] {
+                let expected = result.map_or_else(
+                    || ".error .overflow".to_string(),
+                    |n| format!(".ok (.uint 8 {n})"),
+                );
+                proof.push_str(&format!(
+                    "example : Subject.{name} [.uint 8 {x}, .uint 8 {y}] = {expected} := by rfl\n"
+                ));
+            }
+        }
+    }
+    for x in [0u64, 1, u64::MAX / 2, u64::MAX] {
+        let y = 0x9e3779b97f4a7c15u64;
+        let a = x.wrapping_add(y);
+        let b = (a ^ (a >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
+        let c = (b ^ (b >> 27)).wrapping_mul(0x94d049bb133111eb);
+        let result = c ^ (c >> 31);
+        proof.push_str(&format!("example : Subject.mix [.uint 64 {x}, .uint 64 {y}] = .ok (.uint 64 {result}) := by rfl\n"));
+    }
     proof.push_str("example : Subject.call_order [.uint 8 255, .uint 8 0] = .error .overflow := by rfl\nexample : Subject.div [.uint 8 1, .uint 8 0] = .error .divisionByZero := by rfl\nexample : Subject.assertion [.uint 8 2, .uint 8 1] = .error .assertion := by rfl\n");
     w.write("Proofs.lean", &proof);
     verify(&p, &w.out()).unwrap();

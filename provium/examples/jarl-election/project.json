@@ -1,0 +1,23 @@
+{
+  "scalar_method": {
+    "crate_root": "../../../jarl/src/lib.rs",
+    "method": "node::Node::reset_election"
+  },
+  "namespace": "JarlElection",
+  "usize_bits": 64,
+  "proofs": "Proofs.lean",
+  "obligations": [
+    {
+      "theorem": "Election.elapsed_reset",
+      "function": "node_Node_reset_election_elapsed"
+    },
+    {
+      "theorem": "Election.deadline_range",
+      "function": "node_Node_reset_election_election_deadline"
+    },
+    {
+      "theorem": "Election.random_advanced",
+      "function": "node_Node_reset_election_random"
+    }
+  ]
+}

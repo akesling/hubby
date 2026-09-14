@@ -909,3 +909,5 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
     fs::write(out.join("verified.json"),serde_json::to_vec_pretty(&serde_json::json!({"manifest_sha256":hash(bytes),"whole_raft_proved":false,"complete_method_bodies":methods.len(),"obligations":project.obligations.len()})).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;
     Ok(format!("Verified {} complete method bodies and {} obligations in field-store semantics. Whole-Raft proof remains incomplete.\n{report}",methods.len(),project.obligations.len()))
 }
+
+pub mod scalar;

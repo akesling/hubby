@@ -6,3 +6,5 @@ cargo run --locked -- verify examples/assertions/project.json --out artifacts/as
 cargo test --locked --test lean -- --ignored
 cargo run --locked -- verify-methods examples/jarl-methods/project.json --out artifacts/jarl-methods
 cargo test --locked --test methods -- --ignored
+cargo run --locked -- verify examples/jarl-election/project.json --out artifacts/jarl-election
+cargo test --locked --test scalar_methods -- --ignored

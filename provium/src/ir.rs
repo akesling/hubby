@@ -40,6 +40,12 @@ pub enum Op {
     SaturatingSub,
     WrappingAdd,
     WrappingSub,
+    WrappingMul,
+    BitAnd,
+    BitOr,
+    BitXor,
+    Shl,
+    Shr,
 }
 impl Op {
     pub fn lean(self) -> &'static str {
@@ -61,6 +67,12 @@ impl Op {
             Self::SaturatingSub => "saturatingSub",
             Self::WrappingAdd => "wrappingAdd",
             Self::WrappingSub => "wrappingSub",
+            Self::WrappingMul => "wrappingMul",
+            Self::BitAnd => "bitAnd",
+            Self::BitOr => "bitOr",
+            Self::BitXor => "bitXor",
+            Self::Shl => "shl",
+            Self::Shr => "shr",
         }
     }
     pub fn comparison(self) -> bool {
@@ -235,6 +247,14 @@ pub fn binary(op: Op, a: Value, b: Value) -> Outcome {
         Op::SaturatingSub => word(bits, a.saturating_sub(b)),
         Op::WrappingAdd => word(bits, (a + b) % bound),
         Op::WrappingSub => word(bits, (a + bound - b) % bound),
+        Op::WrappingMul => word(bits, (a * b) % bound),
+        Op::BitAnd => word(bits, a & b),
+        Op::BitOr => word(bits, a | b),
+        Op::BitXor => word(bits, a ^ b),
+        Op::Shl | Op::Shr if b >= bits as u128 => Err(Fault::Overflow),
+        // A valid left shift discards high bits even with overflow checks on.
+        Op::Shl => word(bits, (a << b) % bound),
+        Op::Shr => word(bits, a >> b),
     }
 }
 pub fn evaluate(expr: &Expr, env: &[Value]) -> Outcome {

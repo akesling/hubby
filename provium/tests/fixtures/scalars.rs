@@ -53,3 +53,21 @@ fn nested_calls(x: u8, y: u8) -> u8 {
 fn short_circuit(x: u8, y: u8) -> bool {
     x == 0 || !(y / x != 1)
 }
+fn bits(x: u8, y: u8) -> u8 {
+    let mut a = x.wrapping_mul(y);
+    a ^= (x & y) | (x ^ y);
+    a
+}
+fn shl(x: u8, y: u8) -> u8 {
+    x << y
+}
+fn shr(x: u8, y: u8) -> u8 {
+    x >> y
+}
+fn mix(x: u64, y: u64) -> u64 {
+    let a = x.wrapping_add(y);
+    let mut b = (a ^ (a >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
+    b = (b ^ (b >> 27)).wrapping_mul(0x94d049bb133111eb);
+    b ^= b >> 31;
+    b
+}

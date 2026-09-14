@@ -108,7 +108,7 @@ still be a valid, useless theorem. Review the statements and assumptions.
 
 ## Translate closed functions
 
-A project uses either `source` or `slices`, never both:
+A scalar project chooses exactly one input: `source`, `slices`, or `scalar_method`:
 
 ```json
 {
@@ -136,7 +136,10 @@ Supported today:
   assignments at the outer function block.
 - Tail expressions, expression-valued `if/else`, lazy `&&`/`||`, boolean `!`,
   comparisons, `+`, `-`, `*`, `/`, and `%`.
-- Unsigned `min`, `max`, `saturating_add/sub`, and `wrapping_add/sub`.
+- Unsigned `min`, `max`, `saturating_add/sub`, and `wrapping_add/sub/mul`.
+- Unsigned bitwise `&`, `|`, `^`, same-type `<<`/`>>`, and local `^=`.
+  Shift counts outside the operand width fault; valid left shifts discard high
+  bits, matching Rust even when checked arithmetic is enabled.
 - `assert!(condition)` without formatting arguments.
 - Direct, acyclic calls within the same file, with eager left-to-right arguments.
 
@@ -278,6 +281,45 @@ acknowledgment code must fail in Lean, not merely in the parser or compiler.
 Conditional/helper-call tests compare compiled Rust outcomes with Lean, prove
 state-update ordering and framing for arbitrary stores, and require a changed
 branch to break the proof.
+
+## Complete scalar-method projections
+
+The [election project](examples/jarl-election/project.json) uses:
+
+```json
+{
+  "scalar_method": {
+    "crate_root": "../../../jarl/src/lib.rs",
+    "method": "node::Node::reset_election"
+  },
+  "namespace": "JarlElection",
+  "usize_bits": 64
+}
+```
+
+This mode resolves all accessed field types from the original production crate,
+checks that crate with rustc, and generates a scalar function for every written
+field. Each function executes **every statement** before returning its field:
+a later division fault also faults an earlier field's projection. The manifest
+records the original complete method, all source files, field paths/types,
+parameter order, and generated projection names. No hand-written field bindings
+or expression selectors are accepted. Currently it admits `&mut self`, no
+ordinary parameters, a unit return, builtin `u64` fields, and bodies accepted by
+the closed scalar frontend after field resolution. Unsupported syntax fails
+closed; generated identifiers cannot collide with source locals.
+
+These are successful-state projections. A fault does **not** describe the Rust
+store after partial mutation; proving a successful result is required before
+using a final-field contract. Borrow/layout refinement and frontend translation
+remain trusted. This does not establish a whole-Raft proof or election liveness.
+
+For the unchanged `Node::reset_election`, the contracts require a positive tick
+interval at most `2^63` and valid `u64` inputs. They state successful execution of
+every projection, elapsed time reset to zero, the exact wrapping seed advance,
+and a deadline in `[ticks, 2*ticks)` within `u64`. The tick-range assumption must
+still be connected to reachable Jarl configurations. Native Rust comparisons and
+source mutations exercise these projections through the normal verification
+scripts.
 
 ## Validation and next boundary
 

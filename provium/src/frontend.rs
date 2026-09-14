@@ -211,6 +211,16 @@ impl Compiler {
                 let body = self.stmts(rest, &inner, result, assignments)?;
                 Ok(Expr { ty: result, kind: Kind::Let { value: Box::new(value), body: Box::new(body) } })
             }
+            Stmt::Expr(RustExpr::Binary(binary), Some(semi)) if matches!(binary.op, BinOp::BitXorAssign(_)) => {
+                attributes(&binary.attrs)?;
+                if path_name(&binary.left).is_none() { return fail(binary, "compound assignment requires a local variable"); }
+                let left = &binary.left;
+                let right = &binary.right;
+                let assign: RustExpr = syn::parse_quote!(#left = #left ^ (#right));
+                let mut normalized = vec![Stmt::Expr(assign, Some(*semi))];
+                normalized.extend_from_slice(rest);
+                self.stmts(&normalized, env, result, assignments)
+            }
             Stmt::Expr(RustExpr::Assign(assign), Some(_)) => {
                 attributes(&assign.attrs)?;
                 if !assignments { return fail(assign, "assignments inside nested blocks require state-threading semantics"); }
@@ -371,6 +381,11 @@ impl Compiler {
                         BinOp::Mul(_) => Op::Mul,
                         BinOp::Div(_) => Op::Div,
                         BinOp::Rem(_) => Op::Rem,
+                        BinOp::BitAnd(_) => Op::BitAnd,
+                        BinOp::BitOr(_) => Op::BitOr,
+                        BinOp::BitXor(_) => Op::BitXor,
+                        BinOp::Shl(_) => Op::Shl,
+                        BinOp::Shr(_) => Op::Shr,
                         BinOp::Eq(_) => Op::Eq,
                         BinOp::Ne(_) => Op::Ne,
                         BinOp::Lt(_) => Op::Lt,
@@ -436,6 +451,7 @@ impl Compiler {
                     "saturating_sub" => Op::SaturatingSub,
                     "wrapping_add" => Op::WrappingAdd,
                     "wrapping_sub" => Op::WrappingSub,
+                    "wrapping_mul" => Op::WrappingMul,
                     _ => {
                         return fail(
                             m,

@@ -18,6 +18,9 @@ mod native {
     pub fn byte(name: &str, x: u8, y: u8) -> u8 {
         match name {
             "arithmetic" => arithmetic(x, y),
+            "bits" => bits(x, y),
+            "shl" => shl(x, y),
+            "shr" => shr(x, y),
             "add" => add(x, y),
             "sub" => sub(x, y),
             "mul" => mul(x, y),
@@ -28,6 +31,9 @@ mod native {
             "increment" => increment(x),
             _ => unreachable!(),
         }
+    }
+    pub fn mixer(x: u64, y: u64) -> u64 {
+        mix(x, y)
     }
     pub fn wide(x: u64, y: u64) -> u64 {
         choose(x, y)
@@ -56,8 +62,8 @@ fn lowering_agrees_with_compiled_rust() {
     for x in 0..=255u8 {
         for y in 0..=255u8 {
             let args = [uint(8, x.into()), uint(8, y.into())];
-            for name in ["guarded_division", "arithmetic"] {
-                let actual = if name == "arithmetic" {
+            for name in ["guarded_division", "arithmetic", "bits"] {
+                let actual = if name != "guarded_division" {
                     uint(8, native::byte(name, x, y).into())
                 } else {
                     Value::Bool(native::boolean(name, x, y))
@@ -73,6 +79,8 @@ fn lowering_agrees_with_compiled_rust() {
     for x in [0, 1, 2, 7, 127, 128, 254, 255] {
         for y in [0, 1, 2, 7, 127, 128, 254, 255] {
             for name in [
+                "shl",
+                "shr",
                 "add",
                 "sub",
                 "mul",
@@ -106,6 +114,10 @@ fn lowering_agrees_with_compiled_rust() {
     }
     for x in [0, 1, 2, u64::MAX / 2, u64::MAX] {
         for y in [0, 1, 2, u64::MAX / 2, u64::MAX] {
+            assert_eq!(
+                ir::run(&functions["mix"], &[uint(64, x), uint(64, y)], usize::BITS),
+                Ok(uint(64, native::mixer(x, y)))
+            );
             assert_eq!(
                 ir::run(
                     &functions["choose"],

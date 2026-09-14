@@ -20,7 +20,8 @@ abbrev Result := Except Fault Value
 abbrev Env := List Value
 inductive Op where
   | add | sub | mul | div | rem | eq | ne | lt | le | gt | ge | min | max
-  | saturatingAdd | saturatingSub | wrappingAdd | wrappingSub
+  | saturatingAdd | saturatingSub | wrappingAdd | wrappingSub | wrappingMul
+  | bitAnd | bitOr | bitXor | shl | shr
   deriving Repr, DecidableEq
 
 def validWidth (w : Nat) : Bool := w == 8 || w == 16 || w == 32 || w == 64
@@ -75,6 +76,12 @@ def uintOp (op : Op) (w a b : Nat) : Result :=
   | .saturatingSub => word w (a - b)
   | .wrappingAdd => word w ((a + b) % 2^w)
   | .wrappingSub => word w ((a + 2^w - b) % 2^w)
+  | .wrappingMul => word w ((a * b) % 2^w)
+  | .bitAnd => word w (Nat.land a b)
+  | .bitOr => word w (Nat.lor a b)
+  | .bitXor => word w (Nat.xor a b)
+  | .shl => if b < w then word w ((a * 2^b) % 2^w) else .error .overflow
+  | .shr => if b < w then word w (a / 2^b) else .error .overflow
 
 def binary (op : Op) (left right : Value) : Result :=
   match left, right with

@@ -19,6 +19,7 @@ pub struct Obligation {
 #[serde(deny_unknown_fields)]
 pub struct Project {
     pub source: Option<PathBuf>,
+    pub scalar_method: Option<crate::methods::scalar::Request>,
     #[serde(default)]
     pub slices: Vec<crate::extract::Slice>,
     pub namespace: String,
@@ -46,6 +47,7 @@ pub struct Manifest {
     pub lean_toolchain: String,
     pub sources: Vec<Source>,
     pub extraction: Vec<crate::extract::Evidence>,
+    pub scalar_method: Option<crate::methods::scalar::Evidence>,
     pub source_path: String,
     pub source_sha256: String,
     pub semantics_sha256: String,
@@ -76,8 +78,12 @@ fn identifier(name: &str) -> bool {
 pub fn read(path: &Path) -> Result<Project, String> {
     let project: Project = serde_json::from_slice(&io(fs::read(path))?)
         .map_err(|e| format!("invalid project file: {e}"))?;
-    if project.source.is_some() != project.slices.is_empty() {
-        return Err("choose exactly one: source or nonempty slices".into());
+    if usize::from(project.source.is_some())
+        + usize::from(!project.slices.is_empty())
+        + usize::from(project.scalar_method.is_some())
+        != 1
+    {
+        return Err("choose exactly one: source, scalar_method, or nonempty slices".into());
     }
     if !identifier(&project.namespace) {
         return Err("invalid Lean namespace".into());
@@ -128,6 +134,7 @@ pub fn compile(project_path: &Path, output: &Path) -> Result<Manifest, String> {
     let mut sources = Vec::<Source>::new();
     let mut snapshots = Vec::<String>::new();
     let mut extraction = vec![];
+    let mut scalar_method = None;
     let source = if let Some(path) = &project.source {
         let path = io(base.join(path).canonicalize())?;
         let text = io(fs::read_to_string(&path))?;
@@ -137,6 +144,19 @@ pub fn compile(project_path: &Path, output: &Path) -> Result<Manifest, String> {
             snapshot: "Source.rs".into(),
         });
         text
+    } else if let Some(request) = &project.scalar_method {
+        let krate = crate::methods::Crate::load(&base.join(&request.crate_root))?;
+        let translation = krate.scalar_projections(&request.method)?;
+        scalar_method = Some(translation.evidence);
+        for (path, text) in translation.files {
+            sources.push(Source {
+                path: path.display().to_string(),
+                sha256: hash(&text),
+                snapshot: format!("Inputs/{}.rs", snapshots.len()),
+            });
+            snapshots.push(text);
+        }
+        translation.source
     } else {
         for slice in &project.slices {
             let path = io(base.join(&slice.source).canonicalize())?;
@@ -170,7 +190,7 @@ pub fn compile(project_path: &Path, output: &Path) -> Result<Manifest, String> {
     let source_path = if project.source.is_some() {
         sources[0].path.clone()
     } else {
-        "Source.rs (generated abstraction; see extraction evidence)".into()
+        "Source.rs (generated abstraction; see extraction/scalar-method evidence)".into()
     };
     let functions = Compiler::parse(&source, project.usize_bits)?
         .compile()
@@ -234,6 +254,33 @@ pub fn compile(project_path: &Path, output: &Path) -> Result<Manifest, String> {
         return Err("input files must be outside the output directory".into());
     }
     // Reject invalid Rust too: syn is a parser, not Rust's type checker.
+    if let Some(request) = &project.scalar_method {
+        let mut rustc = Command::new("rustc");
+        rustc
+            .args([
+                "--crate-name",
+                "provium_original",
+                "--crate-type",
+                "lib",
+                "--emit=metadata",
+                "--edition=2021",
+                "-C",
+                "overflow-checks=yes",
+            ])
+            .arg(base.join(&request.crate_root))
+            .arg("-o")
+            .arg(output.join("original.rmeta"));
+        if let Some(target) = &project.rust_target {
+            rustc.args(["--target", target]);
+        }
+        let checked = io(rustc.output())?;
+        if !checked.status.success() {
+            return Err(format!(
+                "rustc rejected original crate: {}",
+                String::from_utf8_lossy(&checked.stderr)
+            ));
+        }
+    }
     let rustc = rustc_output(&["--version"], None)?;
     let cfg = rustc_output(&["--print", "cfg"], project.rust_target.as_deref())?;
     if !cfg
@@ -311,6 +358,7 @@ pub fn compile(project_path: &Path, output: &Path) -> Result<Manifest, String> {
     }
     io(fs::write(output.join("Check.lean"), audit))?;
     let manifest = Manifest {
+        scalar_method,
         rustc: rustc.trim().into(), rust_target_cfg: cfg,
         compiler_sha256: hash(io(fs::read(io(std::env::current_exe())?))?),
         config_sha256: config_hash, audit_sha256: hash(AUDIT),
@@ -319,7 +367,7 @@ pub fn compile(project_path: &Path, output: &Path) -> Result<Manifest, String> {
         semantics_sha256: hash(SEMANTICS), generated_sha256: hash(generated), proofs_sha256: proofs.map(hash),
         usize_bits: project.usize_bits, overflow: "checked (explicit wrapping/saturating methods retain their semantics)",
         functions, obligations: project.obligations,
-        trusted_boundary: "syn parsing, source name/type checking and AST-to-IR lowering, the specified Rust subset semantics, explicit slice bindings and scope (when used), and Lean's trusted implementation. Generated correspondence proves backend agreement with IR, not frontend correctness or whole-Jarl safety.",
+        trusted_boundary: "syn parsing, source name/type checking and AST-to-IR lowering, the specified Rust subset semantics, explicit slice bindings and scope (when used), successful-state field projections and borrow/layout refinement (when used), and Lean's trusted implementation. Generated correspondence proves backend agreement with IR, not frontend correctness or whole-Jarl safety.",
     };
     io(fs::write(
         output.join("manifest.json"),
@@ -440,7 +488,7 @@ pub fn verify(project_path: &Path, output: &Path) -> Result<String, String> {
             return Err(format!("artifact {file} changed during verification"));
         }
     }
-    let certificate = serde_json::json!({ "manifest_sha256": hash(io(fs::read(output.join("manifest.json")))?), "source_sha256": manifest.source_sha256, "generated_sha256": manifest.generated_sha256, "semantics_sha256": manifest.semantics_sha256, "proofs_sha256": manifest.proofs_sha256, "lean": String::from_utf8_lossy(&version.stdout).trim(), "backend_certificates": manifest.functions.len(), "invariant_obligations": manifest.obligations.len(), "audit": report, "trust_boundary": manifest.trusted_boundary });
+    let certificate = serde_json::json!({ "whole_raft_proved": false, "manifest_sha256": hash(io(fs::read(output.join("manifest.json")))?), "source_sha256": manifest.source_sha256, "generated_sha256": manifest.generated_sha256, "semantics_sha256": manifest.semantics_sha256, "proofs_sha256": manifest.proofs_sha256, "lean": String::from_utf8_lossy(&version.stdout).trim(), "backend_certificates": manifest.functions.len(), "invariant_obligations": manifest.obligations.len(), "audit": report, "trust_boundary": manifest.trusted_boundary });
     io(fs::write(
         output.join("verified.json"),
         serde_json::to_string_pretty(&certificate).map_err(|e| e.to_string())?,
