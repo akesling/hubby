@@ -282,6 +282,32 @@ Conditional/helper-call tests compare compiled Rust outcomes with Lean, prove
 state-update ordering and framing for arbitrary stores, and require a changed
 branch to break the proof.
 
+## Complete optional-record array methods
+
+The [membership project](examples/jarl-membership/project.json) translates both
+`Membership::finalized` and `Membership::is_joint` from their complete production
+bodies. Array traversal supports a single receiver array of optional records,
+exclusive iteration, a `Some` binding, typed boolean field updates/branches, and
+slot deletion. The consumed receiver and records must derive builtin `Copy`,
+which rustc checks, so deletion cannot hide destructors. Read-only queries support
+`iter().flatten().any(...)` with a pure boolean record predicate. Custom trait
+methods that could shadow the modeled iterator operations cause rejection.
+
+Arrays are modeled as lists with their empty slots preserved. Proofs quantify
+over arbitrary lengths, including zero, rather than an enumerated cluster size.
+They establish preserved capacity; retention exactly for target voters or
+learners; cleared old-voter flags; unchanged retained fields and identities; and
+that the generated `is_joint` returns false after generated `finalized`.
+
+The reserved `$present` cell records slot deletion inside Provium and cannot name
+a Rust field. It is excluded from record-field frame claims. The same trusted
+frontend and Rust representation/borrow boundary applies as for other method
+proofs. These contracts do not establish that a reachable Raft leader is
+*authorized* to finalize a configuration, or that its entry has been committed.
+The tests compare the actual method bodies with interpreted generated effects
+for every optional-record combination at capacities 0–3, and require mutations of
+retention, old-voter clearing, and the joint query to fail in Lean.
+
 ## Complete scalar-method projections
 
 The [election project](examples/jarl-election/project.json) uses:

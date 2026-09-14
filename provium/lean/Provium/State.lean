@@ -94,4 +94,23 @@ theorem execute_frame (program : Program) (state : Store α) (key : Path)
     split
     · exact ihyes _ untouched.1
     · exact ihno _ untouched.2
+-- Option-array representation preserves empty slots and capacity. The reserved
+-- presence leaf records slot deletion and is not a Rust record field.
+abbrev ArrayStore (α : Type) := List (Option (Store α))
+def mapSlot (effect : Store α → Store α) : Option (Store α) → Option (Store α)
+  | none => none
+  | some state =>
+    let result := effect (put state ["$present"] (.boolean true))
+    if evalCondition (.field ["$present"]) result then some result else none
+
+def executeArray (program : Program) (entries : ArrayStore α) : ArrayStore α :=
+  entries.map (mapSlot (execute program))
+
+theorem executeArray_length (program : Program) (entries : ArrayStore α) :
+    (executeArray program entries).length = entries.length := by
+  simp [executeArray]
+def queryArray (predicate : Condition) (entries : ArrayStore α) : Bool :=
+  entries.any (fun entry => match entry with
+    | none => false
+    | some state => evalCondition predicate state)
 end Provium.State

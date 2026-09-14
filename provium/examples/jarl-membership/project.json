@@ -1,0 +1,35 @@
+{
+  "crate_root": "../../../jarl/src/lib.rs",
+  "namespace": "JarlMembership",
+  "methods": [
+    "membership::Membership::finalized",
+    "membership::Membership::is_joint"
+  ],
+  "proofs": "Proofs.lean",
+  "obligations": [
+    {
+      "theorem": "Finalization.capacity_preserved",
+      "function": "membership_Membership_finalized"
+    },
+    {
+      "theorem": "Finalization.slot_effect",
+      "function": "membership_Membership_finalized"
+    },
+    {
+      "theorem": "Finalization.retained_fields",
+      "function": "membership_Membership_finalized"
+    },
+    {
+      "theorem": "Finalization.all_old_flags_cleared",
+      "function": "membership_Membership_finalized"
+    },
+    {
+      "theorem": "Finalization.no_longer_joint",
+      "function": "membership_Membership_is_joint"
+    },
+    {
+      "theorem": "Finalization.identity_origin",
+      "function": "membership_Membership_finalized"
+    }
+  ]
+}

@@ -41,3 +41,4 @@ jobs:
             provium/artifacts/assertions
             provium/artifacts/jarl-methods
             provium/artifacts/jarl-election
+            provium/artifacts/jarl-membership

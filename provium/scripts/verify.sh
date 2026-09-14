@@ -8,3 +8,5 @@ cargo run --locked -- verify-methods examples/jarl-methods/project.json --out ar
 cargo test --locked --test methods -- --ignored
 cargo run --locked -- verify examples/jarl-election/project.json --out artifacts/jarl-election
 cargo test --locked --test scalar_methods -- --ignored
+cargo run --locked -- verify-methods examples/jarl-membership/project.json --out artifacts/jarl-membership
+cargo test --locked --test arrays -- --ignored

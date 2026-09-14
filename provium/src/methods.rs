@@ -70,6 +70,7 @@ pub struct Method {
     /// All possible writes; execution order and guards live in `body`.
     pub writes: Vec<Write>,
     pub body: Vec<Statement>,
+    pub array: Option<arrays::Shape>,
 }
 struct Definition {
     module: String,
@@ -84,6 +85,7 @@ pub struct Crate {
     imports: BTreeMap<(String, String), Vec<String>>,
     methods: BTreeMap<String, Definition>,
     drops: Vec<String>,
+    array_iterator_shadow: bool,
 }
 fn tokens(t: &impl ToTokens) -> String {
     t.to_token_stream().to_string()
@@ -140,6 +142,7 @@ impl Crate {
             imports: BTreeMap::new(),
             methods: BTreeMap::new(),
             drops: vec![],
+            array_iterator_shadow: false,
         };
         krate.file(root, "", true)?;
         Ok(krate)
@@ -296,10 +299,18 @@ impl Crate {
                         );
                     }
                 }
+                Item::Trait(t) if !test_only(&t.attrs) => {
+                    if t.items.iter().any(|i| matches!(i,syn::TraitItem::Fn(f) if ["iter","flatten","any"].iter().any(|n|f.sig.ident==*n))) {
+                        self.array_iterator_shadow = true;
+                    }
+                }
                 Item::Impl(i) if !test_only(&i.attrs) => {
                     let receiver = base_type(&i.self_ty)?;
                     attrs(&i.attrs)?;
                     if let Some((_, trait_path, _)) = &i.trait_ {
+                        if i.items.iter().any(|i| matches!(i,syn::ImplItem::Fn(f) if ["iter","flatten","any"].iter().any(|n|f.sig.ident==*n))) {
+                            self.array_iterator_shadow = true;
+                        }
                         if trait_path
                             .segments
                             .last()
@@ -374,6 +385,16 @@ impl Crate {
         self.methods.keys().cloned().collect()
     }
     pub fn lower(&self, name: &str) -> Result<Method, String> {
+        if let Some(def) = self.methods.get(name) {
+            if matches!(&def.item.sig.output, syn::ReturnType::Type(_,ty) if matches!(&**ty, Type::Path(p) if p.path.is_ident("bool")))
+            {
+                return self.lower_array_query(name);
+            }
+            if matches!(&def.item.sig.output, syn::ReturnType::Type(_,ty) if matches!(&**ty, Type::Path(p) if p.path.is_ident("Self")))
+            {
+                return self.lower_array(name);
+            }
+        }
         self.lower_inner(name, &[], &std::cell::Cell::new(0))
     }
     fn lower_inner(
@@ -454,6 +475,7 @@ impl Crate {
             rust: tokens(f),
             writes,
             body,
+            array: None,
         })
     }
     fn field_type<'a>(&'a self, def: &Definition, p: &[String]) -> Result<&'a Type, String> {
@@ -733,6 +755,10 @@ pub fn generate(methods: &[Method], namespace: &str) -> String {
     let mut text=format!("-- Generated from complete Rust method bodies; no sliced statements.\nimport Provium.State\nnamespace {namespace}\nopen Provium.State\n");
     for method in methods {
         let name = &method.symbol;
+        if method.array.is_some() {
+            text.push_str(&arrays::generate(method));
+            continue;
+        }
         text.push_str(&format!(
             "def {name}_ir : Program := {}\ndef {name} (state : Store α) : Store α :=\n{}",
             program(&method.body),
@@ -771,6 +797,7 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
         for name in [
             m.symbol.clone(),
             format!("{}_ir", m.symbol),
+            format!("{}_slot", m.symbol),
             format!("{}_correspondence", m.symbol),
         ] {
             if !identifier(&name) || !symbols.insert(name) {
@@ -911,3 +938,5 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
 }
 
 pub mod scalar;
+
+mod arrays;
