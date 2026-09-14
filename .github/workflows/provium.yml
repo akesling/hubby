@@ -1,0 +1,40 @@
+name: Provium
+
+on:
+  push:
+    paths: ["provium/**", "jarl/**", "Cargo.toml", "Cargo.lock", ".github/workflows/provium.yml"]
+  pull_request:
+    paths: ["provium/**", "jarl/**", "Cargo.toml", "Cargo.lock", ".github/workflows/provium.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install stable --profile minimal --component clippy,rustfmt --target wasm32-unknown-unknown
+      - name: Install the pinned Lean toolchain
+        shell: bash
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o "$RUNNER_TEMP/elan-init.sh"
+          sh "$RUNNER_TEMP/elan-init.sh" -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          "$HOME/.elan/bin/elan" toolchain install "$(cat provium/lean-toolchain)"
+      - run: provium/scripts/check.sh
+        env:
+          RUSTUP_TOOLCHAIN: stable
+      - name: Check the host crate and its no_std target
+        run: |
+          cargo +stable test -p jarl --locked --offline
+          cargo +stable check -p jarl --target wasm32-unknown-unknown --locked --offline
+      - uses: actions/upload-artifact@v7
+        with:
+          name: provium-proof-evidence
+          path: |
+            provium/target/jarl
+            provium/target/assertions

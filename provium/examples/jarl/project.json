@@ -1,0 +1,170 @@
+{
+  "namespace": "JarlRules",
+  "usize_bits": 64,
+  "proofs": "Proofs.lean",
+  "obligations": [
+    {
+      "theorem": "JarlProofs.majority_strict",
+      "function": "majority"
+    },
+    {
+      "theorem": "JarlProofs.majority_cardinality_overlap",
+      "function": "majority"
+    },
+    {
+      "theorem": "JarlProofs.majority_position_in_bounds",
+      "function": "majority_position"
+    },
+    {
+      "theorem": "JarlProofs.joint_commit_requires_both",
+      "function": "joint_commit_index"
+    },
+    {
+      "theorem": "JarlProofs.follower_never_overcommits",
+      "function": "follower_commit"
+    },
+    {
+      "theorem": "JarlProofs.commit_never_regresses",
+      "function": "commit_index"
+    },
+    {
+      "theorem": "JarlProofs.current_term_required",
+      "function": "can_commit_term"
+    },
+    {
+      "theorem": "JarlProofs.commit_sequence_monotone",
+      "function": "commit_index"
+    }
+  ],
+  "slices": [
+    {
+      "source": "../../../jarl/src/membership.rs",
+      "method": "Membership::quorum",
+      "name": "majority",
+      "select": [
+        "let:majority",
+        "closure",
+        "tail"
+      ],
+      "bindings": [
+        {
+          "rust": "count",
+          "name": "count",
+          "ty": "usize"
+        },
+        {
+          "rust": "total",
+          "name": "total",
+          "ty": "usize"
+        }
+      ],
+      "result": "bool"
+    },
+    {
+      "source": "../../../jarl/src/membership.rs",
+      "method": "Membership::quorum_index",
+      "name": "majority_position",
+      "select": [
+        "let:new:old",
+        "index"
+      ],
+      "bindings": [
+        {
+          "rust": "count",
+          "name": "total",
+          "ty": "usize"
+        }
+      ],
+      "result": "usize"
+    },
+    {
+      "source": "../../../jarl/src/membership.rs",
+      "method": "Membership::quorum_index",
+      "name": "joint_commit_index",
+      "select": [
+        "tail"
+      ],
+      "bindings": [
+        {
+          "rust": "new",
+          "name": "new",
+          "ty": "u64"
+        },
+        {
+          "rust": "old",
+          "name": "old",
+          "ty": "u64"
+        }
+      ],
+      "result": "u64"
+    },
+    {
+      "source": "../../../jarl/src/node.rs",
+      "method": "Node::append",
+      "name": "follower_commit",
+      "select": [
+        "calls:commit_to:0:2"
+      ],
+      "bindings": [
+        {
+          "rust": "commit",
+          "name": "leader",
+          "ty": "u64"
+        },
+        {
+          "rust": "matched",
+          "name": "matched",
+          "ty": "u64"
+        }
+      ],
+      "result": "u64"
+    },
+    {
+      "source": "../../../jarl/src/node.rs",
+      "method": "Node::commit_to",
+      "name": "commit_index",
+      "select": [
+        "stmt:0"
+      ],
+      "bindings": [
+        {
+          "rust": "self.state.hard.commit",
+          "name": "current",
+          "ty": "u64"
+        },
+        {
+          "rust": "index",
+          "name": "incoming",
+          "ty": "u64"
+        }
+      ],
+      "result": "u64",
+      "guarded_assignment_prefix": true
+    },
+    {
+      "source": "../../../jarl/src/node.rs",
+      "method": "Node::advance_commit",
+      "name": "can_commit_term",
+      "select": [
+        "tail",
+        "condition",
+        "right",
+        "arg:0",
+        "closure"
+      ],
+      "bindings": [
+        {
+          "rust": "id.term",
+          "name": "entry",
+          "ty": "u64"
+        },
+        {
+          "rust": "self.state.hard.term",
+          "name": "current",
+          "ty": "u64"
+        }
+      ],
+      "result": "bool"
+    }
+  ]
+}

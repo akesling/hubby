@@ -1,0 +1,11 @@
+{
+  "source": "source.rs",
+  "namespace": "Assertions",
+  "usize_bits": 64,
+  "proofs": "Proofs.lean",
+  "obligations": [
+    {"theorem": "Contracts.increment_safe", "function": "increment"},
+    {"theorem": "Contracts.assertion_is_a_failure", "function": "increment"},
+    {"theorem": "Contracts.zero_divisor_short_circuits", "function": "guarded_division"}
+  ]
+}

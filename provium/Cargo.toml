@@ -1,0 +1,19 @@
+[package]
+name = "provium"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Fail-closed Rust subset translation to source-linked Lean proof obligations"
+
+[workspace]
+
+[dependencies]
+syn = { version = "=2.0.118", features = ["full", "extra-traits", "visit", "visit-mut"] }
+proc-macro2 = { version = "=1.0.107", features = ["span-locations"] }
+quote = "=1.0.45"
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.151"
+sha2 = "=0.10.9"
+
+[profile.release]
+overflow-checks = true
