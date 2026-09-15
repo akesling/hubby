@@ -6,4 +6,6 @@ members = [
     "jarl",
 ]
 
+exclude = ["provium"]
+
 resolver = "2"

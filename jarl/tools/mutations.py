@@ -58,8 +58,10 @@ def main():
     with tempfile.TemporaryDirectory(prefix="jarl-mutations-") as directory:
         root = Path(directory)
         crate = root / "jarl"
-        shutil.copytree(CRATE, crate)
-        (root / "Cargo.toml").write_text('[workspace]\nmembers = ["jarl"]\nresolver = "2"\n')
+        ignored = shutil.ignore_patterns("target", "artifacts", ".lake", "*.olean", "*.ilean")
+        shutil.copytree(CRATE, crate, ignore=ignored)
+        shutil.copytree(CRATE.parent / "provium", root / "provium", ignore=ignored)
+        (root / "Cargo.toml").write_text('[workspace]\nmembers = ["jarl"]\nexclude = ["provium"]\nresolver = "2"\n')
         for name, relative, original, replacement, selection in MUTATIONS:
             path = crate / relative
             source = path.read_text()

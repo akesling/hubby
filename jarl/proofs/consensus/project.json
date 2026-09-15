@@ -46,7 +46,7 @@
   ],
   "slices": [
     {
-      "source": "../../../jarl/src/membership.rs",
+      "source": "../../src/membership.rs",
       "method": "Membership::quorum",
       "name": "majority",
       "select": [
@@ -69,7 +69,7 @@
       "result": "bool"
     },
     {
-      "source": "../../../jarl/src/membership.rs",
+      "source": "../../src/membership.rs",
       "method": "Membership::quorum_index",
       "name": "majority_position",
       "select": [
@@ -86,7 +86,7 @@
       "result": "usize"
     },
     {
-      "source": "../../../jarl/src/membership.rs",
+      "source": "../../src/membership.rs",
       "method": "Membership::quorum_index",
       "name": "joint_commit_index",
       "select": [
@@ -107,7 +107,7 @@
       "result": "u64"
     },
     {
-      "source": "../../../jarl/src/node.rs",
+      "source": "../../src/node.rs",
       "method": "Node::append",
       "name": "follower_commit",
       "select": [
@@ -128,7 +128,7 @@
       "result": "u64"
     },
     {
-      "source": "../../../jarl/src/node.rs",
+      "source": "../../src/node.rs",
       "method": "Node::commit_to",
       "name": "commit_index",
       "select": [
@@ -150,7 +150,7 @@
       "guarded_assignment_prefix": true
     },
     {
-      "source": "../../../jarl/src/node.rs",
+      "source": "../../src/node.rs",
       "method": "Node::advance_commit",
       "name": "can_commit_term",
       "select": [

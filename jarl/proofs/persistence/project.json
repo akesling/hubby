@@ -1,5 +1,5 @@
 {
-  "crate_root": "../../../jarl/src/lib.rs",
+  "crate_root": "../../src/lib.rs",
   "namespace": "JarlMethods",
   "methods": ["ready::Ready::persisted"],
   "proofs": "Proofs.lean",

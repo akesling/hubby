@@ -178,6 +178,13 @@ existing voter state or run two processes with the same voter identity.
 
 ## Verification and performance
 
+Jarl owns its Lean contracts in [proofs/](proofs/README.md) and asserts them from
+[`tests/proofs.rs`](tests/proofs.rs) using Provium as a dev-dependency. Ordinary
+proof tests fail when the supported Lean toolchain is missing; they never silently
+skip verification. Run `jarl/scripts/verify.sh` for contracts plus proof mutation
+and 32-bit checks. Generated evidence belongs to `jarl/artifacts/provium/`.
+These remain component contracts, not a full Raft correctness proof.
+
 ```sh
 cargo test -p jarl --locked --offline
 cargo test -p jarl --release --locked --offline

@@ -1,5 +1,5 @@
 {
-  "crate_root": "../../../jarl/src/lib.rs",
+  "crate_root": "../../src/lib.rs",
   "namespace": "JarlMembership",
   "methods": [
     "membership::Membership::finalized",

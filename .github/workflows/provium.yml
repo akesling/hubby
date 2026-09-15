@@ -2,9 +2,9 @@ name: Provium
 
 on:
   push:
-    paths: ["provium/**", "jarl/**", "Cargo.toml", "Cargo.lock", ".github/workflows/provium.yml"]
+    paths: ["provium/**", ".github/workflows/provium.yml"]
   pull_request:
-    paths: ["provium/**", "jarl/**", "Cargo.toml", "Cargo.lock", ".github/workflows/provium.yml"]
+    paths: ["provium/**", ".github/workflows/provium.yml"]
 
 permissions:
   contents: read
@@ -18,7 +18,6 @@ jobs:
         with:
           persist-credentials: false
       - run: rustup component add clippy rustfmt --toolchain stable
-      - run: rustup target add wasm32-unknown-unknown --toolchain stable
       - name: Install the pinned Lean toolchain
         shell: bash
         run: |
@@ -29,16 +28,7 @@ jobs:
       - run: provium/scripts/check.sh
         env:
           RUSTUP_TOOLCHAIN: stable
-      - name: Check the host crate and its no_std target
-        run: |
-          cargo +stable test -p jarl --locked --offline
-          cargo +stable check -p jarl --target wasm32-unknown-unknown --locked --offline
       - uses: actions/upload-artifact@v7
         with:
           name: provium-proof-evidence
-          path: |
-            provium/artifacts/jarl
-            provium/artifacts/assertions
-            provium/artifacts/jarl-methods
-            provium/artifacts/jarl-election
-            provium/artifacts/jarl-membership
+          path: provium/artifacts/assertions
