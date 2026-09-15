@@ -46,8 +46,20 @@ It is not a completion certificate. No full-correctness milestone is closed yet.
   comparison. Given the separate `len ≤ CAP` invariant, non-full implies space.
 - The contract passes for 64-bit and installed wasm32 targets. Changing the
   original equality to inequality must fail the Lean contract, not the parser.
-- Establishing `len ≤ CAP` through construction, restore and every mutation is
-  still open; this predicate proof does not assume those callers are correct.
+- Preservation of `len ≤ CAP` through restore and mutation is still open; this
+  predicate proof does not assume those callers are correct.
+
+## Fresh-state initialization (M1, C02/R02)
+
+- The complete original `State::new` constructor now lowers with its derived
+  hard-state Default and empty Option-array callback. Hidden/default initializer
+  effects and namespace shadowing are rejected.
+- Lean checks initial term/vote/commit, absent snapshot, zero length, arbitrary
+  empty-array capacity, and the initial length bound. This supplies the fresh-state
+  case; restore and all mutating transitions remain separate obligations.
+- Provider native comparisons cover const-parameter substitution and initial
+  fields. Independent provider and Jarl source mutations change the initial length
+  and must fail in Lean. Jarl additionally checks the installed 32-bit target.
 
 ## Outstanding dependency frontier
 

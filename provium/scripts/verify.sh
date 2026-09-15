@@ -5,4 +5,5 @@ cargo run --locked -- verify examples/assertions/project.json --out artifacts/as
 cargo test --locked --test lean -- --ignored
 cargo test --locked --test methods -- --ignored
 cargo test --locked --test queries -- --ignored
+cargo test --locked --test constructors -- --ignored
 cargo test --locked --test suite -- --ignored

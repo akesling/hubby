@@ -1,0 +1,11 @@
+{
+  "crate_root":"../../src/lib.rs",
+  "namespace":"JarlInitial",
+  "methods":["state::State::new"],
+  "proofs":"Proofs.lean",
+  "obligations":[
+    {"theorem":"Initialization.fresh_fields","function":"state_State_new"},
+    {"theorem":"Initialization.initial_length_within_capacity","function":"state_State_new"},
+    {"theorem":"Initialization.all_slots_empty","function":"state_State_new"}
+  ]
+}

@@ -74,6 +74,7 @@ pub struct Method {
     pub body: Vec<Statement>,
     pub array: Option<arrays::Shape>,
     pub query: Option<queries::Query>,
+    pub constructor: Option<constructors::Constructor>,
 }
 struct Definition {
     module: String,
@@ -81,6 +82,7 @@ struct Definition {
     item: syn::ImplItemFn,
     receiver: String,
     impl_generics: syn::Generics,
+    self_type: Option<Type>,
 }
 pub struct Crate {
     files: BTreeMap<PathBuf, String>,
@@ -362,6 +364,7 @@ impl Crate {
                                         item: method,
                                         receiver: receiver.clone(),
                                         impl_generics: i.generics.clone(),
+                                        self_type: Some(*i.self_ty.clone()),
                                     },
                                 )
                                 .is_some()
@@ -411,6 +414,11 @@ impl Crate {
     }
     pub fn lower(&self, name: &str) -> Result<Method, String> {
         if let Some(def) = self.methods.get(name) {
+            if def.item.sig.inputs.is_empty()
+                && matches!(&def.item.sig.output,syn::ReturnType::Type(_,ty) if matches!(&**ty,Type::Path(p) if p.path.is_ident("Self")))
+            {
+                return self.lower_constructor(name);
+            }
             if queries::result_error(&def.item.sig.output).is_ok() {
                 return self.lower_query(name, &[]);
             }
@@ -505,6 +513,7 @@ impl Crate {
             body,
             array: None,
             query: None,
+            constructor: None,
         })
     }
     fn field_type<'a>(&'a self, def: &Definition, p: &[String]) -> Result<&'a Type, String> {
@@ -784,6 +793,10 @@ pub fn generate(methods: &[Method], namespace: &str) -> String {
     let mut text=format!("-- Generated from complete Rust method bodies; no sliced statements.\nimport Provium.State\nnamespace {namespace}\nopen Provium.State\n");
     for method in methods {
         let name = &method.symbol;
+        if method.constructor.is_some() {
+            text.push_str(&constructors::generate(method));
+            continue;
+        }
         if method.query.is_some() {
             text.push_str(&queries::generate(method));
             continue;
@@ -992,4 +1005,5 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
 pub mod scalar;
 
 mod arrays;
+pub mod constructors;
 pub mod queries;

@@ -146,4 +146,31 @@ def runQuery : Query → QueryStore α → Except String Unit
   | .success, _ => .ok ()
   | .failure e, _ => .error e
   | .branch t yes no, s => if evalQueryTest t s then runQuery yes s else runQuery no s
+
+inductive InitCapacity where
+  | fixed (size : Nat)
+  | parameter (name : String)
+inductive Initial where
+  | boolean (value : Bool)
+  | unsigned (rustType : String) (value : Nat)
+  | absent
+  | emptySlots (capacity : InitCapacity)
+inductive InitCell where
+  | boolean (value : Bool)
+  | unsigned (rustType : String) (value : Nat)
+  | absent
+  | slots (entries : List (Option Unit))
+structure InitField where
+  path : Path
+  value : Initial
+abbrev InitStore := Path → InitCell
+def initialCell (sizes : String → Nat) : Initial → InitCell
+  | .boolean b => .boolean b
+  | .unsigned ty n => .unsigned ty n
+  | .absent => .absent
+  | .emptySlots c => .slots (List.replicate (match c with
+      | .fixed n => n | .parameter p => sizes p) none)
+def initializeFields (fields : List InitField) (sizes : String → Nat) : InitStore :=
+  fields.foldl (fun s field key =>
+    if key = field.path then initialCell sizes field.value else s key) (fun _ => .absent)
 end Provium.State

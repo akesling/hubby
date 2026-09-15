@@ -156,6 +156,14 @@ their manifests record verbose rustc identity, target cfg and the actual
 type-check arguments. This describes the direct rustc check, not a Cargo build
 closure. Component certificates use `whole_program_proved: false`.
 
+Argument-free `Self` constructors support explicit named-field initialization
+from builtin literals, `None`, scalar/Option fields of builtin-derived Default
+records, and `core::array::from_fn(|_| None)`. Original const arguments are
+substituted into array capacities. Constructors reject hidden initializer effects,
+custom/inherent defaults, shadowed standard namespaces and omitted fields. Their
+logical initialization stores do not establish Rust memory/layout refinement or
+physical resource availability; standard-operation semantics remain trusted.
+
 Assignment stores model nonoverlapping leaf locations with opaque values for untouched
 payloads. Boolean reads have a total extension on malformed stores; Rust
 refinement requires the corresponding leaves to contain booleans. Frame theorems

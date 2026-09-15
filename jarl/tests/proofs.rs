@@ -86,6 +86,8 @@ mod capacity;
 mod consensus;
 #[path = "proof_cases/scalar_methods.rs"]
 mod election;
+#[path = "proof_cases/initialization.rs"]
+mod initialization;
 #[path = "proof_cases/queries.rs"]
 mod input_gating;
 #[path = "proof_cases/arrays.rs"]

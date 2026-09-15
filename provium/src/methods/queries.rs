@@ -145,6 +145,7 @@ impl Crate {
             body: vec![],
             array: None,
             query: Some(query),
+            constructor: None,
         })
     }
     fn query_block(

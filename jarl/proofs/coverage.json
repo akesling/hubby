@@ -3896,12 +3896,10 @@
     "crate::state::<State < V , S , CAP >>::new": {
       "requirements": [
         "C02",
-        "R02",
-        "R03",
-        "R05"
+        "R02"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+      "status": "component_evidence",
+      "note": "Complete fresh-state constructor contracts in proofs/initialization; restore/mutation preservation and source/layout refinement remain open."
     },
     "crate::state::<State < V , S , CAP >>::push": {
       "requirements": [
