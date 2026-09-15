@@ -1,7 +1,7 @@
 //! Exhaustive borrowed enum matches that copy a primitive field. Every variant
 //! and selected field is retained; this does not prove the Rust memory view.
 use super::*;
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Branch {
     pub variant: String,
     pub field: String,
@@ -10,6 +10,7 @@ pub struct Branch {
 pub struct Projection {
     pub receiver: String,
     pub branches: Vec<Branch>,
+    pub arms: Vec<Vec<Branch>>,
     pub scope: &'static str,
 }
 fn alternatives(pattern: &syn::Pat) -> Result<Vec<&syn::PatStruct>, String> {
@@ -109,7 +110,9 @@ impl Crate {
             return Err("enum projection must match its shared receiver".into());
         }
         let mut branches = Vec::new();
+        let mut arms = Vec::new();
         for arm in &m.arms {
+            let first = branches.len();
             attrs(&arm.attrs)?;
             if arm.guard.is_some() {
                 return Err("guarded enum projections are not modeled".into());
@@ -190,11 +193,12 @@ impl Crate {
                     field: member.to_string(),
                 });
             }
+            arms.push(branches[first..].to_vec());
         }
         if branches.len() != enumeration.variants.len() || branches.is_empty() {
             return Err("enum projection must explicitly cover every source variant".into());
         }
-        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],array:None,query:None,constructor:None,buffer:None,relocation:None,iteration:None,last:None,truncation:None,installation:None,restoration:None,record_at:None,lookup:None,selection:None,enum_projection:Some(Projection{receiver:def.receiver.clone(),branches,scope:"complete exhaustive borrowed enum field projection; physical discriminants, Rust borrows and frontend preservation remain unproved"})})
+        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],array:None,query:None,constructor:None,buffer:None,relocation:None,iteration:None,last:None,truncation:None,installation:None,restoration:None,record_at:None,lookup:None,selection:None,enum_projection:Some(Projection{receiver:def.receiver.clone(),branches,arms,scope:"complete exhaustive borrowed enum field projection; physical discriminants, Rust borrows and frontend preservation remain unproved"})})
     }
 }
 pub(super) fn generate(method: &Method) -> String {
@@ -211,6 +215,25 @@ pub(super) fn generate(method: &Method) -> String {
         })
         .collect::<Vec<_>>()
         .join(", ");
+    let arms = p
+        .arms
+        .iter()
+        .map(|arm| {
+            let alternatives = arm
+                .iter()
+                .map(|b| {
+                    format!(
+                        "({}, {})",
+                        serde_json::to_string(&b.variant).unwrap(),
+                        lean_path(std::slice::from_ref(&b.field))
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("[{alternatives}]")
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
     let name = &method.symbol;
-    format!("def {name}_ir : List (String × Path) := [{branches}]\ndef {name} (state : EnumStore) : Option Nat := enumProjection {name}_ir state\ntheorem {name}_correspondence (state : EnumStore) :\n  enumProjection {name}_ir state = {name} state := by rfl\n")
+    format!("def {name}_source : List (List (String × Path)) := [{arms}]\ndef {name}_ir : List (String × Path) := [{branches}]\ndef {name} (state : EnumStore) : Option Nat := enumProjection {name}_ir state\ntheorem {name}_correspondence (state : EnumStore) :\n  enumMatch {name}_source state = {name} state := by\n  rw [enum_match_flatten]\n  rfl\n")
 }

@@ -349,3 +349,22 @@ complete generated transitions, including durable votes and restart.
 - An independent generic enum fixture has 18 native results checked directly by
   Lean plus a universal field-read contract. This does not prove physical enum
   layout or the complete Node::valid / Node::step dispatch yet.
+
+## Enum normalization validation (partial P10 evidence)
+
+- Generated enum certificates retain source arm groups and the flattened table
+  separately. Lean proves first-match selection is preserved by flattening,
+  including missing tags and malformed primitive views.
+- The generated correspondence theorem now uses that normalization proof; an
+  injected table-only field corruption must fail it. This is one verified IR
+  transformation, not a proof of source-byte parsing or Rust memory refinement.
+
+## Next complete-body target
+
+Translate Node::valid with the now-complete Message::term helper, then use its
+postconditions in Node::append and Node::step. Preserve the early PreVoted
+campaign check, eager derived LogId default, valid_id closure capture, optional
+entry validation, checked successor arithmetic, batch occupied-prefix scan and
+its inferred integer counter type, snapshot index check, and nested rejection
+pattern. Do not replace the complete match/loop with slices or assumed predicates.
+The storage contracts above expose the exact caller obligations this must feed.

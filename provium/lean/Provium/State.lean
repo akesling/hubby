@@ -1086,4 +1086,23 @@ def enumProjection (branches : List (String × Path)) (state : EnumStore) : Opti
   let branch ← branches.find? (fun branch => branch.1 == state.variant)
   recordWord state.fields branch.2
 
+-- A restricted source match retains arm grouping and ordered alternatives.
+-- Field-binding resolution is still a checked but unverified frontend step.
+def enumMatch : List (List (String × Path)) → EnumStore → Option Nat
+  | [], _ => none
+  | arm :: rest, state =>
+    match arm.find? (fun branch => branch.1 == state.variant) with
+    | none => enumMatch rest state
+    | some branch => recordWord state.fields branch.2
+
+theorem enum_match_flatten (arms : List (List (String × Path))) (state : EnumStore) :
+    enumMatch arms state = enumProjection arms.flatten state := by
+  induction arms with
+  | nil => rfl
+  | cons arm rest ih =>
+    simp only [enumMatch,List.flatten_cons,enumProjection,List.find?_append]
+    cases found : arm.find? (fun branch => branch.1 == state.variant) with
+    | none => simpa [found,enumProjection,bind,Option.bind] using ih
+    | some branch => simp [bind,Option.bind]
+
 end Provium.State

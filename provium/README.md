@@ -300,3 +300,9 @@ Complete borrowed enum matches can project builtin u64 fields. Every source
 variant must be explicit, and the compiler retains each selected variant/field
 pair. Unknown view tags and malformed primitive fields have no value. This
 backend does not assume a Rust enum memory layout or accept opaque arm effects.
+
+Enum projection certificates retain the source arm grouping separately from the
+flattened dispatch table. A Lean theorem proves that flattening preserves ordered
+selection, including malformed field views. Generated correspondence uses that
+theorem, and tests reject a corrupted compiled table. Parsing, binding resolution
+and the connection from Rust memory to this source representation remain trusted.

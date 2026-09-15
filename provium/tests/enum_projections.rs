@@ -38,6 +38,8 @@ fn complete_enum_projection_preserves_alternatives_and_field_identity() {
     let p = w.lower().unwrap().enum_projection.unwrap();
     assert_eq!(p.receiver, "Event");
     assert_eq!(p.branches.len(), 2);
+    assert_eq!(p.arms.len(), 1);
+    assert_eq!(p.arms[0].len(), 2);
     assert_eq!(p.branches[0].variant, "Open");
     assert_eq!(p.branches[1].variant, "Reply");
     assert!(p.branches.iter().all(|b| b.field == "epoch"));
@@ -122,6 +124,47 @@ println!("{{variant}} {{epoch}} {{request}} {{}}",message.epoch());
     fs::write(&config,serde_json::to_vec(&serde_json::json!({"crate_root":"lib.rs","namespace":"Subject","methods":["Event::epoch"],"proofs":"Proofs.lean","obligations":obligations})).unwrap()).unwrap();
     let out = w.0.join("out");
     provium::methods::verify(&config, &out).unwrap();
+    // Corrupt only the compiled table: the retained source arms remain intact.
+    // The generated correspondence proof must reject this compiler-pass bug.
+    let generated = fs::read_to_string(out.join("Generated.lean")).unwrap();
+    let broken = generated
+        .lines()
+        .map(|line| {
+            if line.starts_with("def Event_epoch_ir") {
+                line.replace("(\"Reply\", [\"epoch\"])", "(\"Reply\", [\"request\"])")
+            } else {
+                line.to_owned()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert_ne!(generated.trim(), broken.trim());
+    fs::write(out.join("Broken.lean"), broken).unwrap();
+    let toolchain =
+        fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("lean-toolchain")).unwrap();
+    let rejected = std::process::Command::new("elan")
+        .args([
+            "run",
+            toolchain.trim(),
+            "lean",
+            "--trust=0",
+            "-DwarningAsError=true",
+            "Broken.lean",
+        ])
+        .current_dir(&out)
+        .env("LEAN_PATH", &out)
+        .output()
+        .unwrap();
+    let diagnostic = String::from_utf8_lossy(&rejected.stdout);
+    assert!(
+        !rejected.status.success(),
+        "corrupted enum lowering was accepted"
+    );
+    assert!(
+        diagnostic.contains("rfl") && diagnostic.contains("error"),
+        "{diagnostic}\n{}",
+        String::from_utf8_lossy(&rejected.stderr)
+    );
     fs::write(
         w.0.join("lib.rs"),
         SOURCE.replace("Self::Reply{epoch,..}", "Self::Reply{request:epoch,..}"),
