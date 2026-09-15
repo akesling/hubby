@@ -192,6 +192,7 @@ impl Crate {
             body: vec![],
             array: None,
             query: None,
+            buffer: None,
             constructor: Some(Constructor {
                 fields,
                 constants: constants.into_keys().collect(),

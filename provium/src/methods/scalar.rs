@@ -154,6 +154,7 @@ impl Crate {
             return Err("scalar method must write at least one field".into());
         }
         let fields = flat.fields.into_values().collect::<Vec<_>>();
+        unique_parameters(&fields)?;
         let parameters = fields
             .iter()
             .map(|f| {
@@ -303,6 +304,7 @@ impl Crate {
             return Err(error);
         }
         let fields = flat.fields.into_values().collect::<Vec<_>>();
+        unique_parameters(&fields)?;
         let mut parameters = vec![];
         for field in &fields {
             let id = format_ident!("{}", field.parameter);
@@ -321,4 +323,21 @@ impl Crate {
             scope:"complete shared scalar method body with explicit original const parameters; all statements and scalar failure outcomes retained; source/field/borrow refinement remains trusted",
         }})
     }
+}
+
+// Keep the readable spelling used in proof statements, but reject ambiguity at
+// the source boundary rather than emitting duplicate Rust parameter names.
+fn unique_parameters(fields: &[Field]) -> Result<(), String> {
+    let mut names = BTreeMap::new();
+    for field in fields {
+        if let Some(previous) = names.insert(&field.parameter, &field.path) {
+            return Err(format!(
+                "scalar field paths {} and {} collide as {}; unambiguous field encoding required",
+                previous.join("."),
+                field.path.join("."),
+                field.parameter
+            ));
+        }
+    }
+    Ok(())
 }

@@ -94,3 +94,6 @@ mod input_gating;
 mod membership;
 #[path = "proof_cases/methods.rs"]
 mod persistence;
+
+#[path = "proof_cases/storage.rs"]
+mod storage;

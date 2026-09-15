@@ -43,6 +43,7 @@ CI runs both ordinary tests and the full proof gate.
 | [membership](membership/Proofs.lean) | Complete `Membership::finalized` and `is_joint`: arbitrary capacity, correct retention/removal, cleared old flags, surviving identities/fields preserved, no longer joint |
 | [input-gating](input-gating/Proofs.lean) | Complete `Node::available` and `idle`: exact Result, dirty-state/reply/outbox rejection, and clean/drained admission over arbitrary outbox lengths |
 | [capacity](capacity/Proofs.lean) | Complete `State::full`: exact equality against the original const-generic capacity; non-full implies room under the separate `len ≤ CAP` representation invariant |
+| [storage](storage/Proofs.lean) | Complete `State::push` and `new`: no-drop append success, occupied-prefix/capacity preservation, explicit full-input destruction boundary, and induction over successful append histories |
 | [initialization](initialization/Proofs.lean) | Complete `State::new`: initial hard-state fields, absent snapshot, all slots empty for arbitrary capacity, and initial `len ≤ CAP` |
 
 Each directory's `project.json` binds production Rust to explicit theorem
@@ -73,7 +74,8 @@ view relation does not claim to prove Rust alias/layout correspondence. The full
 gate checks this project against both the host and installed 32-bit target.
 
 Initialization derives the initial length bound from the generated constructor.
-It does not yet prove preservation through restore/push/truncate/install or
+Storage now composes it with append preservation. Neither project proves
+preservation through restore/truncate/install/grow or
 authorize resetting an existing voter. Builtin Default and array-construction
 semantics, source interpretation and Rust layout remain in the trusted boundary.
 
@@ -87,3 +89,17 @@ Provium's frontend, Rust subset semantics, field/borrow/layout refinement, and
 Lean implementation remain trusted. Axiom audits reject admits and custom axioms;
 they cannot establish specification adequacy. Global Raft safety/liveness,
 crash-recovery assumptions, and compiler correctness remain open proof work.
+
+The storage backend retains the entire bounded append body and its original
+capacity helper. A valid shape requires occupied slots below `len`, empty slots
+above it, and a capacity-sized array. Under that invariant and available room,
+Lean proves append returns without destruction or arithmetic/bounds failure,
+preserves earlier payloads, and advances length by one. An inductive theorem
+covers any finite sequence of successful appends from the generated constructor.
+This does not cover all reachable Raft storage histories or prove log-ID ordering.
+
+Rejected owned inputs and overwritten payloads have explicit drop suspensions.
+Their continuations apply only if destruction returns normally. Destructor panic,
+unwinding and external side effects are not erased into a successful transition.
+The native compiler tests compare slots, length, destructor order and late panic
+states; source mutations and wasm32 checks exercise Jarl's actual method.

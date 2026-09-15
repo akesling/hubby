@@ -232,3 +232,13 @@ cargo run --locked -- verify examples/assertions/project.json --out artifacts/as
 ```
 
 `compile` generates evidence without asserting a proved obligation.
+
+The whole-method backend also accepts a closed bounded-buffer append idiom:
+source-resolved capacity guard, indexed `Some(input)` assignment, usize length
+increment, and Result return. Its manifest records the entire method and guard.
+Unsupported syntax is rejected; no Jarl method names are built into the compiler.
+The buffer IR exposes drop suspensions and retains bounds/overflow failure stores.
+A drop continuation only applies after normal destructor return; it does not
+model destructor unwinding or prove Rust memory/layout correspondence. Consumers
+can prove no-drop success by establishing an empty destination slot. Independent
+native tests include destructor traces and partially changed state after panic.

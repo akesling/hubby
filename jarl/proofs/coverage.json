@@ -3908,8 +3908,8 @@
         "R03",
         "R05"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+      "status": "component_evidence",
+      "note": "Complete bounded append and original full helper in proofs/storage: exact no-drop success, shape/prefix preservation, full-input drop suspension, and append-only induction from generated initialization. Restore/truncate/install/grow, destructor unwinding, log semantics and source/layout refinement remain open."
     },
     "crate::state::<State < V , S , CAP >>::restore": {
       "requirements": [

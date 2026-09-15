@@ -56,10 +56,33 @@ It is not a completion certificate. No full-correctness milestone is closed yet.
   effects and namespace shadowing are rejected.
 - Lean checks initial term/vote/commit, absent snapshot, zero length, arbitrary
   empty-array capacity, and the initial length bound. This supplies the fresh-state
-  case; restore and all mutating transitions remain separate obligations.
+  case; restore and other mutating transitions remain separate obligations.
 - Provider native comparisons cover const-parameter substitution and initial
   fields. Independent provider and Jarl source mutations change the initial length
   and must fail in Lean. Jarl additionally checks the installed 32-bit target.
+
+## Bounded append preservation (M1, C02/R02/R03)
+
+- Provium translates the complete indexed append idiom and its source-resolved
+  const-capacity guard, retaining original field paths, payload type, increment,
+  error variant and helper source. Hidden effects and substitutions it cannot
+  resolve are rejected. No production Jarl source was changed.
+- Its outcome semantics retain bounds and overflow faults and partial stores.
+  Payload destruction is a suspension with a normal-return continuation, not an
+  assumption that custom Drop is pure, infallible or safe to unwind.
+- Jarl's `proofs/storage` proves exact append success without drops under the
+  occupied-prefix invariant, shape/length preservation, earlier-payload
+  preservation, and the rejected-input destruction boundary when full.
+- An explicit constructor/store view preserves slot presence. Induction over
+  successful generated append transitions proves shape for arbitrary capacity
+  and arbitrarily long finite append histories from fresh initialization.
+- Provider comparisons cover native slot contents, lengths, drop ordering and
+  late overflow states. Independent provider and original Jarl source mutations
+  alter the increment and guard and must fail the Lean proof. The Jarl contract
+  also type-checks for the installed wasm32 target.
+- Restore, truncate, install, growth, log-ID ordering, destructor unwinding and
+  source/layout/borrow refinement remain separate obligations. The append-only
+  history is not a claim about all reachable Raft storage states.
 
 ## Outstanding dependency frontier
 

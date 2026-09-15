@@ -173,4 +173,44 @@ def initialCell (sizes : String → Nat) : Initial → InitCell
 def initializeFields (fields : List InitField) (sizes : String → Nat) : InitStore :=
   fields.foldl (fun s field key =>
     if key = field.path then initialCell sizes field.value else s key) (fun _ => .absent)
+-- A drop node is an external interaction, not a claim that destruction is pure,
+-- total, or safe to unwind. The continuation is valid only after normal return.
+structure BufferState (α : Type) where
+  slots : List (Option α)
+  len : Nat
+  deriving DecidableEq
+inductive BufferFault where
+  | bounds
+  | overflow
+  deriving DecidableEq
+inductive BufferRun (α : Type) where
+  | returned (result : Except String Unit) (state : BufferState α)
+  | fault (reason : BufferFault) (state : BufferState α)
+  | drop (payload : α) (before : BufferState α) (continuation : BufferRun α)
+structure BufferAppend where
+  equal : Bool
+  increment : Nat
+  error : String
+
+def appendBuffer (program : BufferAppend) (bits capacity : Nat)
+    (state : BufferState α) (input : α) : BufferRun α :=
+  if (decide (state.len = capacity)) == program.equal then
+    .drop input state (.returned (.error program.error) state)
+  else
+    match state.slots[state.len]? with
+    | none => .drop input state (.fault .bounds state)
+    | some previous =>
+      let stored := {state with slots := state.slots.set state.len (some input)}
+      let next := if state.len + program.increment < 2^bits then
+          BufferRun.returned (.ok ()) {stored with len := state.len + program.increment}
+        else .fault .overflow stored
+      match previous with
+      | none => next
+      | some old => .drop old state next
+
+-- Only complete, normally returning drop continuations are followed. No theorem
+-- about this projection licenses a consumer to assume its Drop cannot panic.
+def resumeDrops : BufferRun α → BufferRun α
+  | .drop _ _ next => resumeDrops next
+  | result => result
 end Provium.State

@@ -145,3 +145,22 @@ fn shared_queries_resolve_const_parameters_and_keep_failure_paths() {
         Err(ir::Fault::DivisionByZero)
     );
 }
+
+#[test]
+fn ambiguous_field_paths_fail_at_the_source_boundary() {
+    let w = Work::new();
+    for body in [
+        "fn inspect(&self)->bool { self.a_b == self.a.b }",
+        "fn inspect(&mut self) { self.a_b = 1; self.a.b = 2; }",
+    ] {
+        let source = format!(
+            "struct Inner {{ b:u64 }} struct State {{ a:Inner,a_b:u64 }} impl State {{ {body} }}"
+        );
+        let error = Crate::load(&w.source(&source))
+            .unwrap()
+            .scalar_projections("State::inspect")
+            .err()
+            .unwrap();
+        assert!(error.contains("field paths a.b and a_b collide"), "{error}");
+    }
+}

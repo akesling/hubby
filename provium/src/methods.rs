@@ -75,6 +75,7 @@ pub struct Method {
     pub array: Option<arrays::Shape>,
     pub query: Option<queries::Query>,
     pub constructor: Option<constructors::Constructor>,
+    pub buffer: Option<buffers::Append>,
 }
 struct Definition {
     module: String,
@@ -201,7 +202,7 @@ impl Crate {
                                 Err("renamed/glob imports require qualified resolution".into())
                             }
                             syn::UseTree::Name(n)
-                                if ["None", "Option", "bool", "u8", "u16", "u32", "u64", "usize", "Result", "Ok", "Err"]
+                                if ["None", "Option", "bool", "u8", "u16", "u32", "u64", "usize", "Result", "Ok", "Err", "Some"]
                                     .iter()
                                     .any(|s| n.ident == *s) =>
                             {
@@ -256,7 +257,7 @@ impl Crate {
                         }
                     }
                 }
-                Item::Enum(e) if ["Option", "bool", "u8", "u16", "u32", "u64", "usize", "Result", "Ok", "Err"].iter().any(|n| e.ident == *n) => {
+                Item::Enum(e) if ["Option", "bool", "u8", "u16", "u32", "u64", "usize", "Result", "Ok", "Err", "Some"].iter().any(|n| e.ident == *n) => {
                     return Err("shadowed primitive/prelude type".into())
                 }
                 Item::Enum(e) if !test_only(&e.attrs) => {
@@ -268,13 +269,13 @@ impl Crate {
                         return Err("ambiguous enum type".into());
                     }
                 }
-                Item::Fn(f) if ["Ok", "Err"].iter().any(|n| f.sig.ident == *n) => {
+                Item::Fn(f) if ["Ok", "Err", "Some"].iter().any(|n| f.sig.ident == *n) => {
                     return Err("shadowed Result constructor".into());
                 }
-                Item::Const(c) if ["None", "Ok", "Err"].iter().any(|n| c.ident == *n) => {
+                Item::Const(c) if ["None", "Ok", "Err", "Some"].iter().any(|n| c.ident == *n) => {
                     return Err("shadowed None constructor".into())
                 }
-                Item::Static(c) if ["None", "Ok", "Err"].iter().any(|n| c.ident == *n) => {
+                Item::Static(c) if ["None", "Ok", "Err", "Some"].iter().any(|n| c.ident == *n) => {
                     return Err("shadowed None constructor".into())
                 }
                 Item::Macro(_) => {
@@ -290,7 +291,7 @@ impl Crate {
                     if self.enums.contains_key(&s.ident.to_string()) {
                         return Err("ambiguous enum/struct type name".into());
                     }
-                    if ["Option", "bool", "u8", "u16", "u32", "u64", "usize", "Result", "Ok", "Err"].iter().any(|n| s.ident == *n) {
+                    if ["Option", "bool", "u8", "u16", "u32", "u64", "usize", "Result", "Ok", "Err", "Some"].iter().any(|n| s.ident == *n) {
                         return Err("shadowed primitive/prelude type".into());
                     }
                     for attr in &s.attrs {
@@ -328,7 +329,7 @@ impl Crate {
                     }
                 }
                 Item::Impl(i) if !test_only(&i.attrs) => {
-                    if i.generics.type_params().any(|p| ["Option", "Result", "bool", "u8", "u16", "u32", "u64", "usize", "Ok", "Err"].iter().any(|n| p.ident == *n)) {
+                    if i.generics.type_params().any(|p| ["Option", "Result", "bool", "u8", "u16", "u32", "u64", "usize", "Ok", "Err", "Some"].iter().any(|n| p.ident == *n)) {
                         return Err("impl generic parameter shadows a primitive/prelude type".into());
                     }
                     let receiver = base_type(&i.self_ty)?;
@@ -420,6 +421,10 @@ impl Crate {
                 return self.lower_constructor(name);
             }
             if queries::result_error(&def.item.sig.output).is_ok() {
+                if matches!(def.item.sig.inputs.first(), Some(syn::FnArg::Receiver(r)) if r.mutability.is_some())
+                {
+                    return self.lower_buffer(name);
+                }
                 return self.lower_query(name, &[]);
             }
             if matches!(&def.item.sig.output, syn::ReturnType::Type(_,ty) if matches!(&**ty, Type::Path(p) if p.path.is_ident("bool")))
@@ -514,6 +519,7 @@ impl Crate {
             array: None,
             query: None,
             constructor: None,
+            buffer: None,
         })
     }
     fn field_type<'a>(&'a self, def: &Definition, p: &[String]) -> Result<&'a Type, String> {
@@ -793,6 +799,10 @@ pub fn generate(methods: &[Method], namespace: &str) -> String {
     let mut text=format!("-- Generated from complete Rust method bodies; no sliced statements.\nimport Provium.State\nnamespace {namespace}\nopen Provium.State\n");
     for method in methods {
         let name = &method.symbol;
+        if method.buffer.is_some() {
+            text.push_str(&buffers::generate(method));
+            continue;
+        }
         if method.constructor.is_some() {
             text.push_str(&constructors::generate(method));
             continue;
@@ -1007,3 +1017,5 @@ pub mod scalar;
 mod arrays;
 pub mod constructors;
 pub mod queries;
+
+pub mod buffers;

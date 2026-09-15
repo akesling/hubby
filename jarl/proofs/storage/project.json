@@ -1,0 +1,35 @@
+{
+  "crate_root": "../../src/lib.rs",
+  "namespace": "JarlStorage",
+  "methods": [
+    "state::State::push",
+    "state::State::new"
+  ],
+  "proofs": "Proofs.lean",
+  "obligations": [
+    {
+      "theorem": "Storage.append_exact",
+      "function": "state_State_push"
+    },
+    {
+      "theorem": "Storage.append_preserves_shape",
+      "function": "state_State_push"
+    },
+    {
+      "theorem": "Storage.full_preserves_state_at_drop",
+      "function": "state_State_push"
+    },
+    {
+      "theorem": "Storage.append_preserves_prefix",
+      "function": "state_State_push"
+    },
+    {
+      "theorem": "Storage.fresh_representation",
+      "function": "state_State_new"
+    },
+    {
+      "theorem": "Storage.history_preserves_shape",
+      "function": "state_State_push"
+    }
+  ]
+}
