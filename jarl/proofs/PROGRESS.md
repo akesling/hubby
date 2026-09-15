@@ -8,9 +8,9 @@ Continue with the next open source-linked obligation under the existing toolchai
 dependency, no_std/sans-I/O and approval constraints. Only the full specification's
 verified completion can close this work; a green component suite cannot.
 
-Immediate frontier: prove log-ID ordering and metadata/commitment bounds for
-restoration and their preservation across storage operations, then compose the
-complete protocol callers and durable histories. Buffer-shape induction alone
+Immediate frontier: preserve restored log-ID ordering and commitment bounds
+across storage mutations, then compose complete protocol callers and durable
+histories. Successful recovery ordering and its scalar validity are checked below. Buffer-shape induction alone
 is not a source-level Raft correctness proof.
 
 ## Source accounting (M0, C01–C12, P12)
@@ -281,3 +281,19 @@ complete generated transitions, including durable votes and restart.
 - Removing either bound check from Jarl must fail its own Lean contracts on the
   installed 32-bit target. These bounds do not prove durable provenance or Raft
   committed-prefix safety.
+
+## Recovery log ordering and scalar validity (partial R02/R03 evidence)
+
+- Successful recovery has a nonzero snapshot index/term when present, a snapshot
+  term no greater than the hard term, and no vote in term zero.
+- An induction through the complete translated recovery loop establishes an
+  OrderedEntries chain for every returned payload. Each index is the checked
+  successor of its predecessor; terms are positive, nondecreasing and bounded
+  by the hard term. Arbitrary iterator responses are validated inside the proof.
+- Exact-index corollaries bind each live slot to base.index + position + 1 and
+  the complete last() result to base.index + len. This is no longer merely a
+  conditional local guard statement or an occupied-prefix invariant.
+- The original-source suite rejects altered checked addition and missing initial,
+  term-order and upper-term guards. Both 32-bit and host proof projects pass.
+- Persistence provenance, mutator/caller preservation, global consensus and
+  Rust-to-IR semantic preservation remain open; full certification still rejects.

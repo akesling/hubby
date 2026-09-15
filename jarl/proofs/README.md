@@ -134,7 +134,8 @@ branch and entry-record projection. It returns the full base record at the
 boundary (including genesis), the selected entry's full `id` record on a hit,
 and None on an off-boundary miss. The proof does not assume that an arbitrary
 stored entry's id.index equals the requested index; contiguous log-ID invariants
-remain work for restore, append callers, truncation and snapshot installation.
+are checked for successful restore below; preservation through append callers,
+truncation and snapshot installation remains open.
 
 `State::entries` retains the complete prefix-slice check and builtin double-ended
 iterator construction. Its list is a denotation of borrowed locations, not a
@@ -171,5 +172,10 @@ shape and the supplied metadata; the interpreter bound is sufficient for every
 response sequence. Successful recovery also establishes the concrete bounds
 `snapshot.index ≤ hard.commit ≤ last().index` using the translated final guard.
 Restoration now participates in the buffer-history theorem.
-This closes the listed storage operations for that shape predicate, not log-ID
-ordering, valid durable recovery, protocol safety or Rust memory refinement.
+Successful recovery also establishes an ordered chain for every returned entry:
+indices are consecutive from the snapshot boundary, terms are positive and
+nondecreasing, and all terms are bounded by the hard-state term. Exact-index
+contracts bind live slots and the original last() result to their offsets.
+Snapshot validity and the term-zero vote rule are checked from the initial guard.
+Preserving these logical invariants through every mutator and protocol caller,
+valid durable recovery, protocol safety and Rust memory refinement remain open.

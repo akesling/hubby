@@ -31,6 +31,13 @@ fn storage_shape_holds_on_32_bit_and_rejects_changed_effects() {
     project["crate_root"] = "src/lib.rs".into();
     fs::write(&config, project.to_string()).unwrap();
     for (from, to) in [
+        ("last.index.checked_add(1)", "last.index.checked_add(2)"),
+        ("entry.id.term == 0", "false"),
+        ("entry.id.term < last.term", "false"),
+        ("entry.id.term > hard.term", "false"),
+        ("base.term > hard.term", "false"),
+        ("hard.term == 0 && hard.voted_for.is_some()", "false"),
+        ("base.index == 0 || base.term == 0", "false"),
         ("hard.commit < base.index", "false"),
         ("hard.commit > state.last().index", "false"),
         ("self.len += 1;", "self.len += 2;"),

@@ -114,6 +114,30 @@
     {
       "theorem": "Storage.restoration_commit_bounds",
       "function": "state_State_restore"
+    },
+    {
+      "theorem": "Storage.restoration_initial_guard",
+      "function": "state_State_restore"
+    },
+    {
+      "theorem": "Storage.restoration_base_term_bound",
+      "function": "state_State_restore"
+    },
+    {
+      "theorem": "Storage.restoration_zero_term_has_no_vote",
+      "function": "state_State_restore"
+    },
+    {
+      "theorem": "Storage.restoration_snapshot_nonzero",
+      "function": "state_State_restore"
+    },
+    {
+      "theorem": "Storage.restoration_orders_log",
+      "function": "state_State_restore"
+    },
+    {
+      "theorem": "Storage.restoration_exact_indices",
+      "function": "state_State_restore"
     }
   ]
 }
