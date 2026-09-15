@@ -148,6 +148,7 @@ impl Crate {
             iteration: None,
             last: None,
             truncation: None,
+            installation: None,
             record_at: None,
             lookup: None,
             selection: None,

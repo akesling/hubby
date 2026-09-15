@@ -8,10 +8,10 @@ Continue with the next open source-linked obligation under the existing toolchai
 dependency, no_std/sans-I/O and approval constraints. Only the full specification's
 verified completion can close this work; a green component suite cannot.
 
-Immediate frontier: translate snapshot installation and restoration with their
-original source ordering and owned-payload interactions, then close log-ID ordering
-and committed-prefix preservation before claiming the storage invariant for every
-reachable state.
+Immediate frontier: compose installation into the storage-shape history, translate
+restoration with its original iterator/ownership interactions, then close log-ID
+ordering and committed-prefix preservation before claiming the storage invariant
+for every reachable state.
 
 ## Source accounting (M0, C01–C12, P12)
 
@@ -214,3 +214,23 @@ complete generated transitions, including durable votes and restart.
 - Record views preserve opaque payload identity but do not prove physical Rust
   layout/borrow correspondence. Destructor panic/unwinding, consumer side effects,
   log-ID ordering and the protocol's committed-prefix callers remain open.
+
+## Complete snapshot installation (partial R/S evidence)
+
+- The complete original `State::install` body now translates, including its full
+  record-at/lookup/base helper chain, derived equality over every u64 record field,
+  checked subtraction, target-word cast, rotation and both clearing loops.
+- Kernel obligations prove capacity preservation, nonincreasing retained length,
+  nondecreasing commit and replacement with the exact owned input snapshot. Given
+  the original lookup/equality decision, arbitrary matching prefixes retain their
+  exact suffix; mismatches clear the entire retained prefix. Source-place contracts
+  bind slots, length, snapshot and commit fields.
+- Entry drops follow source order; old snapshot destruction follows the commit
+  update and precedes assignment. Faults retain the owned incoming snapshot at the
+  pre-unwind boundary. Following drop continuations requires normal return.
+- Native tests cover all occupancy masks at capacities 0/1/3, invalid lengths,
+  snapshot bases, term mismatches, boundary indices, commit extrema, ownership and
+  destructor order. Original-source mutations and installed wasm32 verification
+  are required by the Jarl gate.
+- General storage-shape/history composition, protocol authorization, log ordering,
+  committed-prefix preservation and physical view/unwinding refinement remain open.

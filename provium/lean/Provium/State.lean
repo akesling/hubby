@@ -419,4 +419,124 @@ def resumeTruncation : TruncationRun α → TruncationRun α
   | .drop _ _ next => resumeTruncation next
   | result => result
 
+structure Installation where
+  slotsPath : Path
+  lengthPath : Path
+  snapshotPath : Path
+  commitPath : Path
+  recordAt : RecordAt
+  recordField : Path
+  indexField : Path
+  baseIndexField : Path
+  commitIndexField : Path
+  equalityFields : List Path
+  equal : Bool
+  rotateLeft : Bool
+  maximum : Bool
+structure InstallationState (α β : Type) where
+  buffer : BufferState α
+  commit : Nat
+  snapshot : Option β
+inductive InstallationFault where
+  | input
+  | lookup
+  | subtraction
+  | bounds
+  deriving DecidableEq
+-- Faults stop before unwinding and retain ownership of the pending input.
+-- Drop continuations are conditional on normal consumer destructor return.
+inductive InstallationRun (α β : Type) where
+  | returned (state : InstallationState α β)
+  | fault (reason : InstallationFault) (state : InstallationState α β) (input : β)
+  | dropEntry (payload : α) (before : InstallationState α β) (input : β) (next : InstallationRun α β)
+  | dropSnapshot (payload : β) (before : InstallationState α β) (input : β) (next : InstallationRun α β)
+
+def recordWord (record : InitStore) (field : Path) : Option Nat :=
+  match record field with
+  | .unsigned ty value => if ty = "u64" ∧ value < 2^64 then some value else none
+  | _ => none
+
+def recordWords (record : InitStore) : List Path → Option (List Nat)
+  | [] => some []
+  | field :: rest => do
+    let value ← recordWord record field
+    let tail ← recordWords record rest
+    pure (value :: tail)
+
+def recordEquality (found : Option InitStore) (record : InitStore) (fields : List Path) : Option Bool :=
+  match found with
+  | none => some false
+  | some existing => do
+    let left ← recordWords existing fields
+    let right ← recordWords record fields
+    pure (left == right)
+
+def installationView (view : α → Path → InitStore) (snapshotView : β → Path → InitStore)
+    (state : InstallationState α β) : LookupStore (Path → InitStore) :=
+  ⟨fun _ => state.snapshot.map snapshotView,fun _ => state.buffer.slots.map (Option.map view)⟩
+
+def finishInstallation (program : Installation) (snapshotView : β → Path → InitStore)
+    (state : InstallationState α β) (input : β) : InstallationRun α β :=
+  match recordWord (snapshotView input program.recordField) program.commitIndexField with
+  | none => .fault .input state input
+  | some index =>
+    if state.commit ≥ 2^64 then .fault .input state input else
+    let committed := {state with commit := if program.maximum then max state.commit index else min state.commit index}
+    let next := InstallationRun.returned {committed with snapshot := some input}
+    match state.snapshot with
+    | none => next
+    | some previous => .dropSnapshot previous committed input next
+
+def clearInstallation (program : Installation) (snapshotView : β → Path → InitStore)
+    (resetLength : Bool) (input : β) : Nat → Nat → InstallationState α β → InstallationRun α β
+  | _, 0, state =>
+    finishInstallation program snapshotView
+      (if resetLength then {state with buffer.len := 0} else state) input
+  | index, count + 1, state =>
+    match state.buffer.slots[index]? with
+    | none => .fault .bounds state input
+    | some previous =>
+      let cleared := {state with buffer.slots := state.buffer.slots.set index none}
+      let next := clearInstallation program snapshotView resetLength input (index + 1) count cleared
+      match previous with
+      | none => next
+      | some payload => .dropEntry payload state input next
+
+def installSnapshot (program : Installation) (bits : Nat)
+    (view : α → Path → InitStore) (snapshotView : β → Path → InitStore)
+    (state : InstallationState α β) (input : β) : InstallationRun α β :=
+  let record := snapshotView input program.recordField
+  let projected := installationView view snapshotView state
+  match recordWord record program.indexField with
+  | none => .fault .input state input
+  | some index => match recordAt program.recordAt bits projected index with
+    | .error _ => .fault .lookup state input
+    | .ok found =>
+      let equality := recordEquality found record program.equalityFields
+      match equality with
+      | none => .fault .input state input
+      | some equal => if equal == program.equal then
+          match recordWord (selectRecord program.recordAt.lookup.base projected.records) program.baseIndexField with
+          | none => .fault .input state input
+          | some base =>
+            if index < base then .fault .subtraction state input else
+            let remove := (index - base) % 2^bits
+            if state.buffer.len > state.buffer.slots.length ∨ remove > state.buffer.len then
+              .fault .bounds state input
+            else
+              let retained := state.buffer.slots.take state.buffer.len
+              let amount := if program.rotateLeft then remove else state.buffer.len - remove
+              let rotated := retained.drop amount ++ retained.take amount ++ state.buffer.slots.drop state.buffer.len
+              let shifted := {state with buffer := ⟨rotated,state.buffer.len - remove⟩}
+              clearInstallation program snapshotView false input shifted.buffer.len
+                (rotated.length - shifted.buffer.len) shifted
+        else
+          if state.buffer.len > state.buffer.slots.length then .fault .bounds state input
+          else clearInstallation program snapshotView true input 0 state.buffer.len state
+
+def resumeInstallation : InstallationRun α β → InstallationRun α β
+  | .dropEntry _ _ _ next => resumeInstallation next
+  | .dropSnapshot _ _ _ next => resumeInstallation next
+  | result => result
+
 end Provium.State

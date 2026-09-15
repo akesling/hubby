@@ -44,7 +44,7 @@ CI runs both ordinary tests and the full proof gate.
 | [input-gating](input-gating/Proofs.lean) | Complete `Node::available` and `idle`: exact Result, dirty-state/reply/outbox rejection, and clean/drained admission over arbitrary outbox lengths |
 | [capacity](capacity/Proofs.lean) | Complete `State::full`: exact equality against the original const-generic capacity; non-full implies room under the separate `len ≤ CAP` representation invariant |
 | [log-boundary](log-boundary/Proofs.lean) | Complete `State::base`, `get`, `id_at`, `entries` and `last`: snapshot boundary, checked borrowed lookup, ordered prefix iteration, and exact boundary/final-entry records |
-| [storage](storage/Proofs.lean) | Complete `State::push`, `new`, `grow` and `truncate`: no-drop append/growth, occupied-prefix/capacity and metadata preservation, explicit destruction boundaries, and induction over histories with changing capacity |
+| [storage](storage/Proofs.lean) | Complete `State::push`, `new`, `grow`, `truncate` and `install`: no-drop append/growth, occupied-prefix/capacity and metadata preservation, explicit destruction boundaries, and induction over histories with changing capacity |
 | [initialization](initialization/Proofs.lean) | Complete `State::new`: initial hard-state fields, absent snapshot, all slots empty for arbitrary capacity, and initial `len ≤ CAP` |
 
 Each directory's `project.json` binds production Rust to explicit theorem
@@ -153,3 +153,10 @@ the internal interpreter fuel cannot run out. Native tests compare sparse and
 malformed buffers, bounds-panic state, removal boundaries and destructor order.
 Following a drop continuation requires normal destructor return; metadata-view
 refinement, panic/unwinding and committed-prefix preservation remain open.
+
+Snapshot installation includes complete source lookup helpers and derived
+all-field record equality. Its contracts retain the exact matching suffix or
+clear the mismatching prefix, preserve capacity, advance commit monotonically,
+and install the exact input snapshot. The branch contracts require their explicit
+lookup/equality decisions; proving every reachable caller satisfies the required
+log invariants remains open. Destructors and pre-unwind ownership are explicit.

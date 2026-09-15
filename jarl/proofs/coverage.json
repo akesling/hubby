@@ -3880,8 +3880,8 @@
         "R03",
         "R05"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+      "status": "component_evidence",
+      "note": "Complete original snapshot installation and record-at/lookup/base helpers in proofs/storage: all-field derived equality, target-word cast and rotation, exact matching suffix and mismatching prefix under lookup decisions, capacity/commit/snapshot postconditions, and source-ordered payload destruction. Global storage-history composition, log ordering, committed-prefix callers, source/layout refinement and destructor unwinding remain open."
     },
     "crate::state::<State < V , S , CAP >>::last": {
       "requirements": [

@@ -83,6 +83,7 @@ pub struct Method {
     pub iteration: Option<iterations::Iteration>,
     pub last: Option<iterations::Last>,
     pub truncation: Option<truncations::Truncation>,
+    pub installation: Option<installations::Installation>,
 }
 struct Definition {
     module: String,
@@ -449,6 +450,9 @@ impl Crate {
             ) {
                 return self.lower_truncation(name);
             }
+            if installations::candidate(&def.item) {
+                return self.lower_installation(name);
+            }
             if iterations::last_expression(&def.item.block) {
                 return self.lower_last(name);
             }
@@ -563,6 +567,7 @@ impl Crate {
             iteration: None,
             last: None,
             truncation: None,
+            installation: None,
         })
     }
     fn field_type<'a>(&'a self, def: &Definition, p: &[String]) -> Result<&'a Type, String> {
@@ -842,6 +847,10 @@ pub fn generate(methods: &[Method], namespace: &str) -> String {
     let mut text=format!("-- Generated from complete Rust method bodies; no sliced statements.\nimport Provium.State\nnamespace {namespace}\nopen Provium.State\n");
     for method in methods {
         let name = &method.symbol;
+        if method.installation.is_some() {
+            text.push_str(&installations::generate(method));
+            continue;
+        }
         if method.truncation.is_some() {
             text.push_str(&truncations::generate(method));
             continue;
@@ -1098,3 +1107,5 @@ pub mod records;
 pub mod iterations;
 
 pub mod truncations;
+
+pub mod installations;

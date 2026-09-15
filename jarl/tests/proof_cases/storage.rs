@@ -35,6 +35,9 @@ fn storage_shape_holds_on_32_bit_and_rejects_changed_effects() {
         ("self.len == CAP", "self.len != CAP"),
         ("if i < self.len", "if i <= self.len"),
         ("NEW >= CAP", "NEW <= CAP"),
+        ("rotate_left(remove)", "rotate_right(remove)"),
+        (".max(snapshot.last.index)", ".min(snapshot.last.index)"),
+        ("== Some(snapshot.last)", "!= Some(snapshot.last)"),
         ("self.last().index >= from", "self.last().index > from"),
         ("self.last().index >= from", "self.last().term >= from"),
     ] {

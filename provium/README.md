@@ -280,3 +280,10 @@ explicit destructor suspensions with normally returning continuations. Opaque
 payloads are separate from immutable record views; no payload Clone is imposed on
 the subject. Native tests compare boundaries, sparse storage and drop order.
 Physical record-view refinement and destructor panic/unwinding are still open.
+
+Snapshot replacement additionally composes complete optional-record lookup,
+derived equality over all scalar record fields, target-word casts and prefix
+rotation. Source-ordered clearing and replacement expose both entry and snapshot
+destructor boundaries. Fault outcomes retain the incoming owned snapshot before
+unwinding. Native comparisons include malformed buffers, term mismatches and
+commit extrema; this backend does not establish protocol caller invariants.

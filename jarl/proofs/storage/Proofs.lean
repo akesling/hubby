@@ -425,4 +425,193 @@ theorem truncation_fuel_sufficient (view : α → Path → InitStore) (records :
     resumeTruncation (JarlStorage.state_State_truncate view records state boundary) ≠ .fault .exhausted failed := by
   exact truncate_fuel_sufficient _ view records boundary _ state failed (by omega)
 
+
+private theorem finish_installation_frame (program : Installation) (snapshotView : β → Path → InitStore)
+    (state next : InstallationState α β) (input : β) (maximum : program.maximum = true)
+    (execution : resumeInstallation (finishInstallation program snapshotView state input) = .returned next) :
+    next.buffer = state.buffer ∧ state.commit ≤ next.commit ∧ next.snapshot = some input := by
+  simp only [finishInstallation,maximum] at execution
+  split at execution
+  · simp [resumeInstallation] at execution
+  · split at execution
+    · simp [resumeInstallation] at execution
+    · split at execution <;> simp [resumeInstallation] at execution
+      all_goals subst next; exact ⟨rfl,Nat.le_max_left _ _,rfl⟩
+
+private theorem clear_installation_frame (program : Installation) (snapshotView : β → Path → InitStore)
+    (state next : InstallationState α β) (input : β) (resetLength : Bool) (start count : Nat)
+    (maximum : program.maximum = true)
+    (execution : resumeInstallation (clearInstallation program snapshotView resetLength input start count state) = .returned next) :
+    next.buffer.slots.length = state.buffer.slots.length ∧ next.buffer.len ≤ state.buffer.len ∧
+      state.commit ≤ next.commit ∧ next.snapshot = some input := by
+  induction count generalizing start state with
+  | zero =>
+    have result := finish_installation_frame program snapshotView _ next input maximum execution
+    cases resetLength <;> simp_all
+  | succ count ih =>
+    simp only [clearInstallation] at execution
+    split at execution
+    · simp [resumeInstallation] at execution
+    · split at execution <;> try simp only [resumeInstallation] at execution
+      all_goals
+        obtain ⟨length, short, commit, snapshot⟩ := ih _ _ execution
+        exact ⟨by simpa using length,short,commit,snapshot⟩
+
+theorem installation_preserves_capacity_and_commit (bits : Nat) (view : α → Path → InitStore)
+    (snapshotView : β → Path → InitStore) (state next : InstallationState α β) (input : β)
+    (execution : resumeInstallation (JarlStorage.state_State_install bits view snapshotView state input) = .returned next) :
+    next.buffer.slots.length = state.buffer.slots.length ∧ next.buffer.len ≤ state.buffer.len ∧
+      state.commit ≤ next.commit ∧ next.snapshot = some input := by
+  unfold JarlStorage.state_State_install installSnapshot at execution
+  dsimp only [JarlStorage.state_State_install_ir] at execution
+  simp only [if_true] at execution
+  split at execution
+  · simp [resumeInstallation] at execution
+  · split at execution
+    · simp [resumeInstallation] at execution
+    · split at execution
+      · simp [resumeInstallation] at execution
+      · split at execution
+        · split at execution
+          · simp [resumeInstallation] at execution
+          · split at execution
+            · simp [resumeInstallation] at execution
+            · split at execution
+              · simp [resumeInstallation] at execution
+              · obtain ⟨length, shorter, commit, snapshot⟩ :=
+                  clear_installation_frame _ snapshotView _ next input false _ _ rfl execution
+                refine ⟨?_, ?_, commit, snapshot⟩
+                · simp only [List.length_append,List.length_drop,List.length_take] at length
+                  omega
+                · dsimp at shorter
+                  omega
+        · split at execution
+          · simp [resumeInstallation] at execution
+          · exact clear_installation_frame _ snapshotView state next input true 0 _ rfl execution
+
+private theorem clear_installation_exact (program : Installation) (snapshotView : β → Path → InitStore)
+    (front removed suffix : List (Option α)) (length commit : Nat) (saved : Option β)
+    (input : β) (resetLength : Bool) :
+    resumeInstallation (clearInstallation program snapshotView resetLength input front.length removed.length
+      ⟨⟨front ++ removed ++ suffix,length⟩,commit,saved⟩) =
+    resumeInstallation (finishInstallation program snapshotView
+      ⟨⟨front ++ List.replicate removed.length none ++ suffix,if resetLength then 0 else length⟩,commit,saved⟩ input) := by
+  induction removed generalizing front with
+  | nil => cases resetLength <;> simp [clearInstallation]
+  | cons entry rest ih =>
+    have hit : (front ++ (entry :: rest) ++ suffix)[front.length]? = some entry := by
+      rw [List.getElem?_append_left (by simp),List.getElem?_append_right (by omega)]
+      simp
+    have store : (front ++ (entry :: rest) ++ suffix).set front.length none =
+        (front ++ [none]) ++ rest ++ suffix := by
+      simp [List.append_assoc]
+    simp only [List.length_cons,clearInstallation,hit]
+    cases entry <;> simp only [resumeInstallation]
+    all_goals
+      rw [store]
+      have step := ih (front ++ [none])
+      simp only [List.length_append,List.length_singleton] at step
+      rw [step]
+      simp [List.replicate_succ,List.append_assoc]
+
+theorem installation_matching_suffix (bits base commit : Nat) (view : α → Path → InitStore)
+    (snapshotView : β → Path → InitStore) (removed retained padding : List (Option α))
+    (saved : Option β) (input : β) (words : List Nat)
+    (index_value : snapshotView input ["last"] ["index"] = .unsigned "u64" (base + removed.length))
+    (index_valid : base + removed.length < 2^64) (word_bound : removed.length < 2^bits)
+    (commit_valid : commit < 2^64)
+    (base_value : selectRecord JarlStorage.state_State_install_ir.recordAt.lookup.base
+      (installationView view snapshotView ⟨⟨removed ++ retained ++ padding,removed.length + retained.length⟩,commit,saved⟩).records
+      ["index"] = .unsigned "u64" base)
+    (matched : recordAt JarlStorage.state_State_install_ir.recordAt bits
+      (installationView view snapshotView ⟨⟨removed ++ retained ++ padding,removed.length + retained.length⟩,commit,saved⟩)
+      (base + removed.length) = .ok (some (snapshotView input ["last"])))
+    (values : recordWords (snapshotView input ["last"]) [["index"],["term"]] = some words) :
+    resumeInstallation (JarlStorage.state_State_install bits view snapshotView
+      ⟨⟨removed ++ retained ++ padding,removed.length + retained.length⟩,commit,saved⟩ input) =
+      .returned ⟨⟨retained ++ List.replicate (removed.length + padding.length) none,retained.length⟩,
+        max commit (base + removed.length),some input⟩ := by
+  have input_word : recordWord (snapshotView input ["last"]) ["index"] = some (base + removed.length) := by
+    simp [recordWord,index_value,index_valid]
+  have base_valid : base < 2^64 := by omega
+  have base_word : recordWord (selectRecord JarlStorage.state_State_install_ir.recordAt.lookup.base
+      (installationView view snapshotView ⟨⟨removed ++ retained ++ padding,removed.length + retained.length⟩,commit,saved⟩).records)
+      ["index"] = some base := by
+    unfold recordWord
+    rw [base_value]
+    simp [base_valid]
+  unfold JarlStorage.state_State_install installSnapshot
+  simp only [show JarlStorage.state_State_install_ir.recordField = ["last"] by rfl,
+    show JarlStorage.state_State_install_ir.indexField = ["index"] by rfl,
+    input_word,matched,recordEquality,show JarlStorage.state_State_install_ir.equalityFields = [["index"],["term"]] by rfl,values]
+  simp only [bind, pure, Option.bind, beq_self_eq_true,show JarlStorage.state_State_install_ir.equal = true by rfl,if_true,
+    show JarlStorage.state_State_install_ir.baseIndexField = ["index"] by rfl,base_word]
+  have subtraction : base + removed.length - base = removed.length := by omega
+  have no_underflow : ¬ base + removed.length < base := by omega
+  simp only [no_underflow,if_false,subtraction,Nat.mod_eq_of_lt word_bound,
+    show JarlStorage.state_State_install_ir.rotateLeft = true by rfl,if_true]
+  simp only [List.length_append]
+  rw [if_neg (by omega)]
+  rw [List.take_left' (by simp)]
+  simp only [List.drop_left,List.take_left]
+  have tail : List.drop (removed.length + retained.length) (removed ++ retained ++ padding) = padding := by
+    rw [← List.length_append, List.drop_left]
+  rw [tail]
+  simp only [Nat.add_sub_cancel_left, Nat.add_assoc]
+  have clear := clear_installation_exact JarlStorage.state_State_install_ir snapshotView retained
+    (removed ++ padding) [] retained.length commit saved input false
+  simp only [List.length_append,List.append_nil,Bool.false_eq_true,if_false] at clear
+  simp only [List.append_assoc]
+  rw [clear]
+  unfold finishInstallation
+  simp only [show JarlStorage.state_State_install_ir.recordField = ["last"] by rfl,
+    show JarlStorage.state_State_install_ir.commitIndexField = ["index"] by rfl,input_word]
+  have bound : ¬ commit ≥ 2^64 := by omega
+  simp only [bound,if_false,show JarlStorage.state_State_install_ir.maximum = true by rfl,if_true]
+  cases saved <;> rfl
+
+theorem installation_mismatching_prefix (bits index commit : Nat) (view : α → Path → InitStore)
+    (snapshotView : β → Path → InitStore) (retained padding : List (Option α))
+    (saved : Option β) (input : β) (found : Option InitStore)
+    (index_value : snapshotView input ["last"] ["index"] = .unsigned "u64" index)
+    (index_valid : index < 2^64) (commit_valid : commit < 2^64)
+    (different : recordEquality found (snapshotView input ["last"]) [["index"],["term"]] = some false)
+    (looked : recordAt JarlStorage.state_State_install_ir.recordAt bits
+      (installationView view snapshotView ⟨⟨retained ++ padding,retained.length⟩,commit,saved⟩)
+      index = .ok found) :
+    resumeInstallation (JarlStorage.state_State_install bits view snapshotView
+      ⟨⟨retained ++ padding,retained.length⟩,commit,saved⟩ input) =
+      .returned ⟨⟨List.replicate retained.length none ++ padding,0⟩,max commit index,some input⟩ := by
+  have input_word : recordWord (snapshotView input ["last"]) ["index"] = some index := by
+    simp [recordWord,index_value,index_valid]
+  unfold JarlStorage.state_State_install installSnapshot
+  simp only [show JarlStorage.state_State_install_ir.recordField = ["last"] by rfl,
+    show JarlStorage.state_State_install_ir.indexField = ["index"] by rfl,input_word,looked,
+    show JarlStorage.state_State_install_ir.equalityFields = [["index"],["term"]] by rfl,
+    show JarlStorage.state_State_install_ir.equal = true by rfl]
+  rw [different]
+  simp
+  rw [if_neg (by omega)]
+  have clear := clear_installation_exact JarlStorage.state_State_install_ir snapshotView [] retained padding
+    retained.length commit saved input true
+  simp only [List.length_nil,List.nil_append,if_true] at clear
+  rw [clear]
+  unfold finishInstallation
+  simp only [show JarlStorage.state_State_install_ir.recordField = ["last"] by rfl,
+    show JarlStorage.state_State_install_ir.commitIndexField = ["index"] by rfl,input_word]
+  have bound : ¬ commit ≥ 2^64 := by omega
+  simp only [bound,if_false,show JarlStorage.state_State_install_ir.maximum = true by rfl,if_true]
+  cases saved <;> rfl
+
+theorem installation_places (bits : Nat) (view : α → Path → InitStore)
+    (snapshotView : β → Path → InitStore) (state next : InstallationState α β) (input : β)
+    (execution : resumeInstallation (JarlStorage.state_State_install bits view snapshotView state input) = .returned next) :
+    JarlStorage.state_State_install_ir.slotsPath = ["entries"] ∧
+    JarlStorage.state_State_install_ir.lengthPath = ["len"] ∧
+    JarlStorage.state_State_install_ir.snapshotPath = ["snapshot"] ∧
+    JarlStorage.state_State_install_ir.commitPath = ["hard","commit"] ∧
+    next.buffer.slots.length = state.buffer.slots.length ∧ next.buffer.len ≤ state.buffer.len ∧
+      state.commit ≤ next.commit ∧ next.snapshot = some input := by
+  exact ⟨rfl,rfl,rfl,rfl,installation_preserves_capacity_and_commit bits view snapshotView state next input execution⟩
+
 end Storage

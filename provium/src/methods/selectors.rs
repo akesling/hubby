@@ -164,7 +164,7 @@ impl Crate {
             &BTreeMap::new(),
             &mut fallback,
         )?;
-        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],array:None,query:None,constructor:None,buffer:None,relocation:None,iteration:None,last:None,truncation:None,record_at:None,lookup:None,selection:Some(Selection{optional,record_field:member.to_string(),record_type,fallback,scope:"complete shared Option record selection with checked eager derived Default; Rust field/type/borrow and frontend correspondence remain unproved"})})
+        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],array:None,query:None,constructor:None,buffer:None,relocation:None,iteration:None,last:None,truncation:None,installation:None,record_at:None,lookup:None,selection:Some(Selection{optional,record_field:member.to_string(),record_type,fallback,scope:"complete shared Option record selection with checked eager derived Default; Rust field/type/borrow and frontend correspondence remain unproved"})})
     }
 }
 pub(super) fn program(s: &Selection) -> String {

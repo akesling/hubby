@@ -5,7 +5,8 @@
     "state::State::push",
     "state::State::new",
     "state::State::grow",
-    "state::State::truncate"
+    "state::State::truncate",
+    "state::State::install"
   ],
   "proofs": "Proofs.lean",
   "obligations": [
@@ -68,6 +69,22 @@
     {
       "theorem": "Storage.truncation_fuel_sufficient",
       "function": "state_State_truncate"
+    },
+    {
+      "theorem": "Storage.installation_preserves_capacity_and_commit",
+      "function": "state_State_install"
+    },
+    {
+      "theorem": "Storage.installation_matching_suffix",
+      "function": "state_State_install"
+    },
+    {
+      "theorem": "Storage.installation_mismatching_prefix",
+      "function": "state_State_install"
+    },
+    {
+      "theorem": "Storage.installation_places",
+      "function": "state_State_install"
     }
   ]
 }
