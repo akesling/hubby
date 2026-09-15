@@ -8,9 +8,10 @@ Continue with the next open source-linked obligation under the existing toolchai
 dependency, no_std/sans-I/O and approval constraints. Only the full specification's
 verified completion can close this work; a green component suite cannot.
 
-Immediate frontier: preserve restored log-ID ordering and commitment bounds
-across storage mutations, then compose complete protocol callers and durable
-histories. Successful recovery ordering and its scalar validity are checked below. Buffer-shape induction alone
+Immediate frontier: prove committed-prefix preservation and append/installation
+log validity under actual caller conditions, then compose complete protocol
+callers and durable histories. Recovery, growth and truncation preserve the
+logical log representation under the contracts below. Buffer-shape induction alone
 is not a source-level Raft correctness proof.
 
 ## Source accounting (M0, C01–C12, P12)
@@ -297,3 +298,13 @@ complete generated transitions, including durable votes and restart.
   term-order and upper-term guards. Both 32-bit and host proof projects pass.
 - Persistence provenance, mutator/caller preservation, global consensus and
   Rust-to-IR semantic preservation remain open; full certification still rejects.
+
+## Logical representation across growth and truncation (partial R02/R03)
+
+- LogRep connects occupied slots to an OrderedEntries chain with the actual
+  metadata/base views. Successful recovery establishes it.
+- Arbitrary nondecreasing capacity growth preserves LogRep and exact length.
+  Successful truncation preserves LogRep by retaining an exact ordered prefix.
+- These contracts retain term and index order, not merely slot presence. They
+  do not authorize truncating committed entries; that requires caller conditions
+  and a separate committed-prefix contract.

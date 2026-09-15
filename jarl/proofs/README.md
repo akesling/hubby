@@ -177,5 +177,8 @@ indices are consecutive from the snapshot boundary, terms are positive and
 nondecreasing, and all terms are bounded by the hard-state term. Exact-index
 contracts bind live slots and the original last() result to their offsets.
 Snapshot validity and the term-zero vote rule are checked from the initial guard.
-Preserving these logical invariants through every mutator and protocol caller,
+Growth and truncation preserve this logical representation: growth retains the
+chain, and truncation retains an ordered prefix. Committed-prefix protection
+requires additional caller conditions. Preservation through append, installation
+and every protocol caller,
 valid durable recovery, protocol safety and Rust memory refinement remain open.

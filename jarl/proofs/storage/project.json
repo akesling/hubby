@@ -138,6 +138,18 @@
     {
       "theorem": "Storage.restoration_exact_indices",
       "function": "state_State_restore"
+    },
+    {
+      "theorem": "Storage.restoration_log_representation",
+      "function": "state_State_restore"
+    },
+    {
+      "theorem": "Storage.growth_preserves_log",
+      "function": "state_State_grow"
+    },
+    {
+      "theorem": "Storage.truncation_preserves_log",
+      "function": "state_State_truncate"
     }
   ]
 }

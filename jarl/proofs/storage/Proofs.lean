@@ -1235,4 +1235,80 @@ theorem restoration_exact_indices (bits : Nat) (sizes : String → Nat)
       simpa [List.getElem?_map,Option.map_eq_some_iff] using present
     exact ordered_entry_index view _ _ entries last boundary baseRead chain position entry member
 
+-- Logical log validity is separate from durability and the caller's authority
+-- to change the committed prefix.
+def LogRep (view : α → Path → InitStore) (hard base : InitStore)
+    (state : BufferState α) (capacity : Nat) : Prop :=
+  Shape state capacity ∧ ∃ entries last,
+    state.slots = entries.map some ++ List.replicate (capacity - state.len) none ∧
+    state.len = entries.length ∧ OrderedEntries view hard base entries last
+
+private theorem ordered_take (view : α → Path → InitStore) (hard base : InitStore)
+    (entries : List α) (last : InitStore) (chain : OrderedEntries view hard base entries last) :
+    ∀ count, count ≤ entries.length → ∃ record, OrderedEntries view hard base (entries.take count) record := by
+  induction chain with
+  | empty => intro count bound; exact ⟨base,by simpa using OrderedEntries.empty (view := view) (hard := hard) (base := base)⟩
+  | @snoc entries previous entry previousIndex index previousTerm term hardTerm chain previousRead indexRead previousTermRead termRead hardRead successor range positive monotone upper ih =>
+    intro count bound
+    by_cases earlier : count ≤ entries.length
+    · rw [List.take_append_of_le_length earlier]
+      exact ih count earlier
+    · have full : (entries ++ [entry]).length ≤ count := by simp only [List.length_append,List.length_singleton] at bound ⊢;omega
+      rw [List.take_of_length_le full]
+      exact ⟨view entry ["id"],.snoc entry previousIndex index previousTerm term hardTerm chain previousRead indexRead previousTermRead termRead hardRead successor range positive monotone upper⟩
+
+private theorem log_rep_prefix (view : α → Path → InitStore) (hard base : InitStore)
+    (state next : BufferState α) (capacity nextCapacity : Nat)
+    (valid : LogRep view hard base state capacity) (shape : Shape next nextCapacity)
+    (shorter : next.len ≤ state.len)
+    (unchanged : ∀ i, i < next.len → next.slots[i]? = state.slots[i]?) :
+    LogRep view hard base next nextCapacity := by
+  obtain ⟨_,entries,last,slots,length,chain⟩ := valid
+  have bound : next.len ≤ entries.length := by omega
+  obtain ⟨record,prefixChain⟩ := ordered_take view hard base entries last chain next.len bound
+  have front : next.slots.take next.len = (entries.take next.len).map some := by
+    apply List.ext_getElem?
+    intro i
+    by_cases inside : i < next.len
+    · rw [List.getElem?_take_of_lt inside,List.getElem?_map,List.getElem?_take_of_lt inside,unchanged i inside,slots,
+        List.getElem?_append_left (by simp only [List.length_map];omega),List.getElem?_map]
+    · simp [List.getElem?_take,inside]
+  refine ⟨shape,entries.take next.len,record,?_,?_,prefixChain⟩
+  · rw [← front,← empty_suffix next nextCapacity shape]
+    exact (List.take_append_drop next.len next.slots).symm
+  · exact (List.length_take_of_le bound).symm
+
+theorem restoration_log_representation (bits : Nat) (sizes : String → Nat)
+    (view : α → Path → InitStore) (snapshotView : β → Path → InitStore)
+    (hardView : δ → InitStore) (hardPresence : δ → Path → Bool)
+    (hard : δ) (snapshot : Option β) (source : σ) (output : RecoveryState α β δ)
+    (word : sizes "CAP" < 2^bits)
+    (execution : RecoveryReturns (JarlStorage.state_State_restore bits sizes view snapshotView hardView hardPresence hard snapshot source : RecoveryRun α β δ σ ι) (.ok output)) :
+    LogRep view (hardView hard)
+      (selectRecord JarlStorage.state_State_restore_ir.last.base (fun _ => snapshot.map snapshotView)) output.buffer (sizes "CAP") := by
+  have shape := (restoration_preserves_shape bits sizes view snapshotView hardView hardPresence hard snapshot source output word execution).1
+  obtain ⟨entries,padding,last,slots,length,chain,_⟩ := restoration_orders_log bits sizes view snapshotView hardView hardPresence hard snapshot source output word execution
+  have size := shape.1
+  rw [slots] at size
+  simp only [List.length_append,List.length_map,List.length_replicate] at size
+  have paddingEq : padding = sizes "CAP" - output.buffer.len := by omega
+  exact ⟨shape,entries,last,by simpa [paddingEq] using slots,length,chain⟩
+
+theorem growth_preserves_log (oldCapacity newCapacity : Nat) (view : α → Path → InitStore)
+    (hard base : InitStore) (state : BufferState α) (metadata : β)
+    (valid : LogRep view hard base state oldCapacity) (grows : oldCapacity ≤ newCapacity) :
+    ∃ next, JarlStorage.state_State_grow oldCapacity newCapacity state metadata = .returned next metadata ∧
+      LogRep view hard base next newCapacity ∧ next.len = state.len := by
+  obtain ⟨next,execution,shape,length,unchanged⟩ := grow_preserves_shape oldCapacity newCapacity state metadata valid.1 grows
+  exact ⟨next,execution,log_rep_prefix view hard base state next oldCapacity newCapacity valid shape (by omega)
+    (fun i inside => unchanged i (by omega)),length⟩
+
+theorem truncation_preserves_log (view : α → Path → InitStore) (records : SelectionStore)
+    (hard base : InitStore) (boundary capacity : Nat) (state next : BufferState α)
+    (valid : LogRep view hard base state capacity)
+    (execution : resumeTruncation (JarlStorage.state_State_truncate view records state boundary) = .returned next) :
+    LogRep view hard base next capacity ∧ next.len ≤ state.len := by
+  obtain ⟨shape,shorter,unchanged⟩ := truncation_preserves_shape view records boundary capacity state next valid.1 execution
+  exact ⟨log_rep_prefix view hard base state next capacity capacity valid shape shorter unchanged,shorter⟩
+
 end Storage
