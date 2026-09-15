@@ -78,6 +78,7 @@ pub struct Method {
     pub buffer: Option<buffers::Append>,
     pub relocation: Option<relocations::Relocation>,
     pub selection: Option<selectors::Selection>,
+    pub lookup: Option<lookups::Lookup>,
 }
 struct Definition {
     module: String,
@@ -427,6 +428,10 @@ impl Crate {
             {
                 return self.lower_constructor(name);
             }
+            if matches!(&def.item.sig.output,syn::ReturnType::Type(_,ty) if matches!(&**ty,Type::Path(p) if p.path.segments.first().is_some_and(|s|s.ident=="Option")))
+            {
+                return self.lower_lookup(name);
+            }
             if queries::result_error(&def.item.sig.output).is_ok() {
                 if matches!(def.item.sig.inputs.first(), Some(syn::FnArg::Receiver(r)) if r.mutability.is_some())
                 {
@@ -533,6 +538,7 @@ impl Crate {
             buffer: None,
             relocation: None,
             selection: None,
+            lookup: None,
         })
     }
     fn field_type<'a>(&'a self, def: &Definition, p: &[String]) -> Result<&'a Type, String> {
@@ -812,6 +818,10 @@ pub fn generate(methods: &[Method], namespace: &str) -> String {
     let mut text=format!("-- Generated from complete Rust method bodies; no sliced statements.\nimport Provium.State\nnamespace {namespace}\nopen Provium.State\n");
     for method in methods {
         let name = &method.symbol;
+        if method.lookup.is_some() {
+            text.push_str(&lookups::generate(method));
+            continue;
+        }
         if method.selection.is_some() {
             text.push_str(&selectors::generate(method));
             continue;
@@ -1044,3 +1054,5 @@ pub mod buffers;
 pub mod relocations;
 
 pub mod selectors;
+
+pub mod lookups;

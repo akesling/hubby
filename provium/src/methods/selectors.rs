@@ -164,12 +164,10 @@ impl Crate {
             &BTreeMap::new(),
             &mut fallback,
         )?;
-        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],array:None,query:None,constructor:None,buffer:None,relocation:None,selection:Some(Selection{optional,record_field:member.to_string(),record_type,fallback,scope:"complete shared Option record selection with checked eager derived Default; Rust field/type/borrow and frontend correspondence remain unproved"})})
+        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],array:None,query:None,constructor:None,buffer:None,relocation:None,lookup:None,selection:Some(Selection{optional,record_field:member.to_string(),record_type,fallback,scope:"complete shared Option record selection with checked eager derived Default; Rust field/type/borrow and frontend correspondence remain unproved"})})
     }
 }
-pub(super) fn generate(method: &Method) -> String {
-    let s = method.selection.as_ref().unwrap();
-    let name = &method.symbol;
+pub(super) fn program(s: &Selection) -> String {
     let fields = s
         .fallback
         .iter()
@@ -182,5 +180,14 @@ pub(super) fn generate(method: &Method) -> String {
         })
         .collect::<Vec<_>>()
         .join(", ");
-    format!("def {name}_ir : RecordSelection := ⟨{}, {}, [{fields}]⟩\ndef {name} (state : SelectionStore) : InitStore :=\n  selectRecord {name}_ir state\ntheorem {name}_correspondence (state : SelectionStore) :\n  selectRecord {name}_ir state = {name} state := by rfl\n",lean_path(&s.optional),lean_path(std::slice::from_ref(&s.record_field)))
+    format!(
+        "⟨{}, {}, [{fields}]⟩",
+        lean_path(&s.optional),
+        lean_path(std::slice::from_ref(&s.record_field))
+    )
+}
+pub(super) fn generate(method: &Method) -> String {
+    let s = method.selection.as_ref().unwrap();
+    let name = &method.symbol;
+    format!("def {name}_ir : RecordSelection := {}\ndef {name} (state : SelectionStore) : InitStore :=\n  selectRecord {name}_ir state\ntheorem {name}_correspondence (state : SelectionStore) :\n  selectRecord {name}_ir state = {name} state := by rfl\n",program(s))
 }

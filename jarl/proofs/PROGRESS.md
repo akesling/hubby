@@ -3,6 +3,16 @@
 This records implemented evidence against [CORRECTNESS_PLAN.md](CORRECTNESS_PLAN.md).
 It is not a completion certificate. No full-correctness milestone is closed yet.
 
+Execution rule: a checked commit is a checkpoint, not the stopping condition.
+Continue with the next open source-linked obligation under the existing toolchain,
+dependency, no_std/sans-I/O and approval constraints. Only the full specification's
+verified completion can close this work; a green component suite cannot.
+
+Immediate frontier: translate `State::id_at` by composing its original `base`
+and `get` helpers, including the equality branch and copied entry LogId. Then
+translate `entries`/`last`, and close restore/truncate/install preservation before
+claiming the storage invariant for every reachable state.
+
 ## Source accounting (M0, C01–C12, P12)
 
 - `coverage.json` reviews 184 syntactic items in Jarl's production module tree.
@@ -114,13 +124,29 @@ It is not a completion certificate. No full-correctness milestone is closed yet.
   name shadowing are rejected.
 - Jarl's `State::base` now proves exact zero index/term without a snapshot and
   exact preservation of the snapshot's `last` record when present. The contract
-  also runs against installed wasm32. It does not yet prove `get` or `id_at`.
+  also runs against installed wasm32. `id_at` and caller composition remain open.
 - Provider native checks exercise both same-typed projected records; changing
   which source field is selected must fail the independent Lean contract.
 - Append/growth IR now also retain source array/length paths and capacity names.
   Explicit Jarl obligations bind the abstract buffer to those original places;
   provider source-renaming mutations cannot pass merely because the abstract
   arithmetic is unchanged. Physical layout and borrow refinement remain open.
+
+## Checked log lookup (M1, C02/R03)
+
+- Provium retains both checked subtractions, original bias, source-resolved base
+  selector/field, usize::try_from, bounds-checked array access and Option borrow
+  from the complete `State::get` body. Potentially overriding standard traits
+  and hidden effects are rejected rather than treated as pure builtins.
+- Jarl proves the exact borrowed source place for each present slot, None at or
+  before the snapshot boundary, and all post-boundary outcomes including target
+  conversion failure, bounds rejection and empty slots. Logical target width is
+  explicit; the project also type-checks original Rust for installed wasm32.
+- Native provider tests compare actual pointer locations across sparse arrays,
+  present/absent snapshots and integer boundaries. Provider mutations alter bias,
+  base field and array path; original Jarl mutations alter bias and base field.
+- Actual reference lifetimes/layout, entry LogId consistency, `id_at`, `last`,
+  restore, truncation and installation still require source-linked contracts.
 
 ## Outstanding dependency frontier
 

@@ -1,10 +1,31 @@
 {
-  "crate_root":"../../src/lib.rs",
-  "namespace":"JarlBoundary",
-  "methods":["state::State::base"],
-  "proofs":"Proofs.lean",
-  "obligations":[
-    {"theorem":"Boundary.without_snapshot","function":"state_State_base"},
-    {"theorem":"Boundary.snapshot_boundary","function":"state_State_base"}
+  "crate_root": "../../src/lib.rs",
+  "namespace": "JarlBoundary",
+  "methods": [
+    "state::State::base",
+    "state::State::get"
+  ],
+  "proofs": "Proofs.lean",
+  "obligations": [
+    {
+      "theorem": "Boundary.without_snapshot",
+      "function": "state_State_base"
+    },
+    {
+      "theorem": "Boundary.snapshot_boundary",
+      "function": "state_State_base"
+    },
+    {
+      "theorem": "Boundary.lookup_exact",
+      "function": "state_State_get"
+    },
+    {
+      "theorem": "Boundary.lookup_at_or_before_boundary",
+      "function": "state_State_get"
+    },
+    {
+      "theorem": "Boundary.lookup_all_offsets",
+      "function": "state_State_get"
+    }
   ]
 }

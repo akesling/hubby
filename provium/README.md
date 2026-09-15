@@ -255,3 +255,9 @@ in Lean and check eager default computation. Storage IR also records source
 array/length paths and capacity names so consumer obligations can bind projected
 stores to specific source places. These source-place checks are complementary to,
 and do not replace, the still-open Rust layout and borrow refinement proof.
+
+The checked lookup backend retains a shared record-base helper, two checked
+subtractions, target usize conversion, optional-array bounds access and the
+returned borrowed place. It rejects source traits that could override the
+accepted standard operations. Native tests compare reference locations; the
+current place model does not prove Rust lifetimes or physical layout.

@@ -3840,8 +3840,8 @@
         "R03",
         "R05"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+      "status": "component_evidence",
+      "note": "Complete checked lookup and inlined original base helper in proofs/log-boundary: exact borrowed slot location, pre-boundary rejection, target usize conversion, holes and bounds. Source paths retained; physical reference validity, log-ID consistency, callers and source/borrow/layout refinement remain open."
     },
     "crate::state::<State < V , S , CAP >>::grow": {
       "requirements": [

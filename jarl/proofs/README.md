@@ -43,7 +43,7 @@ CI runs both ordinary tests and the full proof gate.
 | [membership](membership/Proofs.lean) | Complete `Membership::finalized` and `is_joint`: arbitrary capacity, correct retention/removal, cleared old flags, surviving identities/fields preserved, no longer joint |
 | [input-gating](input-gating/Proofs.lean) | Complete `Node::available` and `idle`: exact Result, dirty-state/reply/outbox rejection, and clean/drained admission over arbitrary outbox lengths |
 | [capacity](capacity/Proofs.lean) | Complete `State::full`: exact equality against the original const-generic capacity; non-full implies room under the separate `len ≤ CAP` representation invariant |
-| [log-boundary](log-boundary/Proofs.lean) | Complete `State::base`: zero index/term without a snapshot, otherwise exactly the snapshot boundary record, with source field paths retained |
+| [log-boundary](log-boundary/Proofs.lean) | Complete `State::base` and `get`: exact snapshot boundary and checked borrowed-slot lookup, including subtraction, target-width, bounds and empty-slot rejection |
 | [storage](storage/Proofs.lean) | Complete `State::push`, `new` and `grow`: no-drop append/growth, occupied-prefix/capacity and metadata preservation, explicit destruction boundaries, and induction over histories with changing capacity |
 | [initialization](initialization/Proofs.lean) | Complete `State::new`: initial hard-state fields, absent snapshot, all slots empty for arbitrary capacity, and initial `len ≤ CAP` |
 
@@ -121,3 +121,11 @@ and payload field paths; an independent provider mutation selecting another
 same-typed record must fail the proof. Storage contracts also bind their
 projected arrays, lengths and capacity parameters to the original source names.
 These bindings guard source drift; they are not Rust memory-layout proofs.
+
+Lookup translates all of `State::get` and its original `base` helper. Its result
+is a borrowed array place, retaining both the source field path and offset.
+The contracts cover every offset after a valid base, including usize conversion
+failure, out-of-bounds access and empty slots; indices at/before the boundary
+return None. Native tests compare pointer identity, and provider/Jarl mutations
+alter the offset or selected base field. The result's physical borrow validity
+and correspondence between each entry's LogId and its slot still need proof.

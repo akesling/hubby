@@ -145,6 +145,7 @@ impl Crate {
             body: vec![],
             array: None,
             query: Some(query),
+            lookup: None,
             selection: None,
             relocation: None,
             buffer: None,

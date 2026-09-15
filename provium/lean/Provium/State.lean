@@ -266,4 +266,34 @@ def selectRecord (program : RecordSelection) (state : SelectionStore) : InitStor
   match state program.optional with
   | none => initializeFields program.fallback (fun _ => 0)
   | some payload => payload program.recordField
+structure RecordLookup where
+  slotsPath : Path
+  base : RecordSelection
+  baseField : Path
+  bias : Nat
+structure LookupStore (α : Type) where
+  records : SelectionStore
+  slots : Path → List (Option α)
+structure ReadPlace where
+  path : Path
+  index : Nat
+  deriving DecidableEq
+inductive LookupFault where
+  | input
+  deriving DecidableEq
+
+def lookupRecord (program : RecordLookup) (bits : Nat) (state : LookupStore α) (index : Nat) :
+    Except LookupFault (Option ReadPlace) :=
+  match selectRecord program.base state.records program.baseField with
+  | .unsigned rustType base =>
+    if rustType ≠ "u64" ∨ index ≥ 2^64 ∨ base ≥ 2^64 ∨ program.bias ≥ 2^64 then .error .input
+    else if index < base then .ok none
+    else if index - base < program.bias then .ok none
+    else
+      let offset := index - base - program.bias
+      if offset ≥ 2^bits then .ok none
+      else match (state.slots program.slotsPath)[offset]? with
+        | some (some _) => .ok (some ⟨program.slotsPath, offset⟩)
+        | _ => .ok none
+  | _ => .error .input
 end Provium.State
