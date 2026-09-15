@@ -267,3 +267,9 @@ checked borrowed lookup and an entry-record projection. Source comparison and
 projection fields remain explicit, and both helpers are translated in full.
 This supports proofs of whole returned records without assuming their content
 already satisfies a protocol's log invariants.
+
+Builtin borrowed double-ended iteration is represented by its ordered location
+sequence, retaining prefix bounds checks without attributing eager allocation to
+Rust. Final-record selection composes the complete iterator and base helpers.
+Native checks mix both iterator ends and track payload Drop; panic hooks and
+physical iterator/lifetime refinement remain outside the model.

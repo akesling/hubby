@@ -43,7 +43,7 @@ CI runs both ordinary tests and the full proof gate.
 | [membership](membership/Proofs.lean) | Complete `Membership::finalized` and `is_joint`: arbitrary capacity, correct retention/removal, cleared old flags, surviving identities/fields preserved, no longer joint |
 | [input-gating](input-gating/Proofs.lean) | Complete `Node::available` and `idle`: exact Result, dirty-state/reply/outbox rejection, and clean/drained admission over arbitrary outbox lengths |
 | [capacity](capacity/Proofs.lean) | Complete `State::full`: exact equality against the original const-generic capacity; non-full implies room under the separate `len ≤ CAP` representation invariant |
-| [log-boundary](log-boundary/Proofs.lean) | Complete `State::base`, `get` and `id_at`: exact snapshot boundary, checked borrowed-slot lookup, and boundary/entry/missing record results |
+| [log-boundary](log-boundary/Proofs.lean) | Complete `State::base`, `get`, `id_at`, `entries` and `last`: snapshot boundary, checked borrowed lookup, ordered prefix iteration, and exact boundary/final-entry records |
 | [storage](storage/Proofs.lean) | Complete `State::push`, `new` and `grow`: no-drop append/growth, occupied-prefix/capacity and metadata preservation, explicit destruction boundaries, and induction over histories with changing capacity |
 | [initialization](initialization/Proofs.lean) | Complete `State::new`: initial hard-state fields, absent snapshot, all slots empty for arbitrary capacity, and initial `len ≤ CAP` |
 
@@ -136,3 +136,12 @@ boundary (including genesis), the selected entry's full `id` record on a hit,
 and None on an off-boundary miss. The proof does not assume that an arbitrary
 stored entry's id.index equals the requested index; contiguous log-ID invariants
 remain work for restore, append callers, truncation and snapshot installation.
+
+`State::entries` retains the complete prefix-slice check and builtin double-ended
+iterator construction. Its list is a denotation of borrowed locations, not a
+claim that Rust eagerly traverses or allocates. `State::last` includes the complete
+iterator and eager base helper: an empty retained prefix returns the base, and a
+final present retained slot returns that entry's id even with holes earlier in
+the prefix. Native tests alternate both iterator ends and check that entry
+Drop is never invoked during those reads. Invalid-prefix panic hooks/unwinding
+and Rust lifetime/layout correspondence remain outside the current model.

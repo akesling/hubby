@@ -4,7 +4,9 @@
   "methods": [
     "state::State::base",
     "state::State::get",
-    "state::State::id_at"
+    "state::State::id_at",
+    "state::State::entries",
+    "state::State::last"
   ],
   "proofs": "Proofs.lean",
   "obligations": [
@@ -39,6 +41,22 @@
     {
       "theorem": "Boundary.record_at_absent",
       "function": "state_State_id_at"
+    },
+    {
+      "theorem": "Boundary.iterator_exact",
+      "function": "state_State_entries"
+    },
+    {
+      "theorem": "Boundary.iterator_rejects_invalid_length",
+      "function": "state_State_entries"
+    },
+    {
+      "theorem": "Boundary.last_empty",
+      "function": "state_State_last"
+    },
+    {
+      "theorem": "Boundary.last_final_slot",
+      "function": "state_State_last"
     }
   ]
 }

@@ -8,8 +8,8 @@ Continue with the next open source-linked obligation under the existing toolchai
 dependency, no_std/sans-I/O and approval constraints. Only the full specification's
 verified completion can close this work; a green component suite cannot.
 
-Immediate frontier: translate `entries`/`last`, then close
-restore/truncate/install preservation before
+Immediate frontier: translate `State::truncate` with explicit payload-drop
+suspensions and complete `last` calls, then close restore/install preservation before
 claiming the storage invariant for every reachable state.
 
 ## Source accounting (M0, C01–C12, P12)
@@ -144,7 +144,7 @@ claiming the storage invariant for every reachable state.
 - Native provider tests compare actual pointer locations across sparse arrays,
   present/absent snapshots and integer boundaries. Provider mutations alter bias,
   base field and array path; original Jarl mutations alter bias and base field.
-- Actual reference lifetimes/layout, entry LogId consistency, `last`,
+- Actual reference lifetimes/layout, entry LogId consistency,
   restore, truncation and installation still require source-linked contracts.
 
 ## Boundary/entry record composition (M1, C02/R03)
@@ -162,6 +162,24 @@ claiming the storage invariant for every reachable state.
 - These are record-selection contracts, not a proof that every entry's id.index
   matches its array position. That requires log-content invariants through all
   storage constructors/mutators and their protocol callers.
+
+## Borrowed iteration and final-record selection (M1, C02/R02/R03)
+
+- Provium translates the full checked prefix slice, builtin iter/flatten chain,
+  and double-ended borrowed Item type. Its sequence is an iterator denotation,
+  not an eager allocation attributed to Rust. Canonical core/std trait imports
+  are accepted; shadowed traits and hidden adapter effects are rejected.
+- `State::last` includes the complete iterator and eager base helper, with the
+  selected iterator end and copied entry-record path kept in the IR.
+- Jarl proves exact prefix-location enumeration, invalid-length rejection,
+  fallback to the base on an empty prefix, and the final present retained slot's
+  exact id, independently of holes earlier in that prefix.
+- Native tests alternate next/next_back, compare actual pointer locations and
+  check custom entry Drop counts, including bounds panic. Provider controls
+  mutate the slice boundary, iterator end, record projection and array name;
+  Jarl mutates its original slice and iterator-end expressions on wasm32.
+- Panic hooks, iterator lifetime/layout refinement and full storage/log-content
+  preservation through restore/truncate/install remain open.
 
 ## Outstanding dependency frontier
 

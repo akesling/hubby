@@ -80,6 +80,8 @@ pub struct Method {
     pub selection: Option<selectors::Selection>,
     pub lookup: Option<lookups::Lookup>,
     pub record_at: Option<records::At>,
+    pub iteration: Option<iterations::Iteration>,
+    pub last: Option<iterations::Last>,
 }
 struct Definition {
     module: String,
@@ -436,6 +438,13 @@ impl Crate {
                 }
                 return self.lower_lookup(name);
             }
+            if matches!(&def.item.sig.output,syn::ReturnType::Type(_,ty) if matches!(&**ty,Type::ImplTrait(_)))
+            {
+                return self.lower_iteration(name);
+            }
+            if iterations::last_expression(&def.item.block) {
+                return self.lower_last(name);
+            }
             if queries::result_error(&def.item.sig.output).is_ok() {
                 if matches!(def.item.sig.inputs.first(), Some(syn::FnArg::Receiver(r)) if r.mutability.is_some())
                 {
@@ -544,6 +553,8 @@ impl Crate {
             selection: None,
             lookup: None,
             record_at: None,
+            iteration: None,
+            last: None,
         })
     }
     fn field_type<'a>(&'a self, def: &Definition, p: &[String]) -> Result<&'a Type, String> {
@@ -823,6 +834,10 @@ pub fn generate(methods: &[Method], namespace: &str) -> String {
     let mut text=format!("-- Generated from complete Rust method bodies; no sliced statements.\nimport Provium.State\nnamespace {namespace}\nopen Provium.State\n");
     for method in methods {
         let name = &method.symbol;
+        if method.iteration.is_some() || method.last.is_some() {
+            text.push_str(&iterations::generate(method));
+            continue;
+        }
         if method.record_at.is_some() {
             text.push_str(&records::generate(method));
             continue;
@@ -1067,3 +1082,5 @@ pub mod selectors;
 pub mod lookups;
 
 pub mod records;
+
+pub mod iterations;

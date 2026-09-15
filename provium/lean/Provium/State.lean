@@ -317,4 +317,44 @@ def recordAt (program : RecordAt) (bits : Nat) (state : LookupStore (Path → In
         | some (some entry) => .ok (some (entry program.recordField))
         | _ => .error .input
   | _ => .error .input
+structure Iteration where
+  slotsPath : Path
+  lengthPath : Path
+  inclusive : Bool
+structure TraversalStore (α : Type) where
+  lookups : LookupStore α
+  lengths : Path → Nat
+inductive TraversalFault where
+  | bounds
+  | input
+  deriving DecidableEq
+
+def presentPlaces (path : Path) : Nat → List (Option α) → List ReadPlace
+  | _, [] => []
+  | index, none :: rest => presentPlaces path (index + 1) rest
+  | index, some _ :: rest => ⟨path, index⟩ :: presentPlaces path (index + 1) rest
+
+def iterateRecords (program : Iteration) (state : TraversalStore α) :
+    Except TraversalFault (List ReadPlace) :=
+  let slots := state.lookups.slots program.slotsPath
+  let count := state.lengths program.lengthPath + (if program.inclusive then 1 else 0)
+  if count ≤ slots.length then .ok (presentPlaces program.slotsPath 0 (slots.take count))
+  else .error .bounds
+structure LastRecord where
+  iteration : Iteration
+  base : RecordSelection
+  recordField : Path
+  fromBack : Bool
+
+def lastRecord (program : LastRecord) (state : TraversalStore (Path → InitStore)) :
+    Except TraversalFault InitStore :=
+  match iterateRecords program.iteration state with
+  | .error error => .error error
+  | .ok places =>
+    let fallback := selectRecord program.base state.lookups.records
+    match (if program.fromBack then places.getLast? else places.head?) with
+    | none => .ok fallback
+    | some place => match (state.lookups.slots place.path)[place.index]? with
+      | some (some entry) => .ok (entry program.recordField)
+      | _ => .error .input
 end Provium.State

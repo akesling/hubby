@@ -3822,8 +3822,8 @@
         "R03",
         "R05"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+      "status": "component_evidence",
+      "note": "Complete original checked prefix slice and borrowed double-ended iterator in proofs/log-boundary: exact ordered borrowed-location denotation and bounds rejection. Lazy execution, Rust lifetimes/layout and panic-hook refinement remain separate."
     },
     "crate::state::<State < V , S , CAP >>::full": {
       "requirements": [
@@ -3890,8 +3890,8 @@
         "R03",
         "R05"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+      "status": "component_evidence",
+      "note": "Complete original iterator and base helpers in proofs/log-boundary: empty retained prefix returns base; final present retained slot yields its id. Index ordering, truncate/restore/install callers, Rust layout/lifetime and panic behavior remain open."
     },
     "crate::state::<State < V , S , CAP >>::new": {
       "requirements": [

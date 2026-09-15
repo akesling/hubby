@@ -109,4 +109,48 @@ theorem record_at_absent (bits base index : Nat) (state : LookupStore (Path → 
   simp only [JarlBoundary.state_State_id_at, recordAt, selected]
   simp [JarlBoundary.state_State_id_at_ir, hi, hb, different] at looked ⊢
   simp [looked]
+theorem iterator_exact (state : TraversalStore α)
+    (bound : state.lengths ["len"] ≤ (state.lookups.slots ["entries"]).length) :
+    JarlBoundary.state_State_entries state =
+      .ok (presentPlaces ["entries"] 0
+        ((state.lookups.slots ["entries"]).take (state.lengths ["len"]))) := by
+  simp [JarlBoundary.state_State_entries, JarlBoundary.state_State_entries_ir, iterateRecords, bound]
+
+theorem iterator_rejects_invalid_length (state : TraversalStore α)
+    (invalid : (state.lookups.slots ["entries"]).length < state.lengths ["len"]) :
+    JarlBoundary.state_State_entries state = .error .bounds := by
+  have bound : ¬ state.lengths ["len"] ≤ (state.lookups.slots ["entries"]).length := by omega
+  simp [JarlBoundary.state_State_entries, JarlBoundary.state_State_entries_ir, iterateRecords, bound]
+
+theorem last_empty (state : TraversalStore (Path → InitStore)) (empty : state.lengths ["len"] = 0) :
+    JarlBoundary.state_State_last state = .ok (JarlBoundary.state_State_base state.lookups.records) := by
+  simp [JarlBoundary.state_State_last, JarlBoundary.state_State_last_ir, lastRecord,
+    iterateRecords, empty, presentPlaces, JarlBoundary.state_State_base, JarlBoundary.state_State_base_ir]
+
+private theorem places_append (path : Path) (start : Nat) (first rest : List (Option α)) :
+    presentPlaces path start (first ++ rest) =
+      presentPlaces path start first ++ presentPlaces path (start + first.length) rest := by
+  induction first generalizing start with
+  | nil => simp [presentPlaces]
+  | cons entry tail ih =>
+    cases entry <;> simp [presentPlaces, ih, Nat.add_right_comm, Nat.add_assoc]
+
+theorem last_final_slot (state : TraversalStore (Path → InitStore))
+    (front suffix : List (Option (Path → InitStore))) (entry : Path → InitStore)
+    (length : state.lengths ["len"] = front.length + 1)
+    (slots : state.lookups.slots ["entries"] = (front ++ [some entry]) ++ suffix) :
+    JarlBoundary.state_State_last state = .ok (entry ["id"]) := by
+  have bound : state.lengths ["len"] ≤ (state.lookups.slots ["entries"]).length := by
+    simp [length, slots]
+  have iter := iterator_exact state bound
+  rw [length, slots, List.take_left' (by simp)] at iter
+  rw [places_append] at iter
+  simp only [Nat.zero_add, presentPlaces] at iter
+  have executed : iterateRecords JarlBoundary.state_State_last_ir.iteration state =
+      .ok (presentPlaces ["entries"] 0 front ++ [⟨["entries"], front.length⟩]) := iter
+  have hit : (state.lookups.slots ["entries"])[front.length]? = some (some entry) := by
+    rw [slots, List.getElem?_append_left (by simp), List.getElem?_append_right (by omega)]
+    simp
+  simp only [JarlBoundary.state_State_last, lastRecord, executed]
+  simp [JarlBoundary.state_State_last_ir, hit]
 end Boundary
