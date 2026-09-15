@@ -198,7 +198,7 @@ impl Crate {
         if branches.len() != enumeration.variants.len() || branches.is_empty() {
             return Err("enum projection must explicitly cover every source variant".into());
         }
-        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],array:None,query:None,constructor:None,buffer:None,relocation:None,iteration:None,last:None,truncation:None,installation:None,restoration:None,record_at:None,lookup:None,selection:None,enum_projection:Some(Projection{receiver:def.receiver.clone(),branches,arms,scope:"complete exhaustive borrowed enum field projection; physical discriminants, Rust borrows and frontend preservation remain unproved"})})
+        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],array:None,query:None,constructor:None,buffer:None,relocation:None,iteration:None,last:None,truncation:None,installation:None,restoration:None,record_at:None,lookup:None,selection:None,validator:None,enum_projection:Some(Projection{receiver:def.receiver.clone(),branches,arms,scope:"complete exhaustive borrowed enum field projection; physical discriminants, Rust borrows and frontend preservation remain unproved"})})
     }
 }
 pub(super) fn generate(method: &Method) -> String {

@@ -85,6 +85,7 @@ pub struct Method {
     pub truncation: Option<truncations::Truncation>,
     pub installation: Option<installations::Installation>,
     pub restoration: Option<restorations::Restoration>,
+    pub validator: Option<validators::Validator>,
     pub enum_projection: Option<enum_projections::Projection>,
 }
 struct Definition {
@@ -212,7 +213,7 @@ impl Crate {
                                 Err("renamed/glob imports require qualified resolution".into())
                             }
                             syn::UseTree::Name(n)
-                                if ["None", "Option", "bool", "u8", "u16", "u32", "u64", "usize", "Result", "Ok", "Err", "Some"]
+                                if ["None", "Option", "bool", "u8", "u16", "u32", "u64", "i32", "usize", "Result", "Ok", "Err", "Some"]
                                     .iter()
                                     .any(|s| n.ident == *s) =>
                             {
@@ -267,7 +268,7 @@ impl Crate {
                         }
                     }
                 }
-                Item::Enum(e) if ["Option", "bool", "u8", "u16", "u32", "u64", "usize", "Result", "Ok", "Err", "Some"].iter().any(|n| e.ident == *n) => {
+                Item::Enum(e) if ["Option", "bool", "u8", "u16", "u32", "u64", "i32", "usize", "Result", "Ok", "Err", "Some"].iter().any(|n| e.ident == *n) => {
                     return Err("shadowed primitive/prelude type".into())
                 }
                 Item::Enum(e) if !test_only(&e.attrs) => {
@@ -301,7 +302,7 @@ impl Crate {
                     if self.enums.contains_key(&s.ident.to_string()) {
                         return Err("ambiguous enum/struct type name".into());
                     }
-                    if ["Option", "bool", "u8", "u16", "u32", "u64", "usize", "Result", "Ok", "Err", "Some"].iter().any(|n| s.ident == *n) {
+                    if ["Option", "bool", "u8", "u16", "u32", "u64", "i32", "usize", "Result", "Ok", "Err", "Some"].iter().any(|n| s.ident == *n) {
                         return Err("shadowed primitive/prelude type".into());
                     }
                     for attr in &s.attrs {
@@ -339,7 +340,7 @@ impl Crate {
                     }
                 }
                 Item::Impl(i) if !test_only(&i.attrs) => {
-                    if i.generics.type_params().any(|p| ["Option", "Result", "bool", "u8", "u16", "u32", "u64", "usize", "Ok", "Err", "Some"].iter().any(|n| p.ident == *n)) {
+                    if i.generics.type_params().any(|p| ["Option", "Result", "bool", "u8", "u16", "u32", "u64", "i32", "usize", "Ok", "Err", "Some"].iter().any(|n| p.ident == *n)) {
                         return Err("impl generic parameter shadows a primitive/prelude type".into());
                     }
                     let receiver = base_type(&i.self_ty)?;
@@ -427,6 +428,9 @@ impl Crate {
         if let Some(def) = self.methods.get(name) {
             if self.enums.contains_key(&def.receiver) {
                 return self.lower_enum_projection(name);
+            }
+            if validators::candidate(&def.item) {
+                return self.lower_validator(name);
             }
             if restorations::candidate(&def.item) {
                 return self.lower_restoration(name);
@@ -547,7 +551,7 @@ impl Crate {
             return Err("consumed receiver has potentially dropping fields".into());
         }
         if structure.generics.type_params().any(|p| {
-            ["Option", "bool", "u8", "u16", "u32", "u64", "usize"]
+            ["Option", "bool", "u8", "u16", "u32", "u64", "i32", "usize"]
                 .iter()
                 .any(|n| p.ident == *n)
         }) {
@@ -578,6 +582,7 @@ impl Crate {
             installation: None,
             restoration: None,
             enum_projection: None,
+            validator: None,
         })
     }
     fn field_type<'a>(&'a self, def: &Definition, p: &[String]) -> Result<&'a Type, String> {
@@ -592,7 +597,7 @@ impl Crate {
                 .get(&current)
                 .ok_or_else(|| format!("unresolved struct {current}"))?;
             if structure.generics.type_params().any(|p| {
-                ["Option", "bool", "u8", "u16", "u32", "u64", "usize"]
+                ["Option", "bool", "u8", "u16", "u32", "u64", "i32", "usize"]
                     .iter()
                     .any(|n| p.ident == *n)
             }) {
@@ -857,6 +862,10 @@ pub fn generate(methods: &[Method], namespace: &str) -> String {
     let mut text=format!("-- Generated from complete Rust method bodies; no sliced statements.\nimport Provium.State\nnamespace {namespace}\nopen Provium.State\n");
     for method in methods {
         let name = &method.symbol;
+        if method.validator.is_some() {
+            text.push_str(&validators::generate(method));
+            continue;
+        }
         if method.enum_projection.is_some() {
             text.push_str(&enum_projections::generate(method));
             continue;
@@ -1099,11 +1108,11 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
             String::from_utf8_lossy(&cfg.stderr)
         ));
     }
-    let manifest = serde_json::json!({"format":1,"compiler_sha256":hash(fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"scope":"complete explicit method bodies in field-store semantics; frontend, field resolution, borrowing/layout refinement and host durability remain trusted; not whole-program correctness", "lean_toolchain":TOOLCHAIN,"rustc":String::from_utf8_lossy(&rustc.stdout).trim(),"rust_target":project.rust_target,"rust_target_cfg":String::from_utf8_lossy(&cfg.stdout),"typecheck_args":typecheck_args,"config_sha256":hash(config_bytes),"sources":inputs,"methods":methods,"unproved_methods":krate.inventory().into_iter().filter(|n|!project.methods.contains(n)).collect::<Vec<_>>(),"artifacts":artifacts.iter().map(|(p,t)|(p,hash(t))).collect::<BTreeMap<_,_>>(),"obligations":project.obligations,"audit":report});
+    let manifest = serde_json::json!({"format":1,"compiler_sha256":hash(fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"scope":"complete explicit method bodies in supported Lean semantics; frontend, field resolution, borrowing/layout refinement and host durability remain trusted; not whole-program correctness", "lean_toolchain":TOOLCHAIN,"rustc":String::from_utf8_lossy(&rustc.stdout).trim(),"rust_target":project.rust_target,"rust_target_cfg":String::from_utf8_lossy(&cfg.stdout),"typecheck_args":typecheck_args,"config_sha256":hash(config_bytes),"sources":inputs,"methods":methods,"unproved_methods":krate.inventory().into_iter().filter(|n|!project.methods.contains(n)).collect::<Vec<_>>(),"artifacts":artifacts.iter().map(|(p,t)|(p,hash(t))).collect::<BTreeMap<_,_>>(),"obligations":project.obligations,"audit":report});
     let bytes = serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?;
     fs::write(out.join("manifest.json"), &bytes).map_err(|e| e.to_string())?;
     fs::write(out.join("verified.json"),serde_json::to_vec_pretty(&serde_json::json!({"manifest_sha256":hash(bytes),"whole_program_proved":false,"complete_method_bodies":methods.len(),"obligations":project.obligations.len()})).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;
-    Ok(format!("Verified {} complete method bodies and {} obligations in field-store semantics. Whole-program proof remains incomplete.\n{report}",methods.len(),project.obligations.len()))
+    Ok(format!("Verified {} complete method bodies and {} obligations in supported Lean semantics. Whole-program proof remains incomplete.\n{report}",methods.len(),project.obligations.len()))
 }
 
 pub mod scalar;
@@ -1131,3 +1140,5 @@ pub mod installations;
 pub mod restorations;
 
 pub mod enum_projections;
+
+pub mod validators;

@@ -1105,4 +1105,258 @@ theorem enum_match_flatten (arms : List (List (String × Path))) (state : EnumSt
     | none => simpa [found,enumProjection,bind,Option.bind] using ih
     | some branch => simp [bind,Option.bind]
 
+
+/- A deliberately restricted, pure Rust expression machine. Borrowed inputs are
+   structural views, not claims about Rust memory. Fuel exhaustion and malformed
+   views are observable faults, never successful validations. -/
+inductive PureValue where
+  | unit | boolean (value : Bool) | number (kind : String) (value : Nat)
+  | record (name : String) (fields : List (String × PureValue))
+  | variant (name tag : String) (fields : List (String × PureValue))
+  | absent | present (value : PureValue) | array (values : List PureValue)
+  deriving Repr
+inductive PurePattern where
+  | any | bind (slot : Nat)
+  | variant (name tag : String) (fields : List (String × PurePattern))
+  | present (value : PurePattern)
+  | alternatives (patterns : List PurePattern)
+  deriving Repr
+inductive PureExpr where
+  | literal (value : PureValue) | read (slot : Nat)
+  | field (value : PureExpr) (name : String)
+  | copy (value : PureExpr) | present (value : PureExpr)
+  | binary (op : String) (left right : PureExpr)
+  | negate (value : PureExpr)
+  | sequence (first second : PureExpr)
+  | write (slot : Nat) (value : PureExpr)
+  | branch (condition yes no : PureExpr)
+  | choose (value : PureExpr) (arms : List (PurePattern × PureExpr))
+  | each (value : PureExpr) (slot : Nat) (body : PureExpr)
+  | ret (value : PureExpr)
+  deriving Repr
+abbrev PureEnv := Nat → Option PureValue
+inductive PureFault where
+  | exhausted | representation | overflow
+  deriving Repr, DecidableEq
+inductive PureExit where
+  | returned (value : PureValue)
+  | fault (reason : PureFault)
+  deriving Repr
+abbrev PureResult := Except PureExit (PureValue × PureEnv)
+def pureSet (env : PureEnv) (slot : Nat) (value : PureValue) : PureEnv :=
+  fun key => if key = slot then some value else env key
+
+def pureFields : PureValue → Option (List (String × PureValue))
+  | .record _ fields | .variant _ _ fields => some fields
+  | _ => none
+
+def pureField (value : PureValue) (name : String) : Option PureValue := do
+  let fields ← pureFields value
+  return (← fields.find? (fun pair => pair.1 == name)).2
+
+-- Pattern traversal is independently bounded. Missing fields cannot bind;
+-- the consumer must still establish that the overall input view is well formed.
+def pureMatch : Nat → PurePattern → PureValue → PureEnv → Option PureEnv
+  | 0, _, _, _ => none
+  | fuel+1, pattern, value, env => match pattern with
+    | .any => some env
+    | .bind slot => some (pureSet env slot value)
+    | .present pattern => match value with
+      | .present value => pureMatch fuel pattern value env
+      | _ => none
+    | .variant owner tag patterns => match value with
+      | .variant actual variant fields =>
+        if actual != owner || variant != tag then none else
+        patterns.foldlM (fun env pair => do
+          let field ← fields.find? (fun field => field.1 == pair.1)
+          pureMatch fuel pair.2 field.2 env) env
+      | _ => none
+    | .alternatives patterns => patterns.findSome? (fun p => pureMatch fuel p value env)
+
+def pureBound (kind : String) : Nat :=
+  if kind = "u64" then 2^64 else if kind = "i32" then 2^31 else 0
+
+def pureEqual (left right : PureValue) : Option Bool :=
+  match left, right with
+  | .boolean a, .boolean b => some (a == b)
+  | .absent, .absent => some true
+  | .absent, .present (.number kind n) | .present (.number kind n), .absent =>
+    if n < pureBound kind then some false else none
+  | .present (.number kind a), .present (.number other b) =>
+    if kind = other ∧ a < pureBound kind ∧ b < pureBound kind then some (a == b) else none
+  | _, _ => none
+
+def pureBinary (op : String) (left right : PureValue) : Except PureExit PureValue :=
+  match left, right with
+  | .number kind a, .number other b =>
+    if kind != other || a ≥ pureBound kind || b ≥ pureBound kind then
+      .error (.fault .representation)
+    else if op = "checked_add" then
+      .ok (if a+b < pureBound kind then .present (.number kind (a+b)) else .absent)
+    else if op = "+" then
+      if a+b < pureBound kind then .ok (.number kind (a+b)) else .error (.fault .overflow)
+    else if op = "==" then .ok (.boolean (a == b))
+    else if op = "!=" then .ok (.boolean (a != b))
+    else if op = ">" then .ok (.boolean (a > b))
+    else if op = "<" then .ok (.boolean (a < b))
+    else if op = ">=" then .ok (.boolean (a ≥ b))
+    else if op = "<=" then .ok (.boolean (a ≤ b))
+    else .error (.fault .representation)
+  | _, _ =>
+    match pureEqual left right with
+    | some value =>
+      if op = "==" then .ok (.boolean value)
+      else if op = "!=" then .ok (.boolean (!value))
+      else .error (.fault .representation)
+    | none => .error (.fault .representation)
+
+def pureEval : Nat → PureExpr → PureEnv → PureResult
+  | 0, _, _ => .error (.fault .exhausted)
+  | fuel+1, expression, env => match expression with
+    | .literal value => .ok (value, env)
+    | .read slot => match env slot with
+      | some value => .ok (value, env)
+      | none => .error (.fault .representation)
+    | .copy value => pureEval fuel value env
+    | .present value => do
+      let (value, env) ← pureEval fuel value env
+      return (.present value, env)
+    | .field value name => do
+      let (value, env) ← pureEval fuel value env
+      match pureField value name with
+      | some value => return (value, env)
+      | none => .error (.fault .representation)
+    | .negate value => do
+      let (.boolean value, env) ← pureEval fuel value env
+        | .error (.fault .representation)
+      return (.boolean (!value), env)
+    | .binary op left right => do
+      let (left, env) ← pureEval fuel left env
+      if op = "&&" || op = "||" then
+        let .boolean value := left | .error (.fault .representation)
+        if (op = "&&" && !value) || (op = "||" && value) then
+          return (.boolean value, env)
+        else
+          let (.boolean value, env) ← pureEval fuel right env
+            | .error (.fault .representation)
+          return (.boolean value, env)
+      else
+        let (right, env) ← pureEval fuel right env
+        let value ← pureBinary op left right
+        return (value, env)
+    | .sequence first second => do
+      let (_, env) ← pureEval fuel first env
+      pureEval fuel second env
+    | .write slot value => do
+      let (value, env) ← pureEval fuel value env
+      return (.unit, pureSet env slot value)
+    | .branch condition yes no => do
+      let (.boolean condition, env) ← pureEval fuel condition env
+        | .error (.fault .representation)
+      pureEval fuel (if condition then yes else no) env
+    | .choose value arms => do
+      let (value, env) ← pureEval fuel value env
+      match arms.findSome? (fun arm =>
+        (pureMatch fuel arm.1 value env).map (fun env => (arm.2,env))) with
+      | some (body, env) => pureEval fuel body env
+      | none => .error (.fault .representation)
+    | .each value slot body => do
+      let (.array values, env) ← pureEval fuel value env
+        | .error (.fault .representation)
+      values.foldlM (fun (_, env) value =>
+        pureEval fuel body (pureSet env slot value)) (.unit, env)
+    | .ret value => do
+      let (value, _) ← pureEval fuel value env
+      .error (.returned value)
+
+def pureValidate (fuel : Nat) (body : PureExpr) (input : PureValue) : Except PureFault Bool :=
+  match pureEval fuel body (pureSet (fun _ => none) 0 input) with
+  | .ok (.boolean value, _) | .error (.returned (.boolean value)) => .ok value
+  | .error (.fault reason) => .error reason
+  | _ => .error .representation
+
+
+/- Compositional rules for consumer proofs. These quantify over arbitrary array
+   lengths and environments; a consumer must establish the body premise from
+   the generated expression rather than assume its desired postcondition. -/
+theorem pure_sequence_error (fuel : Nat) (first second : PureExpr)
+    (env : PureEnv) (reason : PureExit)
+    (failed : pureEval fuel first env = .error reason) :
+    pureEval (fuel+1) (.sequence first second) env = .error reason := by
+  simp [pureEval,failed,bind,Except.bind]
+
+theorem pure_binary_left_error (fuel : Nat) (op : String) (left right : PureExpr)
+    (env : PureEnv) (reason : PureExit)
+    (failed : pureEval fuel left env = .error reason) :
+    pureEval (fuel+1) (.binary op left right) env = .error reason := by
+  simp [pureEval,failed,bind,Except.bind]
+
+theorem pure_fold_invariant (fuel slot : Nat) (body : PureExpr)
+    (invariant : PureEnv → Prop)
+    (step : ∀ (value result : PureValue) (before after : PureEnv),
+      invariant before →
+      pureEval fuel body (pureSet before slot value) = .ok (result,after) →
+      invariant after)
+    (values : List PureValue) (initialResult result : PureValue) (before after : PureEnv)
+    (initial : invariant before)
+    (returned : values.foldlM (fun (_,env) value =>
+      pureEval fuel body (pureSet env slot value)) (initialResult,before) = .ok (result,after)) :
+    invariant after := by
+  induction values generalizing initialResult before with
+  | nil =>
+    have equal : (initialResult,before) = (result,after) := Except.ok.inj returned
+    cases equal
+    exact initial
+  | cons value rest ih =>
+    simp only [List.foldlM] at returned
+    cases evaluated : pureEval fuel body (pureSet before slot value) with
+    | error reason => simp [evaluated,bind,Except.bind] at returned
+    | ok pair =>
+      rcases pair with ⟨nextResult,nextEnv⟩
+      have next := step value nextResult before nextEnv initial evaluated
+      apply ih nextResult nextEnv next
+      simpa [evaluated,bind,Except.bind] using returned
+
+theorem pure_each_invariant (fuel slot : Nat) (source body : PureExpr)
+    (invariant : PureEnv → Prop)
+    (step : ∀ (value result : PureValue) (before after : PureEnv),
+      invariant before →
+      pureEval fuel body (pureSet before slot value) = .ok (result,after) →
+      invariant after)
+    (values : List PureValue) (result : PureValue) (input before after : PureEnv)
+    (read : pureEval fuel source input = .ok (.array values,before))
+    (initial : invariant before)
+    (returned : pureEval (fuel+1) (.each source slot body) input = .ok (result,after)) :
+    invariant after := by
+  apply pure_fold_invariant fuel slot body invariant step values .unit result before after initial
+  simpa [pureEval,read,bind,Except.bind] using returned
+
+
+theorem pure_fold_history (fuel slot : Nat) (body : PureExpr)
+    (invariant : List PureValue → PureEnv → Prop)
+    (step : ∀ (seen : List PureValue) (value result : PureValue) (before after : PureEnv),
+      invariant seen before →
+      pureEval fuel body (pureSet before slot value) = .ok (result,after) →
+      invariant (seen ++ [value]) after)
+    (values seen : List PureValue) (initialResult result : PureValue) (before after : PureEnv)
+    (initial : invariant seen before)
+    (returned : values.foldlM (fun (_,env) value =>
+      pureEval fuel body (pureSet env slot value)) (initialResult,before) = .ok (result,after)) :
+    invariant (seen ++ values) after := by
+  induction values generalizing seen initialResult before with
+  | nil =>
+    have equal : (initialResult,before) = (result,after) := Except.ok.inj returned
+    cases equal
+    simpa using initial
+  | cons value rest ih =>
+    simp only [List.foldlM] at returned
+    cases evaluated : pureEval fuel body (pureSet before slot value) with
+    | error reason => simp [evaluated,bind,Except.bind] at returned
+    | ok pair =>
+      rcases pair with ⟨nextResult,nextEnv⟩
+      have next := step seen value nextResult before nextEnv initial evaluated
+      have tail := ih (seen ++ [value]) nextResult nextEnv next
+        (by simpa [evaluated,bind,Except.bind] using returned)
+      simpa [List.append_assoc] using tail
+
 end Provium.State

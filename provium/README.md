@@ -306,3 +306,28 @@ flattened dispatch table. A Lean theorem proves that flattening preserves ordere
 selection, including malformed field views. Generated correspondence uses that
 theorem, and tests reject a corrupted compiled table. Parsing, binding resolution
 and the connection from Rust memory to this source representation remain trusted.
+
+Pure borrowed validators support complete boolean bodies with typed locals,
+short-circuit operators, early returns, nested enum/Option patterns, borrowed
+array loops, immutable captured closures, derived primitive-record defaults and
+equality, and checked integer addition. Enum field helpers are translated from
+their complete source bodies. The compiler resolves each accessed declaration,
+rejects opaque calls and overloaded operations, and keeps inferred `i32` counters
+separate from `u64` protocol fields. Record equality evaluates each operand once
+in source order. No consumer-specific protocol names occur in this backend.
+
+The generated function takes explicit fuel and a structural `PureValue` input.
+Its correspondence theorem currently identifies the generated interpreter call;
+it is **not** a source-to-IR preservation proof. Input memory representation,
+well-formed views (including array lengths), compiler preservation and sufficient
+fuel need separate contracts. Detected representation faults and exhaustion are
+explicit outcomes; this is not a general input-view well-formedness checker. The independent
+fixture checks 42 native executions by kernel reduction and requires a removed
+batch-hole guard to fail verification. Finite comparisons do not replace
+universal correctness theorems.
+
+The pure machine supplies kernel-proved error-propagation and array-loop rules.
+`pure_fold_history` lets a consumer track the entire scanned prefix, for any
+array length, provided it proves preservation for the actual generated body.
+All five rules are audited for transitive axioms. A separate universal check
+ensures derived record equality evaluates effectful operands exactly once.
