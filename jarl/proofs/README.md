@@ -187,3 +187,13 @@ the actual lookup and index/term equality. Mismatching installation establishes
 an empty log and in-range commit when the snapshot covers the old commit.
 Discharging these conditions in every protocol caller and proving snapshot provenance,
 valid durable recovery, protocol safety and Rust memory refinement remain open.
+
+`message-validation` translates the complete original `node::Node::valid`,
+including its `Message::term` helper, captured `valid_id` closure and batch loop.
+Its 39 obligations include universal zero-term rejection for the seven ordinary
+message variants, campaign cases independent of durable term, unread append
+payload, and concrete checks across every branch, full batches and overflow.
+The 32-bit mutation check rejects removing the batch-hole, snapshot-index or
+campaign guards. General well-formed-input postconditions and composition with
+`append` / `step` are still outstanding; branch examples are not a complete
+validation theorem.

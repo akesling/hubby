@@ -103,3 +103,6 @@ mod boundary;
 
 #[path = "proof_cases/message_dispatch.rs"]
 mod message_dispatch;
+
+#[path = "proof_cases/message_validation.rs"]
+mod message_validation;

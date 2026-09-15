@@ -3596,8 +3596,8 @@
         "C07",
         "C08"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+      "status": "component_evidence",
+      "note": "Complete original body and Message::term helper lowered by the generic pure validator backend in proofs/message-validation. 39 kernel obligations include universal zero-term rejection for seven variants, campaign cases independent of durable term, unread append payload, and concrete cases for all branches, batch holes/full capacity and overflow. Source mutations are rejected on 32-bit. General well-formed-input postconditions, fuel adequacy, source/borrow/layout refinement and append/step composition remain open."
     },
     "crate::node::<item:0>": {
       "requirements": [

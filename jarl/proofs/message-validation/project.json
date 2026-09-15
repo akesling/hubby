@@ -1,0 +1,166 @@
+{
+  "crate_root": "../../src/lib.rs",
+  "namespace": "JarlValidation",
+  "methods": [
+    "node::Node::valid"
+  ],
+  "proofs": "Proofs.lean",
+  "obligations": [
+    {
+      "theorem": "Validation.zero_campaign",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.positive_campaign_ignores_term",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.zero_campaign_ignores_term",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.zero_term_prevote",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.zero_term_vote",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.zero_term_voted",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.zero_term_append",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.zero_term_appendbatch",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.zero_term_install",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.zero_term_replicated",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.voted",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.vote_empty",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.prevote_empty",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.vote_zero_log_term",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.vote_future_log_term",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.vote_nonzero_term_zero_index",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.heartbeat",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.append_successor",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.append_gap",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.append_decreasing_term",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.append_overflow",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.empty_batch",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.one_entry_batch",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.batch_hole",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.batch_gap",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.batch_decreasing_term",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.batch_future_term",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.batch_invalid_previous",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.batch_overflow",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.full_batch",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.snapshot_valid",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.snapshot_empty",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.snapshot_zero_term",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.snapshot_future_term",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.replicated_success",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.replicated_full",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.conflict_zero",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.conflict_positive",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.append_payload_unread",
+      "function": "node_Node_valid"
+    }
+  ]
+}

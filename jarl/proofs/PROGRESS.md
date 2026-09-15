@@ -368,3 +368,41 @@ entry validation, checked successor arithmetic, batch occupied-prefix scan and
 its inferred integer counter type, snapshot index check, and nested rejection
 pattern. Do not replace the complete match/loop with slices or assumed predicates.
 The storage contracts above expose the exact caller obligations this must feed.
+
+## Complete validation body (partial C04–C08 evidence)
+
+- Provium now lowers the complete original Node::valid without modifying Jarl.
+  The generic backend retains scoped local bindings, immutable closure captures,
+  early returns, short-circuit expressions, nested enum/Option patterns and
+  borrowed array iteration. The original complete Message::term is included.
+- Primitive u64 arithmetic and the inferred i32 batch counter are distinct.
+  Derived record equality evaluates both operands once, then compares declared
+  primitive fields. Unsupported calls, ownership operations and shadowed
+  primitives/default constructors fail closed.
+- Jarl owns 39 obligations: universal zero-term rejection for all seven ordinary
+  variants; zero/one campaign cases for every durable term; append payload
+  independence; concrete checks for each branch, holes, full 16-entry batches,
+  predecessor/entry term errors, snapshot boundaries and successor overflow.
+- Three source mutations must fail against the 32-bit Rust build. A separate
+  provider fixture compares 42 native results with Lean kernel computation and
+  rejects a removed hole check. These finite checks are not universal proofs.
+- Structural borrowed views, frontend preservation and interpreter fuel adequacy
+  remain open. The generated correspondence theorem for this backend is only
+  an interpreter-definition identity, not an independently checked compiler pass.
+
+## Current proof frontier
+
+The complete validation body is available. Next establish a reusable symbolic
+execution / loop rule for the pure expression machine, prove fuel adequacy and
+well-formed-view preservation, and derive general validation postconditions
+(especially every batch entry's successor, term and occupied-prefix properties).
+Feed these into the complete Node::append and Node::step translations; retain
+snapshot/caller provenance obligations from the storage contracts. No M0–M8
+milestone or whole-Raft correctness claim is closed by these component checks.
+
+The provider now also supplies five kernel-audited error/loop rules, including
+`pure_fold_history`, which tracks the scanned prefix for arbitrary array
+lengths. Applying that rule to the generated batch body remains the next step.
+Validation: provider format/lint/test/kernel gates pass; all 19 Jarl proof tests
+pass (the coverage status spelling was corrected and that check rerun); all four
+runtime exploration tests pass. Jarl runtime source is unchanged.
