@@ -295,3 +295,8 @@ outcome relations require normal callback return; a separate property checks
 internal interpreter-fuel sufficiency for every callback response. Independent
 native result and cleanup traces are reproduced by kernel computation. This does
 not equate an arbitrary iterator with an infallible list or prove unwinding.
+
+Complete borrowed enum matches can project builtin u64 fields. Every source
+variant must be explicit, and the compiler retains each selected variant/field
+pair. Unknown view tags and malformed primitive fields have no value. This
+backend does not assume a Rust enum memory layout or accept opaque arm effects.

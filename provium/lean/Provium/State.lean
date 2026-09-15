@@ -1076,4 +1076,14 @@ theorem recovery_loop_invariant (program : Restoration) (bits capacity fuel : Na
           obtain ⟨buffer,appended,continued⟩ := recovery_append_success program state output advanced _ _ execution
           exact ih {state with buffer := buffer} advanced (step state entry record buffer valid fetched accepted appended) continued
 
+-- A borrowed enum view; unknown tags and malformed primitive fields have no
+-- value. Physical enum layout and the source-to-view relation remain separate.
+structure EnumStore where
+  variant : String
+  fields : InitStore
+
+def enumProjection (branches : List (String × Path)) (state : EnumStore) : Option Nat := do
+  let branch ← branches.find? (fun branch => branch.1 == state.variant)
+  recordWord state.fields branch.2
+
 end Provium.State

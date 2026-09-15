@@ -85,6 +85,7 @@ pub struct Method {
     pub truncation: Option<truncations::Truncation>,
     pub installation: Option<installations::Installation>,
     pub restoration: Option<restorations::Restoration>,
+    pub enum_projection: Option<enum_projections::Projection>,
 }
 struct Definition {
     module: String,
@@ -424,6 +425,9 @@ impl Crate {
     }
     pub fn lower(&self, name: &str) -> Result<Method, String> {
         if let Some(def) = self.methods.get(name) {
+            if self.enums.contains_key(&def.receiver) {
+                return self.lower_enum_projection(name);
+            }
             if restorations::candidate(&def.item) {
                 return self.lower_restoration(name);
             }
@@ -573,6 +577,7 @@ impl Crate {
             truncation: None,
             installation: None,
             restoration: None,
+            enum_projection: None,
         })
     }
     fn field_type<'a>(&'a self, def: &Definition, p: &[String]) -> Result<&'a Type, String> {
@@ -852,6 +857,10 @@ pub fn generate(methods: &[Method], namespace: &str) -> String {
     let mut text=format!("-- Generated from complete Rust method bodies; no sliced statements.\nimport Provium.State\nnamespace {namespace}\nopen Provium.State\n");
     for method in methods {
         let name = &method.symbol;
+        if method.enum_projection.is_some() {
+            text.push_str(&enum_projections::generate(method));
+            continue;
+        }
         if method.restoration.is_some() {
             text.push_str(&restorations::generate(method));
             continue;
@@ -1120,3 +1129,5 @@ pub mod truncations;
 pub mod installations;
 
 pub mod restorations;
+
+pub mod enum_projections;

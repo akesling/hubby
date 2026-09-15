@@ -1,0 +1,10 @@
+{
+  "crate_root": "../../src/lib.rs",
+  "namespace": "JarlMessages",
+  "methods": ["Message::term"],
+  "proofs": "Proofs.lean",
+  "obligations": [
+    {"theorem": "Messages.term_all_variants", "function": "Message_term"},
+    {"theorem": "Messages.projection_places", "function": "Message_term"}
+  ]
+}

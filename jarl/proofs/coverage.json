@@ -2337,8 +2337,8 @@
         "C01",
         "C12"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+      "status": "component_evidence",
+      "note": "Complete original exhaustive Message::term enum match in proofs/message-dispatch: every variant reads its source term field, with exact variant/field coverage and rejection of substituting the PreVoted campaign. Physical enum views, complete validation/step composition and source/borrow/layout refinement remain open."
     },
     "crate::<item:10>": {
       "requirements": [

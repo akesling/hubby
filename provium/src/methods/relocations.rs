@@ -327,7 +327,7 @@ impl Crate {
         if seen.len() != structure.fields.len() || !plain_fields.contains(&length) {
             return Err("relocation must preserve every field including length".into());
         }
-        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],array:None,query:None,constructor:None,buffer:None,iteration:None,last:None,truncation:None,installation:None,restoration:None,record_at:None,lookup:None,selection:None,relocation:Some(Relocation{slots,length,old_capacity,new_capacity:new.ident.to_string(),metadata,ascending,inclusive,scope:"complete consuming record relocation; metadata transferred or taken, indexed optional slots moved in order; source/borrow/layout and panic unwinding remain unproved; trailing drops suspend before consumer effects"})})
+        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],array:None,query:None,constructor:None,buffer:None,iteration:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,record_at:None,lookup:None,selection:None,relocation:Some(Relocation{slots,length,old_capacity,new_capacity:new.ident.to_string(),metadata,ascending,inclusive,scope:"complete consuming record relocation; metadata transferred or taken, indexed optional slots moved in order; source/borrow/layout and panic unwinding remain unproved; trailing drops suspend before consumer effects"})})
     }
 }
 pub(super) fn generate(method: &Method) -> String {

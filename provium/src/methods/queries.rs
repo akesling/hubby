@@ -150,6 +150,7 @@ impl Crate {
             truncation: None,
             installation: None,
             restoration: None,
+            enum_projection: None,
             record_at: None,
             lookup: None,
             selection: None,

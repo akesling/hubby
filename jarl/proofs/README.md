@@ -38,6 +38,7 @@ CI runs both ordinary tests and the full proof gate.
 | Project | Contracts and scope |
 | --- | --- |
 | [consensus](consensus/Proofs.lean) | Source-expression slices: strict majority, actual shared-voter intersection, stable/joint boundary overlap, quorum-position bounds, joint/follower minima, commit-prefix monotonicity, and current-term checks |
+| [message-dispatch](message-dispatch/Proofs.lean) | Complete `Message::term`: all eight variants read the durable/proposed term field specified by Rust; PreVoted reads term rather than campaign; explicit variant/field coverage |
 | [persistence](persistence/Proofs.lean) | Complete `Ready::persisted` field effects: clear flags, preserve other leaves, algebraic idempotence |
 | [election](election/Proofs.lean) | Complete `Node::reset_election` successful-state projections: exact wrapping seed advance, zero elapsed time, and deadline in `[ticks, 2*ticks)` |
 | [membership](membership/Proofs.lean) | Complete `Membership::finalized` and `is_joint`: arbitrary capacity, correct retention/removal, cleared old flags, surviving identities/fields preserved, no longer joint |

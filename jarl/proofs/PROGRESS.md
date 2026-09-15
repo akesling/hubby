@@ -338,3 +338,14 @@ complete generated transitions, including durable votes and restart.
   assumption that the opaque snapshot represents correct application state.
 - Branch selection, snapshot provenance/validity and caller authorization still
   need composition with the complete protocol and persistence implementation.
+
+## Message term dispatch (partial C02/R04 evidence)
+
+- Provium lowers complete exhaustive borrowed enum matches, retaining every
+  variant and primitive field projection. Unsupported guards, effects, field
+  types, attributes and overlapping/incomplete alternatives are rejected.
+- Jarl owns the Message::term contracts for all eight variants and exact source
+  field coverage. Using PreVoted campaign as durable term must fail on 32-bit.
+- An independent generic enum fixture has 18 native results checked directly by
+  Lean plus a universal field-read contract. This does not prove physical enum
+  layout or the complete Node::valid / Node::step dispatch yet.

@@ -16,3 +16,5 @@ cargo test --locked --test truncations -- --ignored
 cargo test --locked --test installations -- --ignored
 cargo test --locked --test restorations -- --ignored
 cargo test --locked --test suite -- --ignored
+
+cargo test --locked --test enum_projections -- --ignored

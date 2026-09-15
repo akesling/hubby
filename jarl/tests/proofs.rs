@@ -100,3 +100,6 @@ mod storage;
 
 #[path = "proof_cases/boundary.rs"]
 mod boundary;
+
+#[path = "proof_cases/message_dispatch.rs"]
+mod message_dispatch;
