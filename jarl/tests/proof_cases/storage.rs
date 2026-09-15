@@ -3,7 +3,7 @@ use std::{fs, path::Path};
 
 #[test]
 #[ignore = "requires pinned Lean and installed wasm32 target; scripts/verify.sh runs this"]
-fn append_shape_holds_on_32_bit_and_rejects_changed_effects() {
+fn storage_shape_holds_on_32_bit_and_rejects_changed_effects() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let w = Work::new();
     let mut project: serde_json::Value =
@@ -33,6 +33,8 @@ fn append_shape_holds_on_32_bit_and_rejects_changed_effects() {
     for (from, to) in [
         ("self.len += 1;", "self.len += 2;"),
         ("self.len == CAP", "self.len != CAP"),
+        ("if i < self.len", "if i <= self.len"),
+        ("NEW >= CAP", "NEW <= CAP"),
     ] {
         assert_eq!(source.matches(from).count(), 1);
         fs::write(&state, source.replace(from, to)).unwrap();

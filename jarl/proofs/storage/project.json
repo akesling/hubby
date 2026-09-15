@@ -3,7 +3,8 @@
   "namespace": "JarlStorage",
   "methods": [
     "state::State::push",
-    "state::State::new"
+    "state::State::new",
+    "state::State::grow"
   ],
   "proofs": "Proofs.lean",
   "obligations": [
@@ -30,6 +31,18 @@
     {
       "theorem": "Storage.history_preserves_shape",
       "function": "state_State_push"
+    },
+    {
+      "theorem": "Storage.grow_exact",
+      "function": "state_State_grow"
+    },
+    {
+      "theorem": "Storage.grow_preserves_shape",
+      "function": "state_State_grow"
+    },
+    {
+      "theorem": "Storage.history_supports_growth",
+      "function": "state_State_grow"
     }
   ]
 }

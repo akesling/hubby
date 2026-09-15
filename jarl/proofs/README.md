@@ -43,7 +43,7 @@ CI runs both ordinary tests and the full proof gate.
 | [membership](membership/Proofs.lean) | Complete `Membership::finalized` and `is_joint`: arbitrary capacity, correct retention/removal, cleared old flags, surviving identities/fields preserved, no longer joint |
 | [input-gating](input-gating/Proofs.lean) | Complete `Node::available` and `idle`: exact Result, dirty-state/reply/outbox rejection, and clean/drained admission over arbitrary outbox lengths |
 | [capacity](capacity/Proofs.lean) | Complete `State::full`: exact equality against the original const-generic capacity; non-full implies room under the separate `len ≤ CAP` representation invariant |
-| [storage](storage/Proofs.lean) | Complete `State::push` and `new`: no-drop append success, occupied-prefix/capacity preservation, explicit full-input destruction boundary, and induction over successful append histories |
+| [storage](storage/Proofs.lean) | Complete `State::push`, `new` and `grow`: no-drop append/growth, occupied-prefix/capacity and metadata preservation, explicit destruction boundaries, and induction over histories with changing capacity |
 | [initialization](initialization/Proofs.lean) | Complete `State::new`: initial hard-state fields, absent snapshot, all slots empty for arbitrary capacity, and initial `len ≤ CAP` |
 
 Each directory's `project.json` binds production Rust to explicit theorem
@@ -75,7 +75,7 @@ gate checks this project against both the host and installed 32-bit target.
 
 Initialization derives the initial length bound from the generated constructor.
 Storage now composes it with append preservation. Neither project proves
-preservation through restore/truncate/install/grow or
+preservation through restore/truncate/install or
 authorize resetting an existing voter. Builtin Default and array-construction
 semantics, source interpretation and Rust layout remain in the trusted boundary.
 
@@ -103,3 +103,13 @@ Their continuations apply only if destruction returns normally. Destructor panic
 unwinding and external side effects are not erased into a successful transition.
 The native compiler tests compare slots, length, destructor order and late panic
 states; source mutations and wasm32 checks exercise Jarl's actual method.
+
+Growth translates the original consuming `State::grow` body, including its const
+assertion, generic substitution, all metadata transfers, and indexed Option::take
+callback. The proof covers arbitrary nondecreasing capacities and preserves every
+live payload, length and metadata without invoking Drop. The storage-history
+induction allows repeated appends and growth; it is not fixed to one capacity.
+Native tests cover copied and moved metadata and disposal of out-of-prefix
+payloads in malformed states. Partial-record ownership during a failed
+construction, panic hooks, and destructor unwinding are outside the current
+relocation model; the verified valid-state path encounters none of those effects.

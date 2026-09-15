@@ -242,3 +242,10 @@ A drop continuation only applies after normal destructor return; it does not
 model destructor unwinding or prove Rust memory/layout correspondence. Consumers
 can prove no-drop success by establishing an empty destination slot. Independent
 native tests include destructor traces and partially changed state after panic.
+
+Consuming record growth is supported through its full const assertion and
+indexed `Option::take` callback. Every metadata field must be transferred once
+or taken from an Option, and custom receiver Drop is rejected. The generated
+slot-move semantics expose residual payload disposal and preserve metadata as an
+opaque value. They do not model metadata ownership during failed construction,
+panic hooks or unwinding; source/layout/ownership refinement remains open.

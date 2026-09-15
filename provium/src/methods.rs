@@ -76,6 +76,7 @@ pub struct Method {
     pub query: Option<queries::Query>,
     pub constructor: Option<constructors::Constructor>,
     pub buffer: Option<buffers::Append>,
+    pub relocation: Option<relocations::Relocation>,
 }
 struct Definition {
     module: String,
@@ -415,6 +416,11 @@ impl Crate {
     }
     pub fn lower(&self, name: &str) -> Result<Method, String> {
         if let Some(def) = self.methods.get(name) {
+            if def.item.sig.generics.const_params().next().is_some()
+                && matches!(def.item.sig.inputs.first(), Some(syn::FnArg::Receiver(r)) if r.reference.is_none())
+            {
+                return self.lower_relocation(name);
+            }
             if def.item.sig.inputs.is_empty()
                 && matches!(&def.item.sig.output,syn::ReturnType::Type(_,ty) if matches!(&**ty,Type::Path(p) if p.path.is_ident("Self")))
             {
@@ -520,6 +526,7 @@ impl Crate {
             query: None,
             constructor: None,
             buffer: None,
+            relocation: None,
         })
     }
     fn field_type<'a>(&'a self, def: &Definition, p: &[String]) -> Result<&'a Type, String> {
@@ -799,6 +806,10 @@ pub fn generate(methods: &[Method], namespace: &str) -> String {
     let mut text=format!("-- Generated from complete Rust method bodies; no sliced statements.\nimport Provium.State\nnamespace {namespace}\nopen Provium.State\n");
     for method in methods {
         let name = &method.symbol;
+        if method.relocation.is_some() {
+            text.push_str(&relocations::generate(method));
+            continue;
+        }
         if method.buffer.is_some() {
             text.push_str(&buffers::generate(method));
             continue;
@@ -1019,3 +1030,5 @@ pub mod constructors;
 pub mod queries;
 
 pub mod buffers;
+
+pub mod relocations;

@@ -213,4 +213,40 @@ def appendBuffer (program : BufferAppend) (bits capacity : Nat)
 def resumeDrops : BufferRun α → BufferRun α
   | .drop _ _ next => resumeDrops next
   | result => result
+structure Relocation where
+  ascending : Bool
+  inclusive : Bool
+inductive SlotMoves (α : Type) where
+  | done (moved remaining : List (Option α))
+  | bounds (index : Nat) (moved remaining : List (Option α))
+-- Indices advance in source callback order. Each successful take leaves None.
+def moveSlots (inclusive : Bool) (length : Nat) :
+    Nat → Nat → List (Option α) → SlotMoves α
+  | _, 0, source => .done [] source
+  | index, count + 1, source =>
+    if (if inclusive then index ≤ length else index < length) then
+      match source with
+      | [] => .bounds index [] []
+      | entry :: rest =>
+        match moveSlots inclusive length (index + 1) count rest with
+        | .done moved remaining => .done (entry :: moved) (none :: remaining)
+        | .bounds failed moved remaining => .bounds failed (entry :: moved) (none :: remaining)
+    else .done (List.replicate (count + 1) none) source
+inductive RelocationRun (α β : Type) where
+  | returned (state : BufferState α) (metadata : β)
+  | invalidInstantiation
+  | bounds (index : Nat) (moved remaining : List (Option α)) (metadata : β)
+  | drop (payload : α) (continuation : RelocationRun α β)
+def disposeSlots (slots : List (Option α)) (next : RelocationRun α β) : RelocationRun α β :=
+  match slots with
+  | [] => next
+  | none :: rest => disposeSlots rest next
+  | some value :: rest => .drop value (disposeSlots rest next)
+def relocate (program : Relocation) (oldCapacity newCapacity : Nat)
+    (state : BufferState α) (metadata : β) : RelocationRun α β :=
+  if (if program.ascending then newCapacity ≥ oldCapacity else newCapacity ≤ oldCapacity) then
+    match moveSlots program.inclusive state.len 0 newCapacity state.slots with
+    | .done moved remaining => disposeSlots remaining (.returned ⟨moved, state.len⟩ metadata)
+    | .bounds index moved remaining => .bounds index moved remaining metadata
+  else .invalidInstantiation
 end Provium.State

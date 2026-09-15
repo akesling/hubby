@@ -80,9 +80,31 @@ It is not a completion certificate. No full-correctness milestone is closed yet.
   late overflow states. Independent provider and original Jarl source mutations
   alter the increment and guard and must fail the Lean proof. The Jarl contract
   also type-checks for the installed wasm32 target.
-- Restore, truncate, install, growth, log-ID ordering, destructor unwinding and
+- Restore, truncate, install, log-ID ordering, destructor unwinding and
   source/layout/borrow refinement remain separate obligations. The append-only
   history is not a claim about all reachable Raft storage states.
+
+## Capacity growth and changing-capacity histories (M1, C02/R02/R03)
+
+- Provium translates the complete consuming record-growth body: static capacity
+  assertion, original generic substitution, transfer/take of every metadata
+  field, and the entire indexed Option::take callback. Custom receiver Drop,
+  hidden effects, and unresolved substitutions are rejected.
+- Slot-move semantics retain the source traversal order, cleared old slots,
+  a bounds-failure boundary, and disposal suspensions for residual old payloads.
+  Partial-record ownership during failed construction, panic hooks and destructor
+  unwinding remain outside the model; no full Rust outcome refinement is claimed.
+- Jarl's storage proof establishes exact payload/metadata/length preservation for
+  arbitrary nondecreasing capacities. The occupied-prefix invariant ensures the
+  old slots are all empty, so valid growth needs no destructor callback.
+- Induction now covers fresh initialization, successful appends and repeated
+  growth with capacity as a changing history index. Restore, truncation and
+  snapshot installation still need preservation lemmas before this covers every
+  reachable Jarl storage history.
+- Provider native comparisons include copied and moved owned metadata, payload
+  identity, and old-tail disposal order. Both provider and Jarl negative controls
+  mutate the static relation and loop boundary and must fail the Lean contract.
+  Jarl's storage project also runs against installed wasm32.
 
 ## Outstanding dependency frontier
 

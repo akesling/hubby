@@ -192,6 +192,7 @@ impl Crate {
             body: vec![],
             array: None,
             query: None,
+            relocation: None,
             buffer: None,
             constructor: Some(Constructor {
                 fields,

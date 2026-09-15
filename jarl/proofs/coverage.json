@@ -3850,8 +3850,8 @@
         "R03",
         "R05"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+      "status": "component_evidence",
+      "note": "Complete original consuming growth in proofs/storage: arbitrary larger capacity, live payload/metadata/length preservation without drops, and induction across changing-capacity append/grow histories. Rust layout/ownership, failed-construction unwinding, restore/truncate/install and protocol log invariants remain open."
     },
     "crate::state::<State < V , S , CAP >>::hard": {
       "requirements": [
