@@ -4,6 +4,10 @@ Jarl owns these contracts and asserts them using **Provium as a dev-dependency**
 The entry point is [`tests/proofs.rs`](../tests/proofs.rs).
 The runtime remains `no_std` and sans-I/O; Provium is not a runtime dependency.
 
+[CORRECTNESS_PLAN.md](CORRECTNESS_PLAN.md) specifies the complete source-level
+correctness goal, outstanding obligations, assumptions, milestones, and release
+gates. It is a plan, not evidence that those obligations have been proved.
+
 ```rust
 #[test]
 fn invariants() {

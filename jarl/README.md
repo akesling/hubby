@@ -184,6 +184,8 @@ proof tests fail when the supported Lean toolchain is missing; they never silent
 skip verification. Run `jarl/scripts/verify.sh` for contracts plus proof mutation
 and 32-bit checks. Generated evidence belongs to `jarl/artifacts/provium/`.
 These remain component contracts, not a full Raft correctness proof.
+The [correctness specification](proofs/CORRECTNESS_PLAN.md) enumerates the remaining
+translation, protocol, host, and progress obligations and their acceptance gates.
 
 ```sh
 cargo test -p jarl --locked --offline
