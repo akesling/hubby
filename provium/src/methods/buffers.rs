@@ -237,7 +237,7 @@ impl Crate {
             syn::BinOp::Ne(_) => false,
             _ => return Err("unsupported buffer comparison".into()),
         };
-        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],array:None,query:None,constructor:None,lookup:None,selection:None,relocation:None,buffer:Some(Append{slots,length,capacity,guard_method,guard_rust:tokens(&helper.item),equal,increment,error:format!("{resolved}::{}",variant.ident),scope:"complete bounded append and source-resolved guard; drop suspension resumes only when destruction returns; destructor unwinding, Rust layout/borrow and frontend correspondence remain unproved"})})
+        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],array:None,query:None,constructor:None,record_at:None,lookup:None,selection:None,relocation:None,buffer:Some(Append{slots,length,capacity,guard_method,guard_rust:tokens(&helper.item),equal,increment,error:format!("{resolved}::{}",variant.ident),scope:"complete bounded append and source-resolved guard; drop suspension resumes only when destruction returns; destructor unwinding, Rust layout/borrow and frontend correspondence remain unproved"})})
     }
 }
 pub(super) fn generate(method: &Method) -> String {

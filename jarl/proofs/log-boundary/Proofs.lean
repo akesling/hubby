@@ -67,4 +67,46 @@ theorem lookup_all_offsets (bits base offset : Nat) (state : LookupStore α)
     | some value => cases value <;> simp [JarlBoundary.state_State_get_ir, hi, hb, before, bias, position, target, word, slot]
   · have word : offset ≥ 2^bits := by omega
     simp [JarlBoundary.state_State_get_ir, hi, hb, before, bias, position, target, word]
+theorem record_at_snapshot (bits base : Nat) (state : LookupStore (Path → InitStore))
+    (base_value : JarlBoundary.state_State_base state.records ["index"] = .unsigned "u64" base)
+    (valid : base < 2^64) :
+    JarlBoundary.state_State_id_at bits state base =
+      .ok (some (JarlBoundary.state_State_base state.records)) := by
+  have selected : selectRecord JarlBoundary.state_State_id_at_ir.lookup.base state.records
+      JarlBoundary.state_State_id_at_ir.guardField = .unsigned "u64" base := base_value
+  have hb : ¬ base ≥ 2^64 := by omega
+  simp only [JarlBoundary.state_State_id_at, recordAt, selected]
+  simp [JarlBoundary.state_State_id_at_ir, JarlBoundary.state_State_base,
+    JarlBoundary.state_State_base_ir, hb]
+
+theorem record_at_entry (bits base offset : Nat) (state : LookupStore (Path → InitStore))
+    (entry : Path → InitStore)
+    (base_value : JarlBoundary.state_State_base state.records ["index"] = .unsigned "u64" base)
+    (valid : base + 1 + offset < 2^64) (target : offset < 2^bits)
+    (present : (state.slots ["entries"])[offset]? = some (some entry)) :
+    JarlBoundary.state_State_id_at bits state (base + 1 + offset) = .ok (some (entry ["id"])) := by
+  have selected : selectRecord JarlBoundary.state_State_id_at_ir.lookup.base state.records
+      JarlBoundary.state_State_id_at_ir.guardField = .unsigned "u64" base := base_value
+  have looked : lookupRecord JarlBoundary.state_State_id_at_ir.lookup bits state (base + 1 + offset) =
+      .ok (some ⟨["entries"], offset⟩) := lookup_exact bits base offset state entry base_value valid target present
+  have hi : ¬ base + 1 + offset ≥ 2^64 := by omega
+  have hb : ¬ base ≥ 2^64 := by omega
+  have different : base + 1 + offset ≠ base := by omega
+  simp only [JarlBoundary.state_State_id_at, recordAt, selected]
+  simp [JarlBoundary.state_State_id_at_ir, hi, hb, different] at looked ⊢
+  rw [looked]
+  simp [present]
+theorem record_at_absent (bits base index : Nat) (state : LookupStore (Path → InitStore))
+    (base_value : JarlBoundary.state_State_base state.records ["index"] = .unsigned "u64" base)
+    (valid_base : base < 2^64) (valid_index : index < 2^64) (different : index ≠ base)
+    (missing : JarlBoundary.state_State_get bits state index = .ok none) :
+    JarlBoundary.state_State_id_at bits state index = .ok none := by
+  have selected : selectRecord JarlBoundary.state_State_id_at_ir.lookup.base state.records
+      JarlBoundary.state_State_id_at_ir.guardField = .unsigned "u64" base := base_value
+  have looked : lookupRecord JarlBoundary.state_State_id_at_ir.lookup bits state index = .ok none := missing
+  have hi : ¬ index ≥ 2^64 := by omega
+  have hb : ¬ base ≥ 2^64 := by omega
+  simp only [JarlBoundary.state_State_id_at, recordAt, selected]
+  simp [JarlBoundary.state_State_id_at_ir, hi, hb, different] at looked ⊢
+  simp [looked]
 end Boundary

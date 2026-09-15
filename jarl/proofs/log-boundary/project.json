@@ -3,7 +3,8 @@
   "namespace": "JarlBoundary",
   "methods": [
     "state::State::base",
-    "state::State::get"
+    "state::State::get",
+    "state::State::id_at"
   ],
   "proofs": "Proofs.lean",
   "obligations": [
@@ -26,6 +27,18 @@
     {
       "theorem": "Boundary.lookup_all_offsets",
       "function": "state_State_get"
+    },
+    {
+      "theorem": "Boundary.record_at_snapshot",
+      "function": "state_State_id_at"
+    },
+    {
+      "theorem": "Boundary.record_at_entry",
+      "function": "state_State_id_at"
+    },
+    {
+      "theorem": "Boundary.record_at_absent",
+      "function": "state_State_id_at"
     }
   ]
 }

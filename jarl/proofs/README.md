@@ -43,7 +43,7 @@ CI runs both ordinary tests and the full proof gate.
 | [membership](membership/Proofs.lean) | Complete `Membership::finalized` and `is_joint`: arbitrary capacity, correct retention/removal, cleared old flags, surviving identities/fields preserved, no longer joint |
 | [input-gating](input-gating/Proofs.lean) | Complete `Node::available` and `idle`: exact Result, dirty-state/reply/outbox rejection, and clean/drained admission over arbitrary outbox lengths |
 | [capacity](capacity/Proofs.lean) | Complete `State::full`: exact equality against the original const-generic capacity; non-full implies room under the separate `len ≤ CAP` representation invariant |
-| [log-boundary](log-boundary/Proofs.lean) | Complete `State::base` and `get`: exact snapshot boundary and checked borrowed-slot lookup, including subtraction, target-width, bounds and empty-slot rejection |
+| [log-boundary](log-boundary/Proofs.lean) | Complete `State::base`, `get` and `id_at`: exact snapshot boundary, checked borrowed-slot lookup, and boundary/entry/missing record results |
 | [storage](storage/Proofs.lean) | Complete `State::push`, `new` and `grow`: no-drop append/growth, occupied-prefix/capacity and metadata preservation, explicit destruction boundaries, and induction over histories with changing capacity |
 | [initialization](initialization/Proofs.lean) | Complete `State::new`: initial hard-state fields, absent snapshot, all slots empty for arbitrary capacity, and initial `len ≤ CAP` |
 
@@ -129,3 +129,10 @@ failure, out-of-bounds access and empty slots; indices at/before the boundary
 return None. Native tests compare pointer identity, and provider/Jarl mutations
 alter the offset or selected base field. The result's physical borrow validity
 and correspondence between each entry's LogId and its slot still need proof.
+
+`State::id_at` now composes both complete helpers with the original equality
+branch and entry-record projection. It returns the full base record at the
+boundary (including genesis), the selected entry's full `id` record on a hit,
+and None on an off-boundary miss. The proof does not assume that an arbitrary
+stored entry's id.index equals the requested index; contiguous log-ID invariants
+remain work for restore, append callers, truncation and snapshot installation.

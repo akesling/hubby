@@ -31,6 +31,7 @@ fn lookup_contract_verifies_for_32_bit_and_rejects_source_offset_changes() {
     let source = fs::read_to_string(&path).unwrap();
     for (from, to) in [
         ("checked_sub(1)?;", "checked_sub(0)?;"),
+        ("index == self.base().index", "index != self.base().index"),
         (
             "self.base().index)?.checked_sub",
             "self.base().term)?.checked_sub",

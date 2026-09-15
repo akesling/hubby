@@ -8,9 +8,8 @@ Continue with the next open source-linked obligation under the existing toolchai
 dependency, no_std/sans-I/O and approval constraints. Only the full specification's
 verified completion can close this work; a green component suite cannot.
 
-Immediate frontier: translate `State::id_at` by composing its original `base`
-and `get` helpers, including the equality branch and copied entry LogId. Then
-translate `entries`/`last`, and close restore/truncate/install preservation before
+Immediate frontier: translate `entries`/`last`, then close
+restore/truncate/install preservation before
 claiming the storage invariant for every reachable state.
 
 ## Source accounting (M0, C01–C12, P12)
@@ -124,7 +123,7 @@ claiming the storage invariant for every reachable state.
   name shadowing are rejected.
 - Jarl's `State::base` now proves exact zero index/term without a snapshot and
   exact preservation of the snapshot's `last` record when present. The contract
-  also runs against installed wasm32. `id_at` and caller composition remain open.
+  also runs against installed wasm32. Caller composition and log-ID consistency remain open.
 - Provider native checks exercise both same-typed projected records; changing
   which source field is selected must fail the independent Lean contract.
 - Append/growth IR now also retain source array/length paths and capacity names.
@@ -145,8 +144,24 @@ claiming the storage invariant for every reachable state.
 - Native provider tests compare actual pointer locations across sparse arrays,
   present/absent snapshots and integer boundaries. Provider mutations alter bias,
   base field and array path; original Jarl mutations alter bias and base field.
-- Actual reference lifetimes/layout, entry LogId consistency, `id_at`, `last`,
+- Actual reference lifetimes/layout, entry LogId consistency, `last`,
   restore, truncation and installation still require source-linked contracts.
+
+## Boundary/entry record composition (M1, C02/R03)
+
+- Provium translates the complete `State::id_at` branch, reusing the complete
+  original `base` and `get` helpers. It retains the boundary comparison, guard
+  field, copied entry-record field, helper sources and all lookup outcomes.
+- Jarl proves the exact whole base record at the boundary, the exact whole entry
+  id at a successful borrowed location, and None on an off-boundary lookup miss.
+  Genesis and snapshots follow the same original branch; no synthetic rule is
+  substituted for either case.
+- Provider native comparisons cover both same-typed entry projections. Branch,
+  projection and helper-bias mutations fail its kernel contract. Jarl additionally
+  mutates its original equality branch and checks the full project on wasm32.
+- These are record-selection contracts, not a proof that every entry's id.index
+  matches its array position. That requires log-content invariants through all
+  storage constructors/mutators and their protocol callers.
 
 ## Outstanding dependency frontier
 

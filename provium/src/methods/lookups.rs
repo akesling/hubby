@@ -18,7 +18,11 @@ fn try_expr(e: &Expr) -> Result<&Expr, String> {
     attrs(&t.attrs)?;
     Ok(&t.expr)
 }
-fn method<'a>(e: &'a Expr, name: &str, count: usize) -> Result<&'a syn::ExprMethodCall, String> {
+pub(super) fn method<'a>(
+    e: &'a Expr,
+    name: &str,
+    count: usize,
+) -> Result<&'a syn::ExprMethodCall, String> {
     let Expr::MethodCall(c) = e else {
         return Err(format!("expected lookup {name}"));
     };
@@ -28,7 +32,7 @@ fn method<'a>(e: &'a Expr, name: &str, count: usize) -> Result<&'a syn::ExprMeth
     }
     Ok(c)
 }
-fn ident(p: &syn::Pat) -> Result<String, String> {
+pub(super) fn ident(p: &syn::Pat) -> Result<String, String> {
     let syn::Pat::Ident(p) = p else {
         return Err("lookup locals must be plain identifiers".into());
     };
@@ -38,7 +42,7 @@ fn ident(p: &syn::Pat) -> Result<String, String> {
     }
     Ok(p.ident.to_string())
 }
-fn named(e: &Expr, name: &str) -> bool {
+pub(super) fn named(e: &Expr, name: &str) -> bool {
     matches!(e,Expr::Path(p) if p.attrs.is_empty() && p.qself.is_none() && p.path.is_ident(name))
 }
 fn local(l: &syn::Local) -> Result<(String, &Expr), String> {
@@ -210,14 +214,24 @@ impl Crate {
         if tokens(&array.elem) != format!("Option < {} >", tokens(&reference.elem)) {
             return Err("lookup array slot and borrowed result types must agree".into());
         }
-        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],array:None,query:None,constructor:None,buffer:None,relocation:None,selection:None,lookup:Some(Lookup{slots,base_method,base_rust,base,base_field:base_member.to_string(),bias,scope:"complete shared checked lookup and source-resolved base helper; returns an abstract borrowed place; physical reference validity, Rust layout/borrow and frontend correspondence remain unproved"})})
+        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],array:None,query:None,constructor:None,buffer:None,relocation:None,selection:None,record_at:None,lookup:Some(Lookup{slots,base_method,base_rust,base,base_field:base_member.to_string(),bias,scope:"complete shared checked lookup and source-resolved base helper; returns an abstract borrowed place; physical reference validity, Rust layout/borrow and frontend correspondence remain unproved"})})
     }
+}
+pub(super) fn program(l: &Lookup) -> String {
+    format!(
+        "⟨{}, {}, {}, {}⟩",
+        lean_path(&l.slots),
+        selectors::program(&l.base),
+        lean_path(std::slice::from_ref(&l.base_field)),
+        l.bias
+    )
 }
 pub(super) fn generate(method: &Method) -> String {
     let l = method.lookup.as_ref().unwrap();
     let name = &method.symbol;
-    format!("def {name}_ir : RecordLookup := ⟨{}, {}, {}, {}⟩\ndef {name} (bits : Nat) (state : LookupStore α) (index : Nat) : Except LookupFault (Option ReadPlace) :=\n  lookupRecord {name}_ir bits state index\ntheorem {name}_correspondence (bits : Nat) (state : LookupStore α) (index : Nat) :\n  lookupRecord {name}_ir bits state index = {name} bits state index := by rfl\n",lean_path(&l.slots),selectors::program(&l.base),lean_path(std::slice::from_ref(&l.base_field)),l.bias)
+    format!("def {name}_ir : RecordLookup := {}\ndef {name} (bits : Nat) (state : LookupStore α) (index : Nat) : Except LookupFault (Option ReadPlace) :=\n  lookupRecord {name}_ir bits state index\ntheorem {name}_correspondence (bits : Nat) (state : LookupStore α) (index : Nat) :\n  lookupRecord {name}_ir bits state index = {name} bits state index := by rfl\n",program(l))
 }
+
 impl Lookup {
     /// Evaluate the checked-index pipeline after the source-selected base record
     /// has been read. The result is the borrowed slot location, not an owned T.

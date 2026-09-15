@@ -10,4 +10,5 @@ cargo test --locked --test buffers -- --ignored
 cargo test --locked --test relocations -- --ignored
 cargo test --locked --test selectors -- --ignored
 cargo test --locked --test lookups -- --ignored
+cargo test --locked --test records -- --ignored
 cargo test --locked --test suite -- --ignored

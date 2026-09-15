@@ -261,3 +261,9 @@ subtractions, target usize conversion, optional-array bounds access and the
 returned borrowed place. It rejects source traits that could override the
 accepted standard operations. Native tests compare reference locations; the
 current place model does not prove Rust lifetimes or physical layout.
+
+Optional record lookup can compose a copied boundary record with the complete
+checked borrowed lookup and an entry-record projection. Source comparison and
+projection fields remain explicit, and both helpers are translated in full.
+This supports proofs of whole returned records without assuming their content
+already satisfies a protocol's log invariants.

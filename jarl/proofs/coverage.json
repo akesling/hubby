@@ -3870,8 +3870,8 @@
         "R03",
         "R05"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+      "status": "component_evidence",
+      "note": "Complete original boundary branch and both complete helpers in proofs/log-boundary: return snapshot/genesis base, copy the selected entry id, and preserve missing-lookup results. Source paths retained; entry-ID consistency, callers and source/layout/borrow refinement remain open."
     },
     "crate::state::<State < V , S , CAP >>::install": {
       "requirements": [

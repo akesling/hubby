@@ -296,4 +296,25 @@ def lookupRecord (program : RecordLookup) (bits : Nat) (state : LookupStore α) 
         | some (some _) => .ok (some ⟨program.slotsPath, offset⟩)
         | _ => .ok none
   | _ => .error .input
+structure RecordAt where
+  lookup : RecordLookup
+  guardField : Path
+  equal : Bool
+  recordField : Path
+
+def recordAt (program : RecordAt) (bits : Nat) (state : LookupStore (Path → InitStore)) (index : Nat) :
+    Except LookupFault (Option InitStore) :=
+  let boundary := selectRecord program.lookup.base state.records
+  match boundary program.guardField with
+  | .unsigned rustType base =>
+    if rustType ≠ "u64" ∨ index ≥ 2^64 ∨ base ≥ 2^64 then .error .input
+    else if (decide (index = base)) == program.equal then .ok (some boundary)
+    else match lookupRecord program.lookup bits state index with
+      | .error error => .error error
+      | .ok none => .ok none
+      | .ok (some place) =>
+        match (state.slots place.path)[place.index]? with
+        | some (some entry) => .ok (some (entry program.recordField))
+        | _ => .error .input
+  | _ => .error .input
 end Provium.State
