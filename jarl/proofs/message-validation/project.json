@@ -161,6 +161,54 @@
     {
       "theorem": "Validation.append_payload_unread",
       "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.campaign_range",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.vote_range",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.prevote_range",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.heartbeat_range",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.snapshot_range",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.voted_range",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.replicated_range",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.conflict_range",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.append_range",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.append_accepted",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.empty_batch_any_length",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.leading_hole_rejected",
+      "function": "node_Node_valid"
     }
   ]
 }

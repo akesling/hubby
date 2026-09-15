@@ -406,3 +406,23 @@ lengths. Applying that rule to the generated batch body remains the next step.
 Validation: provider format/lint/test/kernel gates pass; all 19 Jarl proof tests
 pass (the coverage status spelling was corrected and that check rerun); all four
 runtime exploration tests pass. Jarl runtime source is unchanged.
+
+## General validation postconditions (partial C04–C08 evidence)
+
+- The message-validation project now has 51 obligations. General theorems
+  characterize every non-batch branch for all bounded scalar inputs: campaign
+  positivity independent of durable term, Vote/PreVote log validity, heartbeat
+  predecessor validity, snapshot index/term validity and replication replies.
+- The accepted-append theorem establishes the exact successor index and a
+  positive entry term bounded below by its predecessor and above by the message
+  term, for arbitrary unread payloads. These are premises for the storage
+  preservation contracts; caller/state-term composition is still required.
+- Source-linked batch-body lemmas cover arbitrary iterator lengths and
+  environments. Complete-function theorems reject all-empty arrays of every
+  length and leading holes followed by any entry and any remaining suffix.
+- Provium's kernel-checked symbolic step rule leaves loops as proof boundaries.
+  The source body is still compiled in full; helper extraction identities are
+  checked by the kernel, not asserted as equivalence axioms.
+- General nonempty batch preservation and complete validation-to-append/step
+  composition remain next. The frontend, Rust memory/borrows, whole-program
+  transition system, durability and safety/liveness milestones remain open.

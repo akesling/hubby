@@ -3597,7 +3597,7 @@
         "C08"
       ],
       "status": "component_evidence",
-      "note": "Complete original body and Message::term helper lowered by the generic pure validator backend in proofs/message-validation. 39 kernel obligations include universal zero-term rejection for seven variants, campaign cases independent of durable term, unread append payload, and concrete cases for all branches, batch holes/full capacity and overflow. Source mutations are rejected on 32-bit. General well-formed-input postconditions, fuel adequacy, source/borrow/layout refinement and append/step composition remain open."
+      "note": "Complete original body and Message::term helper lowered by the generic pure validator backend in proofs/message-validation. 51 kernel obligations include general bounded-value acceptance characterizations for every non-batch variant, accepted append successor/term postconditions, all-empty batches at arbitrary lengths and leading holes with arbitrary suffixes. Source guard mutations are rejected on 32-bit. General nonempty batch preservation, source/borrow/layout refinement and append/step composition remain open."
     },
     "crate::node::<item:0>": {
       "requirements": [

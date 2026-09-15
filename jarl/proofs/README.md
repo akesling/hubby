@@ -190,10 +190,11 @@ valid durable recovery, protocol safety and Rust memory refinement remain open.
 
 `message-validation` translates the complete original `node::Node::valid`,
 including its `Message::term` helper, captured `valid_id` closure and batch loop.
-Its 39 obligations include universal zero-term rejection for the seven ordinary
-message variants, campaign cases independent of durable term, unread append
-payload, and concrete checks across every branch, full batches and overflow.
-The 32-bit mutation check rejects removing the batch-hole, snapshot-index or
-campaign guards. General well-formed-input postconditions and composition with
-`append` / `step` are still outstanding; branch examples are not a complete
-validation theorem.
+Its 51 obligations include general bounded-value acceptance conditions for every
+non-batch variant. Accepted append entries must have the successor index and a
+positive term between the predecessor's and message's terms. Array-loop proofs
+reject all-empty batches of any length and leading holes with arbitrary suffixes.
+Concrete cases also cover full 16-entry batches and overflow. The 32-bit mutation
+check rejects removing the batch-hole, snapshot-index or campaign guards.
+General nonempty batch preservation, source/borrow/layout refinement and
+composition with `append` / `step` remain outstanding.
