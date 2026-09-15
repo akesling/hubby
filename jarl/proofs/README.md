@@ -44,7 +44,7 @@ CI runs both ordinary tests and the full proof gate.
 | [input-gating](input-gating/Proofs.lean) | Complete `Node::available` and `idle`: exact Result, dirty-state/reply/outbox rejection, and clean/drained admission over arbitrary outbox lengths |
 | [capacity](capacity/Proofs.lean) | Complete `State::full`: exact equality against the original const-generic capacity; non-full implies room under the separate `len ≤ CAP` representation invariant |
 | [log-boundary](log-boundary/Proofs.lean) | Complete `State::base`, `get`, `id_at`, `entries` and `last`: snapshot boundary, checked borrowed lookup, ordered prefix iteration, and exact boundary/final-entry records |
-| [storage](storage/Proofs.lean) | Complete `State::push`, `new`, `grow`, `truncate` and `install`: no-drop append/growth, occupied-prefix/capacity and metadata preservation, explicit destruction boundaries, and induction over histories with changing capacity |
+| [storage](storage/Proofs.lean) | Complete `State::push`, `new`, `grow`, `truncate`, `install` and `restore`: no-drop append/growth, occupied-prefix/capacity and metadata preservation, explicit destruction boundaries, and induction over histories with changing capacity |
 | [initialization](initialization/Proofs.lean) | Complete `State::new`: initial hard-state fields, absent snapshot, all slots empty for arbitrary capacity, and initial `len ≤ CAP` |
 
 Each directory's `project.json` binds production Rust to explicit theorem
@@ -75,9 +75,8 @@ view relation does not claim to prove Rust alias/layout correspondence. The full
 gate checks this project against both the host and installed 32-bit target.
 
 Initialization derives the initial length bound from the generated constructor.
-Storage now composes it with append preservation. Neither project proves
-preservation through restore/install or
-authorize resetting an existing voter. Builtin Default and array-construction
+Storage composes it with restore, append, growth, truncation and installation
+for the buffer-shape invariant. This does not authorize resetting an existing voter. Builtin Default and array-construction
 semantics, source interpretation and Rust layout remain in the trusted boundary.
 
 Array proofs quantify over arbitrary lengths, including empty arrays. Native
@@ -165,3 +164,10 @@ The general installation shape theorem covers every successful branch from any
 shape-valid buffer. Storage histories compose this with append, growth and
 truncation. Restoration and protocol/metadata reachability remain outside that
 history theorem; it does not establish global Raft safety.
+
+Restoration translates all original validation and helper bodies. Iterator calls
+and destruction remain external interactions. Successful returns preserve buffer
+shape and the supplied metadata; the interpreter bound is sufficient for every
+response sequence. Restoration now participates in the buffer-history theorem.
+This closes the listed storage operations for that shape predicate, not log-ID
+ordering, valid durable recovery, protocol safety or Rust memory refinement.

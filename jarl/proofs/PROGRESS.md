@@ -8,9 +8,10 @@ Continue with the next open source-linked obligation under the existing toolchai
 dependency, no_std/sans-I/O and approval constraints. Only the full specification's
 verified completion can close this work; a green component suite cannot.
 
-Immediate frontier: translate restoration with its original iterator/ownership
-interactions, then close log-ID ordering and committed-prefix preservation before
-claiming the storage invariant for every reachable state.
+Immediate frontier: prove log-ID ordering and metadata/commitment bounds for
+restoration and their preservation across storage operations, then compose the
+complete protocol callers and durable histories. Buffer-shape induction alone
+is not a source-level Raft correctness proof.
 
 ## Source accounting (M0, C01–C12, P12)
 
@@ -55,8 +56,8 @@ claiming the storage invariant for every reachable state.
   comparison. Given the separate `len ≤ CAP` invariant, non-full implies space.
 - The contract passes for 64-bit and installed wasm32 targets. Changing the
   original equality to inequality must fail the Lean contract, not the parser.
-- Preservation of `len ≤ CAP` through restore and mutation is still open; this
-  predicate proof does not assume those callers are correct.
+- Shape preservation through translated restore/mutation is composed below;
+  physical and protocol reachability remain open.
 
 ## Fresh-state initialization (M1, C02/R02)
 
@@ -65,7 +66,7 @@ claiming the storage invariant for every reachable state.
   effects and namespace shadowing are rejected.
 - Lean checks initial term/vote/commit, absent snapshot, zero length, arbitrary
   empty-array capacity, and the initial length bound. This supplies the fresh-state
-  case; restore and other mutating transitions remain separate obligations.
+  case for the buffer-history composition below; metadata/log reachability is separate.
 - Provider native comparisons cover const-parameter substitution and initial
   fields. Independent provider and Jarl source mutations change the initial length
   and must fail in Lean. Jarl additionally checks the installed 32-bit target.
@@ -89,9 +90,9 @@ claiming the storage invariant for every reachable state.
   late overflow states. Independent provider and original Jarl source mutations
   alter the increment and guard and must fail the Lean proof. The Jarl contract
   also type-checks for the installed wasm32 target.
-- Restore, truncate, install, log-ID ordering, destructor unwinding and
-  source/layout/borrow refinement remain separate obligations. The append-only
-  history is not a claim about all reachable Raft storage states.
+- The append-only theorem excludes other operations; their shape composition is
+  recorded below. Log-ID ordering, destructor unwinding and source/layout/borrow
+  refinement remain open, so this is not global Raft reachability.
 
 ## Capacity growth and changing-capacity histories (M1, C02/R02/R03)
 
@@ -107,9 +108,9 @@ claiming the storage invariant for every reachable state.
   arbitrary nondecreasing capacities. The occupied-prefix invariant ensures the
   old slots are all empty, so valid growth needs no destructor callback.
 - Induction now covers fresh initialization, successful appends and repeated
-  growth with capacity as a changing history index. Restore, truncation and
-  snapshot installation still need preservation lemmas before this covers every
-  reachable Jarl storage history.
+  growth with capacity as a changing history index. The later composition adds
+  restore, truncation and installation. Protocol/durable-history reachability
+  still needs separate invariants.
 - Provider native comparisons include copied and moved owned metadata, payload
   identity, and old-tail disposal order. Both provider and Jarl negative controls
   mutate the static relation and loop boundary and must fail the Lean contract.
@@ -144,8 +145,8 @@ claiming the storage invariant for every reachable state.
 - Native provider tests compare actual pointer locations across sparse arrays,
   present/absent snapshots and integer boundaries. Provider mutations alter bias,
   base field and array path; original Jarl mutations alter bias and base field.
-- Actual reference lifetimes/layout, entry LogId consistency,
-  restore, truncation and installation still require source-linked contracts.
+- Actual reference lifetimes/layout and entry LogId consistency remain open.
+  The complete mutating methods and their shape contracts are recorded below.
 
 ## Boundary/entry record composition (M1, C02/R03)
 
@@ -178,8 +179,8 @@ claiming the storage invariant for every reachable state.
   check custom entry Drop counts, including bounds panic. Provider controls
   mutate the slice boundary, iterator end, record projection and array name;
   Jarl mutates its original slice and iterator-end expressions on wasm32.
-- Panic hooks, iterator lifetime/layout refinement and full storage/log-content
-  preservation through restore/truncate/install remain open.
+- Panic hooks, iterator lifetime/layout refinement and log-content invariants
+  remain open. The buffer-shape composition below covers the mutating methods.
 
 ## Outstanding dependency frontier
 
@@ -205,8 +206,8 @@ complete generated transitions, including durable votes and restart.
   last-slot drop with the exact continuation, empty return, and sufficient internal
   fuel for every input state. Interpreter exhaustion cannot masquerade as success.
 - Storage histories now admit normally completed truncations alongside append and
-  arbitrary nondecreasing capacity growth. Restore and snapshot installation remain
-  excluded, so this is not the global reachable-state invariant.
+  arbitrary nondecreasing capacity growth; the later composition adds restore and
+  installation. This is still not the protocol reachable-state invariant.
 - Native checks cover capacities 0/1/3, all occupancy masks and invalid lengths,
   missing/present snapshot bases, comparison boundaries and destructor order.
   Independent and original-Jarl mutations exercise comparison and helper drift.
@@ -244,6 +245,30 @@ complete generated transitions, including durable votes and restart.
   nondecreasing growth, truncation and installation. Each installation also retains
   its capacity and nondecreasing commit postconditions.
 - These are buffer histories, not complete persistent/protocol histories: metadata
-  reachability and source memory refinement remain open. Restore is still excluded,
-  and log-ID ordering, committed-prefix preservation and network safety are not
-  consequences of the shape invariant alone.
+  reachability and source memory refinement remain open. The later composition
+  includes restore. Log-ID ordering, committed-prefix preservation and network
+  safety are not consequences of the shape invariant alone.
+
+## Complete restoration and buffer-history closure (partial R02/R03 evidence)
+
+- Provium translates the complete original `State::restore`, its constructor,
+  append, last-record, iterator and base helpers. Guards preserve short-circuit
+  order, checked addition and original scalar field paths. Final `last()` remains
+  a lazy guard read, rather than an eager read inserted before the condition.
+- IntoIterator and next are external interactions with arbitrary response values.
+  Source, iterator, entry and snapshot destruction are separate conditional
+  continuations. Declaration order controls state-field destruction. No Clone is
+  added to Jarl's payloads, and no finite/infallible input list is assumed.
+- Successful recovery preserves Shape and the exact supplied hard state/snapshot.
+  Kernel proofs establish sufficient internal fuel on every iterator-response
+  branch and the final validation guard. Source-place contracts bind all fields.
+- Buffer histories now include fresh initialization, restoration, append, arbitrary
+  nondecreasing growth, truncation and installation. These histories deliberately
+  permit arbitrary metadata; protocol/durable-history admissibility is still open.
+- The kernel reproduces 48 native result/cleanup traces for an independent Rust
+  consumer, including invalid checkpoints, bad ordering/terms, full buffers,
+  commit bounds and u64 exhaustion. Mutations change validation or declaration
+  cleanup order and must invalidate those original-source contracts.
+- General log-ID/term ordering, commit-bound interpretation, physical field-view
+  and ownership refinement, callback/unwind behavior and protocol reachability
+  remain open. No full-correctness milestone or complete certificate is closed.

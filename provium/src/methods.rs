@@ -84,6 +84,7 @@ pub struct Method {
     pub last: Option<iterations::Last>,
     pub truncation: Option<truncations::Truncation>,
     pub installation: Option<installations::Installation>,
+    pub restoration: Option<restorations::Restoration>,
 }
 struct Definition {
     module: String,
@@ -423,6 +424,9 @@ impl Crate {
     }
     pub fn lower(&self, name: &str) -> Result<Method, String> {
         if let Some(def) = self.methods.get(name) {
+            if restorations::candidate(&def.item) {
+                return self.lower_restoration(name);
+            }
             if def.item.sig.generics.const_params().next().is_some()
                 && matches!(def.item.sig.inputs.first(), Some(syn::FnArg::Receiver(r)) if r.reference.is_none())
             {
@@ -568,6 +572,7 @@ impl Crate {
             last: None,
             truncation: None,
             installation: None,
+            restoration: None,
         })
     }
     fn field_type<'a>(&'a self, def: &Definition, p: &[String]) -> Result<&'a Type, String> {
@@ -847,6 +852,10 @@ pub fn generate(methods: &[Method], namespace: &str) -> String {
     let mut text=format!("-- Generated from complete Rust method bodies; no sliced statements.\nimport Provium.State\nnamespace {namespace}\nopen Provium.State\n");
     for method in methods {
         let name = &method.symbol;
+        if method.restoration.is_some() {
+            text.push_str(&restorations::generate(method));
+            continue;
+        }
         if method.installation.is_some() {
             text.push_str(&installations::generate(method));
             continue;
@@ -1109,3 +1118,5 @@ pub mod iterations;
 pub mod truncations;
 
 pub mod installations;
+
+pub mod restorations;

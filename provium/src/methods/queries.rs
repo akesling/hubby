@@ -149,6 +149,7 @@ impl Crate {
             last: None,
             truncation: None,
             installation: None,
+            restoration: None,
             record_at: None,
             lookup: None,
             selection: None,

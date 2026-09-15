@@ -287,3 +287,11 @@ rotation. Source-ordered clearing and replacement expose both entry and snapshot
 destructor boundaries. Fault outcomes retain the incoming owned snapshot before
 unwinding. Native comparisons include malformed buffers, term mismatches and
 commit extrema; this backend does not establish protocol caller invariants.
+
+Recovery from consumer-owned iterators uses an interaction tree: IntoIterator,
+next, and source/iterator/payload destruction are explicit boundaries. Complete
+source guards retain short-circuit evaluation and checked addition. Successful
+outcome relations require normal callback return; a separate property checks
+internal interpreter-fuel sufficiency for every callback response. Independent
+native result and cleanup traces are reproduced by kernel computation. This does
+not equate an arbitrary iterator with an infallible list or prove unwinding.

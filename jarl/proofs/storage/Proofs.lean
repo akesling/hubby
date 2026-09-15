@@ -716,8 +716,117 @@ theorem installation_preserves_shape (bits capacity : Nat) (view : α → Path �
           · simp [resumeInstallation] at execution
           · exact clearing_prefix_preserves_shape _ snapshotView state next input capacity rfl shape execution
 
+private theorem recovery_loop_shape (bits capacity fuel : Nat) (view : α → Path → InitStore)
+    (snapshotView : β → Path → InitStore) (hardView : δ → InitStore) (hardPresence : δ → Path → Bool)
+    (base : InitStore) (state output : RecoveryState α β δ) (iterator : ι)
+    (shape : Shape state.buffer capacity) (word : capacity < 2^bits)
+    (execution : RecoveryReturns (recoveryLoop JarlStorage.state_State_restore_ir bits capacity view snapshotView hardView hardPresence base fuel state iterator : RecoveryRun α β δ σ ι) (.ok output)) :
+    Shape output.buffer capacity ∧ output.hard = state.hard ∧ output.snapshot = state.snapshot := by
+  induction fuel generalizing state iterator with
+  | zero => simp [recoveryLoop] at execution
+  | succ fuel ih =>
+    simp only [recoveryLoop,recovery_returns_next] at execution
+    obtain ⟨entry,advanced,execution⟩ := execution
+    cases entry with
+    | none =>
+      simp only [recovery_returns_dropIterator] at execution
+      obtain ⟨same,_⟩ := recovery_finish_success _ view snapshotView hardView hardPresence state output base execution
+      cases same
+      exact ⟨shape,rfl,rfl⟩
+    | some entry =>
+      dsimp only at execution
+      split at execution
+      · simp at execution
+      · split at execution
+        · simp at execution
+        · simp at execution
+        · obtain ⟨buffer,appended,continued⟩ := recovery_append_success _ state output advanced _ _ execution
+          change resumeDrops (JarlStorage.state_State_push bits capacity state.buffer entry) = .returned (.ok ()) buffer at appended
+          have space : state.buffer.len < capacity := by
+            by_cases room : state.buffer.len < capacity
+            · exact room
+            · have full : state.buffer.len = capacity := by have := shape.2.1;omega
+              rw [full_preserves_state_at_drop bits capacity state.buffer entry full] at appended
+              simp [resumeDrops] at appended
+          obtain ⟨updated,computed,preserved,_⟩ := append_preserves_shape bits capacity state.buffer entry shape space word
+          rw [computed] at appended
+          simp only [resumeDrops,BufferRun.returned.injEq] at appended
+          obtain ⟨_,same⟩ := appended
+          cases same
+          exact ih {state with buffer := buffer} advanced preserved continued
+
+theorem restoration_preserves_shape (bits : Nat) (sizes : String → Nat)
+    (view : α → Path → InitStore) (snapshotView : β → Path → InitStore)
+    (hardView : δ → InitStore) (hardPresence : δ → Path → Bool)
+    (hard : δ) (snapshot : Option β) (source : σ) (output : RecoveryState α β δ)
+    (word : sizes "CAP" < 2^bits)
+    (execution : RecoveryReturns (JarlStorage.state_State_restore bits sizes view snapshotView hardView hardPresence hard snapshot source : RecoveryRun α β δ σ ι) (.ok output)) :
+    Shape output.buffer (sizes "CAP") ∧ output.hard = hard ∧ output.snapshot = snapshot := by
+  unfold JarlStorage.state_State_restore restoreState at execution
+  simp only [JarlStorage.state_State_restore_ir,initializeFields,initialCell] at execution
+  simp at execution
+  split at execution
+  · simp at execution
+  · simp at execution
+  · simp only [recovery_returns_intoIterator] at execution
+    obtain ⟨iterator,execution⟩ := execution
+    exact recovery_loop_shape bits (sizes "CAP") _ view snapshotView hardView hardPresence _
+      ⟨⟨List.replicate (sizes "CAP") none,0⟩,hard,snapshot⟩ output iterator
+      (fresh_representation (α := α) sizes).2 word execution
+
+private theorem recovery_loop_fuel_safe (bits capacity fuel : Nat) (view : α → Path → InitStore)
+    (snapshotView : β → Path → InitStore) (hardView : δ → InitStore) (hardPresence : δ → Path → Bool)
+    (base : InitStore) (state : RecoveryState α β δ) (iterator : ι)
+    (shape : Shape state.buffer capacity) (word : capacity < 2^bits)
+    (enough : capacity < state.buffer.len + fuel) :
+    recoveryFuelSafe (recoveryLoop JarlStorage.state_State_restore_ir bits capacity view snapshotView hardView hardPresence base fuel state iterator : RecoveryRun α β δ σ ι) := by
+  induction fuel generalizing state iterator with
+  | zero => have := shape.2.1;omega
+  | succ fuel ih =>
+    rw [recoveryLoop]
+    change ∀ entry advanced, _
+    intro entry advanced
+    cases entry with
+    | none => exact recovery_finish_fuel_safe _ view snapshotView hardView hardPresence state base
+    | some entry =>
+      dsimp only
+      split
+      · trivial
+      · split
+        · trivial
+        · simp [recoveryFuelSafe]
+        · by_cases space : state.buffer.len < capacity
+          · obtain ⟨buffer,computed,preserved,advanced_length⟩ := append_preserves_shape bits capacity state.buffer entry shape space word
+            have appended : appendBuffer JarlStorage.state_State_restore_ir.append bits capacity state.buffer entry =
+                .returned (.ok ()) buffer := computed
+            rw [appended]
+            simp only [recoveryAppend]
+            exact ih {state with buffer := buffer} advanced preserved (by dsimp;rw [advanced_length];omega)
+          · have full : state.buffer.len = capacity := by have := shape.2.1;omega
+            have appended : appendBuffer JarlStorage.state_State_restore_ir.append bits capacity state.buffer entry =
+                .drop entry state.buffer (.returned (.error "Error::Full") state.buffer) :=
+              full_preserves_state_at_drop bits capacity state.buffer entry full
+            rw [appended]
+            simp [recoveryAppend,recoveryFuelSafe]
+
+theorem restoration_fuel_sufficient (bits : Nat) (sizes : String → Nat)
+    (view : α → Path → InitStore) (snapshotView : β → Path → InitStore)
+    (hardView : δ → InitStore) (hardPresence : δ → Path → Bool)
+    (hard : δ) (snapshot : Option β) (source : σ) (word : sizes "CAP" < 2^bits) :
+    recoveryFuelSafe (JarlStorage.state_State_restore bits sizes view snapshotView hardView hardPresence hard snapshot source : RecoveryRun α β δ σ ι) := by
+  unfold JarlStorage.state_State_restore restoreState
+  simp only [JarlStorage.state_State_restore_ir,initializeFields,initialCell]
+  simp
+  split
+  · trivial
+  · simp [recoveryFuelSafe]
+  · intro iterator
+    exact recovery_loop_fuel_safe bits (sizes "CAP") _ view snapshotView hardView hardPresence _
+      ⟨⟨List.replicate (sizes "CAP") none,0⟩,hard,snapshot⟩ iterator
+      (fresh_representation (α := α) sizes).2 word (by simp)
+
 -- Capacity is part of the history index, so growth is not treated as a fixed
--- capacity assumption. These histories still exclude restore and do not encode protocol reachability.
+-- capacity assumption. These are buffer histories; they do not encode protocol or durable-history reachability.
 inductive StorageHistory (bits : Nat) : Nat → BufferState α → Prop where
   | fresh (capacity : Nat) (word : capacity < 2^bits) :
       StorageHistory bits capacity ⟨List.replicate capacity none, 0⟩
@@ -741,6 +850,14 @@ inductive StorageHistory (bits : Nat) : Nat → BufferState α → Prop where
       StorageHistory bits capacity before.buffer →
       resumeInstallation (JarlStorage.state_State_install bits view snapshotView before input) = .returned after →
       StorageHistory bits capacity after.buffer
+
+  | restore {β δ σ ι : Type} (sizes : String → Nat)
+      (view : α → Path → InitStore) (snapshotView : β → Path → InitStore)
+      (hardView : δ → InitStore) (hardPresence : δ → Path → Bool)
+      (hard : δ) (snapshot : Option β) (source : σ) (output : RecoveryState α β δ) :
+      sizes "CAP" < 2^bits →
+      RecoveryReturns (JarlStorage.state_State_restore bits sizes view snapshotView hardView hardPresence hard snapshot source : RecoveryRun α β δ σ ι) (.ok output) →
+      StorageHistory bits (sizes "CAP") output.buffer
 
 private theorem storage_history_valid (bits capacity : Nat) (state : BufferState α)
     (history : StorageHistory bits capacity state) : Shape state capacity ∧ capacity < 2^bits := by
@@ -769,6 +886,8 @@ private theorem storage_history_valid (bits capacity : Nat) (state : BufferState
     exact ⟨(truncation_preserves_shape view records boundary capacity before next ih.1 execution).1, ih.2⟩
   | @install β capacity before after view snapshotView input previous execution ih =>
     exact ⟨installation_preserves_shape bits capacity view snapshotView before after input ih.1 execution,ih.2⟩
+  | @restore β δ σ ι sizes view snapshotView hardView hardPresence hard snapshot source output word execution =>
+    exact ⟨(restoration_preserves_shape bits sizes view snapshotView hardView hardPresence hard snapshot source output word execution).1,word⟩
 
 theorem history_supports_growth (bits capacity newCapacity : Nat) (state : BufferState α) (metadata : β)
     (history : StorageHistory bits capacity state) (grows : capacity ≤ newCapacity) :
@@ -786,5 +905,39 @@ theorem history_supports_installation (bits capacity : Nat) (view : α → Path 
   have valid := storage_history_valid bits capacity state.buffer history
   have effects := installation_preserves_capacity_and_commit bits view snapshotView state next input execution
   exact ⟨valid.1,installation_preserves_shape bits capacity view snapshotView state next input valid.1 execution,effects.2.2⟩
+
+
+theorem restoration_final_guard (bits : Nat) (sizes : String → Nat)
+    (view : α → Path → InitStore) (snapshotView : β → Path → InitStore)
+    (hardView : δ → InitStore) (hardPresence : δ → Path → Bool)
+    (hard : δ) (snapshot : Option β) (source : σ) (output : RecoveryState α β δ)
+    (execution : RecoveryReturns (JarlStorage.state_State_restore bits sizes view snapshotView hardView hardPresence hard snapshot source : RecoveryRun α β δ σ ι) (.ok output)) :
+    recoveryPredicate JarlStorage.state_State_restore_ir view snapshotView hardView hardPresence
+      ⟨output,selectRecord JarlStorage.state_State_restore_ir.last.base (fun _ => snapshot.map snapshotView),
+        (fun _ => .absent),(fun _ => .absent)⟩ JarlStorage.state_State_restore_ir.finalGuard = .ok false := by
+  unfold JarlStorage.state_State_restore restoreState at execution
+  simp only [JarlStorage.state_State_restore_ir,initializeFields,initialCell] at execution
+  simp at execution
+  split at execution
+  · simp at execution
+  · simp at execution
+  · simp only [recovery_returns_intoIterator] at execution
+    obtain ⟨iterator,execution⟩ := execution
+    exact recovery_loop_final_guard _ bits (sizes "CAP") _ view snapshotView hardView hardPresence _
+      ⟨⟨List.replicate (sizes "CAP") none,0⟩,hard,snapshot⟩ output iterator execution
+
+theorem restoration_places (bits : Nat) (sizes : String → Nat)
+    (view : α → Path → InitStore) (snapshotView : β → Path → InitStore)
+    (hardView : δ → InitStore) (hardPresence : δ → Path → Bool)
+    (hard : δ) (snapshot : Option β) (source : σ) (output : RecoveryState α β δ)
+    (word : sizes "CAP" < 2^bits)
+    (execution : RecoveryReturns (JarlStorage.state_State_restore bits sizes view snapshotView hardView hardPresence hard snapshot source : RecoveryRun α β δ σ ι) (.ok output)) :
+    JarlStorage.state_State_restore_ir.hardPath = ["hard"] ∧
+    JarlStorage.state_State_restore_ir.snapshotPath = ["snapshot"] ∧
+    JarlStorage.state_State_restore_ir.append.slotsPath = ["entries"] ∧
+    JarlStorage.state_State_restore_ir.append.lengthPath = ["len"] ∧
+    JarlStorage.state_State_restore_ir.append.capacityName = "CAP" ∧
+    Shape output.buffer (sizes "CAP") ∧ output.hard = hard ∧ output.snapshot = snapshot := by
+  exact ⟨rfl,rfl,rfl,rfl,rfl,restoration_preserves_shape bits sizes view snapshotView hardView hardPresence hard snapshot source output word execution⟩
 
 end Storage

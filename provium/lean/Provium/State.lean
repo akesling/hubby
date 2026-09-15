@@ -539,4 +539,377 @@ def resumeInstallation : InstallationRun α β → InstallationRun α β
   | .dropSnapshot _ _ _ next => resumeInstallation next
   | result => result
 
+inductive RecoveryValue where
+  | constant (value : Nat)
+  | hard (path : Path)
+  | base (path : Path)
+  | last (path : Path)
+  | entry (path : Path)
+  | callLast (path : Path)
+inductive RecoveryPredicate where
+  | boolean (value : Bool)
+  | and (left right : RecoveryPredicate)
+  | or (left right : RecoveryPredicate)
+  | compare (operation : String) (left right : RecoveryValue)
+  | checkedCompare (equal : Bool) (left : RecoveryValue) (increment : Nat) (right : RecoveryValue)
+  | snapshotPresent
+  | hardPresent (path : Path)
+structure Restoration where
+  constructorFields : List InitField
+  append : BufferAppend
+  last : LastRecord
+  hardPath : Path
+  snapshotPath : Path
+  initialGuard : RecoveryPredicate
+  entryGuard : RecoveryPredicate
+  finalGuard : RecoveryPredicate
+  error : String
+  snapshotFirst : Bool
+structure RecoveryState (α β δ : Type) where
+  buffer : BufferState α
+  hard : δ
+  snapshot : Option β
+structure RecoveryContext (α β δ : Type) where
+  state : RecoveryState α β δ
+  base : InitStore
+  last : InitStore
+  entry : InitStore
+inductive RecoveryReadFault where
+  | input
+  | read (reason : TraversalFault)
+inductive RecoveryFault where
+  | evaluation (reason : RecoveryReadFault)
+  | append (reason : BufferFault)
+  | exhausted
+
+def recoveryRecords (snapshotView : β → Path → InitStore) (state : RecoveryState α β δ) : SelectionStore :=
+  fun _ => state.snapshot.map snapshotView
+
+def recoveryLast (program : Restoration) (view : α → Path → InitStore)
+    (snapshotView : β → Path → InitStore) (state : RecoveryState α β δ) : Except RecoveryReadFault InitStore :=
+  match lastRecord program.last (truncationView view (recoveryRecords snapshotView state) state.buffer) with
+  | .ok record => .ok record
+  | .error reason => .error (.read reason)
+
+def recoveryValue (program : Restoration) (view : α → Path → InitStore)
+    (snapshotView : β → Path → InitStore) (hardView : δ → InitStore)
+    (context : RecoveryContext α β δ) (value : RecoveryValue) : Except RecoveryReadFault Nat := do
+  let selected ← match value with
+    | .constant n => if n < 2^64 then .ok (some n) else .error .input
+    | .hard path => .ok (recordWord (hardView context.state.hard) path)
+    | .base path => .ok (recordWord context.base path)
+    | .last path => .ok (recordWord context.last path)
+    | .entry path => .ok (recordWord context.entry path)
+    | .callLast path => do
+      let record ← recoveryLast program view snapshotView context.state
+      pure (recordWord record path)
+  match selected with
+  | some n => .ok n
+  | none => .error .input
+
+def recoveryPredicate (program : Restoration) (view : α → Path → InitStore)
+    (snapshotView : β → Path → InitStore) (hardView : δ → InitStore) (hardPresence : δ → Path → Bool)
+    (context : RecoveryContext α β δ) : RecoveryPredicate → Except RecoveryReadFault Bool
+  | .boolean b => .ok b
+  | .and first second => do
+    let left ← recoveryPredicate program view snapshotView hardView hardPresence context first
+    if left then recoveryPredicate program view snapshotView hardView hardPresence context second else .ok false
+  | .or first second => do
+    let left ← recoveryPredicate program view snapshotView hardView hardPresence context first
+    if left then .ok true else recoveryPredicate program view snapshotView hardView hardPresence context second
+  | .snapshotPresent => .ok context.state.snapshot.isSome
+  | .hardPresent path => .ok (hardPresence context.state.hard path)
+  | .compare operation first second => do
+    let left ← recoveryValue program view snapshotView hardView context first
+    let right ← recoveryValue program view snapshotView hardView context second
+    match operation with
+    | "eq" => .ok (decide (left = right))
+    | "ne" => .ok (decide (left ≠ right))
+    | "lt" => .ok (decide (left < right))
+    | "le" => .ok (decide (left ≤ right))
+    | "gt" => .ok (decide (left > right))
+    | "ge" => .ok (decide (left ≥ right))
+    | _ => .error .input
+  | .checkedCompare equal first increment second => do
+    let left ← recoveryValue program view snapshotView hardView context first
+    if increment ≥ 2^64 then .error .input else
+    let right ← recoveryValue program view snapshotView hardView context second
+    let sum := if left + increment < 2^64 then some (left + increment) else none
+    .ok ((sum == some right) == equal)
+
+-- Opaque source and iterator handles have separate ownership. Each callback may
+-- fail to return; following its continuation is an explicit environment action.
+inductive RecoveryRun (α β δ σ ι : Type) where
+  | returned (result : Except String (RecoveryState α β δ))
+  | invalidRepresentation (hard : δ) (snapshot : Option β) (source : σ)
+  | fault (reason : RecoveryFault) (state : RecoveryState α β δ)
+      (entry : Option α) (source : Option σ) (iterator : Option ι)
+  | intoIterator (source : σ) (state : RecoveryState α β δ) (next : ι → RecoveryRun α β δ σ ι)
+  | next (iterator : ι) (state : RecoveryState α β δ) (resume : Option α → ι → RecoveryRun α β δ σ ι)
+  | dropEntry (payload : α) (next : RecoveryRun α β δ σ ι)
+  | dropSnapshot (payload : β) (next : RecoveryRun α β δ σ ι)
+  | dropSource (source : σ) (next : RecoveryRun α β δ σ ι)
+  | dropIterator (iterator : ι) (next : RecoveryRun α β δ σ ι)
+
+def dropRecoveryEntries (entries : List (Option α)) (next : RecoveryRun α β δ σ ι) : RecoveryRun α β δ σ ι :=
+  match entries with
+  | [] => next
+  | none :: rest => dropRecoveryEntries rest next
+  | some payload :: rest => .dropEntry payload (dropRecoveryEntries rest next)
+
+def dropRecoverySnapshot (snapshot : Option β) (next : RecoveryRun α β δ σ ι) : RecoveryRun α β δ σ ι :=
+  match snapshot with
+  | none => next
+  | some payload => .dropSnapshot payload next
+
+def dropRecoveryState (program : Restoration) (state : RecoveryState α β δ)
+    (next : RecoveryRun α β δ σ ι) : RecoveryRun α β δ σ ι :=
+  if program.snapshotFirst then
+    dropRecoverySnapshot state.snapshot (dropRecoveryEntries state.buffer.slots next)
+  else dropRecoveryEntries state.buffer.slots (dropRecoverySnapshot state.snapshot next)
+
+def recoveryFinish (program : Restoration) (view : α → Path → InitStore)
+    (snapshotView : β → Path → InitStore) (hardView : δ → InitStore) (hardPresence : δ → Path → Bool)
+    (state : RecoveryState α β δ) (base : InitStore) : RecoveryRun α β δ σ ι :=
+  match recoveryPredicate program view snapshotView hardView hardPresence
+      ⟨state,base,(fun _ => .absent),(fun _ => .absent)⟩ program.finalGuard with
+  | .error reason => .fault (.evaluation reason) state none none none
+  | .ok true => dropRecoveryState program state (.returned (.error program.error))
+  | .ok false => .returned (.ok state)
+
+def recoveryAppend (program : Restoration) (state : RecoveryState α β δ) (iterator : ι)
+    (resume : RecoveryState α β δ → RecoveryRun α β δ σ ι) : BufferRun α → RecoveryRun α β δ σ ι
+  | .returned (.ok ()) next => resume {state with buffer := next}
+  | .returned (.error error) next =>
+    .dropIterator iterator (dropRecoveryState program {state with buffer := next} (.returned (.error error)))
+  | .fault reason next => .fault (.append reason) {state with buffer := next} none none (some iterator)
+  | .drop payload _ next => .dropEntry payload (recoveryAppend program state iterator resume next)
+
+def recoveryLoop (program : Restoration) (bits capacity : Nat) (view : α → Path → InitStore)
+    (snapshotView : β → Path → InitStore) (hardView : δ → InitStore) (hardPresence : δ → Path → Bool)
+    (base : InitStore) : Nat → RecoveryState α β δ → ι → RecoveryRun α β δ σ ι
+  | 0, state, iterator => .fault .exhausted state none none (some iterator)
+  | fuel + 1, state, iterator => .next iterator state fun response iterator =>
+    match response with
+    | none => .dropIterator iterator (recoveryFinish program view snapshotView hardView hardPresence state base)
+    | some entry => match recoveryLast program view snapshotView state with
+      | .error reason => .fault (.evaluation reason) state (some entry) none (some iterator)
+      | .ok last =>
+        match recoveryPredicate program view snapshotView hardView hardPresence
+            ⟨state,base,last,view entry program.last.recordField⟩ program.entryGuard with
+        | .error reason => .fault (.evaluation reason) state (some entry) none (some iterator)
+        | .ok true => .dropEntry entry (.dropIterator iterator
+            (dropRecoveryState program state (.returned (.error program.error))))
+        | .ok false => recoveryAppend program state iterator
+            (fun next => recoveryLoop program bits capacity view snapshotView hardView hardPresence base fuel next iterator)
+            (appendBuffer program.append bits capacity state.buffer entry)
+
+def restoreState (program : Restoration) (bits : Nat) (sizes : String → Nat)
+    (view : α → Path → InitStore) (snapshotView : β → Path → InitStore)
+    (hardView : δ → InitStore) (hardPresence : δ → Path → Bool)
+    (hard : δ) (snapshot : Option β) (source : σ) : RecoveryRun α β δ σ ι :=
+  let initial := initializeFields program.constructorFields sizes
+  match initial program.append.slotsPath,initial program.append.lengthPath with
+  | .slots slots,.unsigned ty length =>
+    if ty ≠ "usize" ∨ length ≥ 2^bits ∨ ¬ slots.all Option.isNone then
+      .invalidRepresentation hard snapshot source
+    else
+      let state : RecoveryState α β δ := ⟨⟨slots.map (fun _ => none),length⟩,hard,snapshot⟩
+      let base := selectRecord program.last.base (recoveryRecords snapshotView state)
+      match recoveryPredicate program view snapshotView hardView hardPresence
+          ⟨state,base,(fun _ => .absent),(fun _ => .absent)⟩ program.initialGuard with
+      | .error reason => .fault (.evaluation reason) state none (some source) none
+      | .ok true => dropRecoveryState program state (.dropSource source (.returned (.error program.error)))
+      | .ok false => .intoIterator source state fun iterator =>
+        recoveryLoop program bits (sizes program.append.capacityName) view snapshotView hardView hardPresence base
+          (sizes program.append.capacityName + 1) state iterator
+  | _,_ => .invalidRepresentation hard snapshot source
+
+-- A finite execution in which the invoked consumer callbacks return normally.
+-- The response values remain arbitrary; no particular iterator implementation,
+-- ordered input, finite source collection or infallible callback is assumed.
+inductive RecoveryReturns : RecoveryRun α β δ σ ι → Except String (RecoveryState α β δ) → Prop where
+  | returned (result) : RecoveryReturns (.returned result) result
+  | intoIterator (source state next iterator result) :
+      RecoveryReturns (next iterator) result → RecoveryReturns (.intoIterator source state next) result
+  | next (iterator state resume entry advanced result) :
+      RecoveryReturns (resume entry advanced) result → RecoveryReturns (.next iterator state resume) result
+  | dropEntry (payload next result) : RecoveryReturns next result → RecoveryReturns (.dropEntry payload next) result
+  | dropSnapshot (payload next result) : RecoveryReturns next result → RecoveryReturns (.dropSnapshot payload next) result
+  | dropSource (source next result) : RecoveryReturns next result → RecoveryReturns (.dropSource source next) result
+  | dropIterator (iterator next result) : RecoveryReturns next result → RecoveryReturns (.dropIterator iterator next) result
+
+@[simp] theorem recovery_returns_returned (a b : Except String (RecoveryState α β δ)) :
+    RecoveryReturns (RecoveryRun.returned a : RecoveryRun α β δ σ ι) b ↔ a = b := by
+  constructor
+  · intro execution
+    cases execution
+    rfl
+  · intro equal
+    cases equal
+    exact .returned _
+@[simp] theorem recovery_returns_fault (reason : RecoveryFault) (state : RecoveryState α β δ)
+    (entry : Option α) (source : Option σ) (iterator : Option ι) (result) :
+    ¬ RecoveryReturns (.fault reason state entry source iterator) result := by
+  intro execution
+  cases execution
+@[simp] theorem recovery_returns_invalid (hard : δ) (snapshot : Option β) (source : σ) (result) :
+    ¬ RecoveryReturns (RecoveryRun.invalidRepresentation hard snapshot source : RecoveryRun α β δ σ ι) result := by
+  intro execution
+  cases execution
+@[simp] theorem recovery_returns_dropEntry (payload : α) (next : RecoveryRun α β δ σ ι) (result) :
+    RecoveryReturns (.dropEntry payload next) result ↔ RecoveryReturns next result := by
+  constructor
+  · intro execution
+    cases execution
+    assumption
+  · exact .dropEntry payload next result
+@[simp] theorem recovery_returns_dropSnapshot (payload : β) (next : RecoveryRun α β δ σ ι) (result) :
+    RecoveryReturns (.dropSnapshot payload next) result ↔ RecoveryReturns next result := by
+  constructor
+  · intro execution
+    cases execution
+    assumption
+  · exact .dropSnapshot payload next result
+@[simp] theorem recovery_returns_dropSource (source : σ) (next : RecoveryRun α β δ σ ι) (result) :
+    RecoveryReturns (.dropSource source next) result ↔ RecoveryReturns next result := by
+  constructor
+  · intro execution
+    cases execution
+    assumption
+  · exact .dropSource source next result
+@[simp] theorem recovery_returns_dropIterator (iterator : ι) (next : RecoveryRun α β δ σ ι) (result) :
+    RecoveryReturns (.dropIterator iterator next) result ↔ RecoveryReturns next result := by
+  constructor
+  · intro execution
+    cases execution
+    assumption
+  · exact .dropIterator iterator next result
+@[simp] theorem recovery_returns_dropEntries (entries : List (Option α)) (next : RecoveryRun α β δ σ ι) (result) :
+    RecoveryReturns (dropRecoveryEntries entries next) result ↔ RecoveryReturns next result := by
+  induction entries with
+  | nil => rfl
+  | cons entry rest ih => cases entry <;> simp [dropRecoveryEntries,ih]
+@[simp] theorem recovery_returns_dropSaved (snapshot : Option β) (next : RecoveryRun α β δ σ ι) (result) :
+    RecoveryReturns (dropRecoverySnapshot snapshot next) result ↔ RecoveryReturns next result := by
+  cases snapshot <;> simp [dropRecoverySnapshot]
+@[simp] theorem recovery_returns_dropState (program : Restoration) (state : RecoveryState α β δ)
+    (next : RecoveryRun α β δ σ ι) (result) :
+    RecoveryReturns (dropRecoveryState program state next) result ↔ RecoveryReturns next result := by
+  unfold dropRecoveryState
+  split <;> simp
+@[simp] theorem recovery_returns_intoIterator (source : σ) (state : RecoveryState α β δ)
+    (next : ι → RecoveryRun α β δ σ ι) (result) :
+    RecoveryReturns (.intoIterator source state next) result ↔ ∃ iterator, RecoveryReturns (next iterator) result := by
+  constructor
+  · intro execution
+    cases execution
+    rename_i iterator execution
+    exact ⟨iterator,execution⟩
+  · rintro ⟨iterator,execution⟩
+    exact .intoIterator source state next iterator result execution
+@[simp] theorem recovery_returns_next (iterator : ι) (state : RecoveryState α β δ)
+    (resume : Option α → ι → RecoveryRun α β δ σ ι) (result) :
+    RecoveryReturns (.next iterator state resume) result ↔
+      ∃ entry advanced, RecoveryReturns (resume entry advanced) result := by
+  constructor
+  · intro execution
+    cases execution
+    rename_i entry advanced execution
+    exact ⟨entry,advanced,execution⟩
+  · rintro ⟨entry,advanced,execution⟩
+    exact .next iterator state resume entry advanced result execution
+
+theorem recovery_append_success (program : Restoration) (state output : RecoveryState α β δ) (iterator : ι)
+    (resume : RecoveryState α β δ → RecoveryRun α β δ σ ι) (run : BufferRun α)
+    (execution : RecoveryReturns (recoveryAppend program state iterator resume run) (.ok output)) :
+    ∃ buffer, resumeDrops run = .returned (.ok ()) buffer ∧
+      RecoveryReturns (resume {state with buffer := buffer}) (.ok output) := by
+  induction run with
+  | returned result buffer =>
+    cases result with
+    | ok value => cases value; exact ⟨buffer,rfl,execution⟩
+    | error error => simp [recoveryAppend] at execution
+  | fault reason buffer => simp [recoveryAppend] at execution
+  | drop payload before next ih =>
+    simp only [recoveryAppend,recovery_returns_dropEntry] at execution
+    obtain ⟨buffer,returned,continued⟩ := ih execution
+    exact ⟨buffer,returned,continued⟩
+
+theorem recovery_finish_success (program : Restoration) (view : α → Path → InitStore)
+    (snapshotView : β → Path → InitStore) (hardView : δ → InitStore) (hardPresence : δ → Path → Bool)
+    (state output : RecoveryState α β δ) (base : InitStore)
+    (execution : RecoveryReturns (recoveryFinish program view snapshotView hardView hardPresence state base : RecoveryRun α β δ σ ι) (.ok output)) :
+    state = output ∧ recoveryPredicate program view snapshotView hardView hardPresence
+      ⟨state,base,(fun _ => .absent),(fun _ => .absent)⟩ program.finalGuard = .ok false := by
+  cases decision : recoveryPredicate program view snapshotView hardView hardPresence
+      ⟨state,base,(fun _ => .absent),(fun _ => .absent)⟩ program.finalGuard with
+  | error reason => simp [recoveryFinish,decision] at execution
+  | ok rejected =>
+    cases rejected
+    · simp only [recoveryFinish,decision,recovery_returns_returned,Except.ok.injEq] at execution
+      exact ⟨execution,rfl⟩
+    · simp [recoveryFinish,decision] at execution
+
+-- No interpreter-fuel exhaustion on any branch, including every possible normal
+-- callback response. Other faults are deliberately not conflated with exhaustion.
+def recoveryFuelSafe : RecoveryRun α β δ σ ι → Prop
+  | .returned _ => True
+  | .invalidRepresentation _ _ _ => True
+  | .fault reason _ _ _ _ => match reason with | .exhausted => False | _ => True
+  | .intoIterator _ _ next => ∀ iterator, recoveryFuelSafe (next iterator)
+  | .next _ _ resume => ∀ entry advanced, recoveryFuelSafe (resume entry advanced)
+  | .dropEntry _ next => recoveryFuelSafe next
+  | .dropSnapshot _ next => recoveryFuelSafe next
+  | .dropSource _ next => recoveryFuelSafe next
+  | .dropIterator _ next => recoveryFuelSafe next
+@[simp] theorem recovery_fuel_drop_entries (entries : List (Option α)) (next : RecoveryRun α β δ σ ι) :
+    recoveryFuelSafe (dropRecoveryEntries entries next) ↔ recoveryFuelSafe next := by
+  induction entries with
+  | nil => rfl
+  | cons entry rest ih => cases entry <;> simp [dropRecoveryEntries,recoveryFuelSafe,ih]
+@[simp] theorem recovery_fuel_drop_saved (snapshot : Option β) (next : RecoveryRun α β δ σ ι) :
+    recoveryFuelSafe (dropRecoverySnapshot snapshot next) ↔ recoveryFuelSafe next := by
+  cases snapshot <;> simp [dropRecoverySnapshot,recoveryFuelSafe]
+@[simp] theorem recovery_fuel_drop_state (program : Restoration) (state : RecoveryState α β δ)
+    (next : RecoveryRun α β δ σ ι) :
+    recoveryFuelSafe (dropRecoveryState program state next) ↔ recoveryFuelSafe next := by
+  unfold dropRecoveryState
+  split <;> simp
+
+theorem recovery_finish_fuel_safe (program : Restoration) (view : α → Path → InitStore)
+    (snapshotView : β → Path → InitStore) (hardView : δ → InitStore) (hardPresence : δ → Path → Bool)
+    (state : RecoveryState α β δ) (base : InitStore) :
+    recoveryFuelSafe (recoveryFinish program view snapshotView hardView hardPresence state base : RecoveryRun α β δ σ ι) := by
+  unfold recoveryFinish
+  split <;> simp [recoveryFuelSafe]
+
+theorem recovery_loop_final_guard (program : Restoration) (bits capacity fuel : Nat)
+    (view : α → Path → InitStore) (snapshotView : β → Path → InitStore)
+    (hardView : δ → InitStore) (hardPresence : δ → Path → Bool) (base : InitStore)
+    (state output : RecoveryState α β δ) (iterator : ι)
+    (execution : RecoveryReturns (recoveryLoop program bits capacity view snapshotView hardView hardPresence base fuel state iterator : RecoveryRun α β δ σ ι) (.ok output)) :
+    recoveryPredicate program view snapshotView hardView hardPresence
+      ⟨output,base,(fun _ => .absent),(fun _ => .absent)⟩ program.finalGuard = .ok false := by
+  induction fuel generalizing state iterator with
+  | zero => simp [recoveryLoop] at execution
+  | succ fuel ih =>
+    simp only [recoveryLoop,recovery_returns_next] at execution
+    obtain ⟨entry,advanced,execution⟩ := execution
+    cases entry with
+    | none =>
+      simp only [recovery_returns_dropIterator] at execution
+      obtain ⟨same,decision⟩ := recovery_finish_success program view snapshotView hardView hardPresence state output base execution
+      cases same
+      exact decision
+    | some entry =>
+      dsimp only at execution
+      split at execution
+      · simp at execution
+      · split at execution
+        · simp at execution
+        · simp at execution
+        · obtain ⟨buffer,_,continued⟩ := recovery_append_success program state output advanced _ _ execution
+          exact ih {state with buffer := buffer} advanced continued
+
 end Provium.State

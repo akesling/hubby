@@ -6,7 +6,8 @@
     "state::State::new",
     "state::State::grow",
     "state::State::truncate",
-    "state::State::install"
+    "state::State::install",
+    "state::State::restore"
   ],
   "proofs": "Proofs.lean",
   "obligations": [
@@ -93,6 +94,22 @@
     {
       "theorem": "Storage.history_supports_installation",
       "function": "state_State_install"
+    },
+    {
+      "theorem": "Storage.restoration_preserves_shape",
+      "function": "state_State_restore"
+    },
+    {
+      "theorem": "Storage.restoration_fuel_sufficient",
+      "function": "state_State_restore"
+    },
+    {
+      "theorem": "Storage.restoration_final_guard",
+      "function": "state_State_restore"
+    },
+    {
+      "theorem": "Storage.restoration_places",
+      "function": "state_State_restore"
     }
   ]
 }
