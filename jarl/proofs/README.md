@@ -181,5 +181,8 @@ Growth and truncation preserve this logical representation: growth retains the
 chain, and truncation retains an ordered prefix. Append preserves the chain under explicit successor/term preconditions.
 Truncation proves an exact retained length and protects committed entries when
 the boundary is above commit; append protects the existing committed prefix.
-Discharging these conditions in every protocol caller, proving installation,
+Matching installation preserves the ordered suffix and its exact payloads using
+the actual lookup and index/term equality. Mismatching installation establishes
+an empty log and in-range commit when the snapshot covers the old commit.
+Discharging these conditions in every protocol caller and proving snapshot provenance,
 valid durable recovery, protocol safety and Rust memory refinement remain open.

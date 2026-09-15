@@ -460,9 +460,9 @@ private theorem clear_installation_exact (program : Installation) (snapshotView 
       rw [step]
       simp [List.replicate_succ,List.append_assoc]
 
-theorem installation_matching_suffix (bits base commit : Nat) (view : α → Path → InitStore)
+theorem installation_matching_suffix_by_equality (bits base commit : Nat) (view : α → Path → InitStore)
     (snapshotView : β → Path → InitStore) (removed retained padding : List (Option α))
-    (saved : Option β) (input : β) (words : List Nat)
+    (saved : Option β) (input : β) (found : Option InitStore)
     (index_value : snapshotView input ["last"] ["index"] = .unsigned "u64" (base + removed.length))
     (index_valid : base + removed.length < 2^64) (word_bound : removed.length < 2^bits)
     (commit_valid : commit < 2^64)
@@ -471,8 +471,8 @@ theorem installation_matching_suffix (bits base commit : Nat) (view : α → Pat
       ["index"] = .unsigned "u64" base)
     (matched : recordAt JarlStorage.state_State_install_ir.recordAt bits
       (installationView view snapshotView ⟨⟨removed ++ retained ++ padding,removed.length + retained.length⟩,commit,saved⟩)
-      (base + removed.length) = .ok (some (snapshotView input ["last"])))
-    (values : recordWords (snapshotView input ["last"]) [["index"],["term"]] = some words) :
+      (base + removed.length) = .ok found)
+    (equal : recordEquality found (snapshotView input ["last"]) [["index"],["term"]] = some true) :
     resumeInstallation (JarlStorage.state_State_install bits view snapshotView
       ⟨⟨removed ++ retained ++ padding,removed.length + retained.length⟩,commit,saved⟩ input) =
       .returned ⟨⟨retained ++ List.replicate (removed.length + padding.length) none,retained.length⟩,
@@ -489,8 +489,8 @@ theorem installation_matching_suffix (bits base commit : Nat) (view : α → Pat
   unfold JarlStorage.state_State_install installSnapshot
   simp only [show JarlStorage.state_State_install_ir.recordField = ["last"] by rfl,
     show JarlStorage.state_State_install_ir.indexField = ["index"] by rfl,
-    input_word,matched,recordEquality,show JarlStorage.state_State_install_ir.equalityFields = [["index"],["term"]] by rfl,values]
-  simp only [bind, pure, Option.bind, beq_self_eq_true,show JarlStorage.state_State_install_ir.equal = true by rfl,if_true,
+    input_word,matched,show JarlStorage.state_State_install_ir.equalityFields = [["index"],["term"]] by rfl,equal]
+  simp only [beq_self_eq_true,show JarlStorage.state_State_install_ir.equal = true by rfl,if_true,
     show JarlStorage.state_State_install_ir.baseIndexField = ["index"] by rfl,base_word]
   have subtraction : base + removed.length - base = removed.length := by omega
   have no_underflow : ¬ base + removed.length < base := by omega
@@ -515,6 +515,27 @@ theorem installation_matching_suffix (bits base commit : Nat) (view : α → Pat
   have bound : ¬ commit ≥ 2^64 := by omega
   simp only [bound,if_false,show JarlStorage.state_State_install_ir.maximum = true by rfl,if_true]
   cases saved <;> rfl
+
+theorem installation_matching_suffix (bits base commit : Nat) (view : α → Path → InitStore)
+    (snapshotView : β → Path → InitStore) (removed retained padding : List (Option α))
+    (saved : Option β) (input : β) (words : List Nat)
+    (index_value : snapshotView input ["last"] ["index"] = .unsigned "u64" (base + removed.length))
+    (index_valid : base + removed.length < 2^64) (word_bound : removed.length < 2^bits)
+    (commit_valid : commit < 2^64)
+    (base_value : selectRecord JarlStorage.state_State_install_ir.recordAt.lookup.base
+      (installationView view snapshotView ⟨⟨removed ++ retained ++ padding,removed.length + retained.length⟩,commit,saved⟩).records
+      ["index"] = .unsigned "u64" base)
+    (matched : recordAt JarlStorage.state_State_install_ir.recordAt bits
+      (installationView view snapshotView ⟨⟨removed ++ retained ++ padding,removed.length + retained.length⟩,commit,saved⟩)
+      (base + removed.length) = .ok (some (snapshotView input ["last"])))
+    (values : recordWords (snapshotView input ["last"]) [["index"],["term"]] = some words) :
+    resumeInstallation (JarlStorage.state_State_install bits view snapshotView
+      ⟨⟨removed ++ retained ++ padding,removed.length + retained.length⟩,commit,saved⟩ input) =
+      .returned ⟨⟨retained ++ List.replicate (removed.length + padding.length) none,retained.length⟩,
+        max commit (base + removed.length),some input⟩ := by
+  apply installation_matching_suffix_by_equality bits base commit view snapshotView removed retained padding saved input
+    (some (snapshotView input ["last"])) index_value index_valid word_bound commit_valid base_value matched
+  simp [recordEquality,values,bind,pure,Option.bind]
 
 theorem installation_mismatching_prefix (bits index commit : Nat) (view : α → Path → InitStore)
     (snapshotView : β → Path → InitStore) (retained padding : List (Option α))
@@ -1505,5 +1526,184 @@ theorem append_preserves_committed_prefix (bits capacity baseIndex commit : Nat)
   have identical := (BufferRun.returned.inj same).2
   subst framed
   exact ⟨next,execution,by omega,fun position inside => unchanged position (by omega)⟩
+
+private theorem ordered_split (view : α → Path → InitStore) (hard base : InitStore)
+    (entries : List α) (last : InitStore) (chain : OrderedEntries view hard base entries last) :
+    ∀ count, count ≤ entries.length → ∃ middle,
+      OrderedEntries view hard base (entries.take count) middle ∧
+      OrderedEntries view hard middle (entries.drop count) last := by
+  induction chain with
+  | empty => intro count bound; exact ⟨base,by simpa using OrderedEntries.empty,by simpa using OrderedEntries.empty⟩
+  | @snoc entries previous entry previousIndex index previousTerm term hardTerm chain previousRead indexRead previousTermRead termRead hardRead successor range positive monotone upper ih =>
+    intro count bound
+    by_cases earlier : count ≤ entries.length
+    · obtain ⟨middle,left,right⟩ := ih count earlier
+      refine ⟨middle,?_,?_⟩
+      · simpa only [List.take_append_of_le_length earlier] using left
+      · rw [List.drop_append_of_le_length earlier]
+        exact .snoc entry previousIndex index previousTerm term hardTerm right previousRead indexRead previousTermRead termRead hardRead successor range positive monotone upper
+    · have full : (entries ++ [entry]).length ≤ count := by simp only [List.length_append,List.length_singleton] at bound ⊢;omega
+      rw [List.take_of_length_le full,List.drop_of_length_le full]
+      exact ⟨view entry ["id"],.snoc entry previousIndex index previousTerm term hardTerm chain previousRead indexRead previousTermRead termRead hardRead successor range positive monotone upper,.empty⟩
+
+private theorem record_at_live_offset (bits baseIndex offset : Nat) (state : LookupStore (Path → InitStore))
+    (entry : Path → InitStore)
+    (baseRead : selectRecord JarlStorage.state_State_install_ir.recordAt.lookup.base state.records ["index"] = .unsigned "u64" baseIndex)
+    (range : baseIndex + offset + 1 < 2^64) (word : offset < 2^bits)
+    (present : (state.slots ["entries"])[offset]? = some (some entry)) :
+    recordAt JarlStorage.state_State_install_ir.recordAt bits state (baseIndex + offset + 1) = .ok (some (entry ["id"])) := by
+  have indexRange : ¬ baseIndex + offset + 1 ≥ 2^64 := by omega
+  have baseRange : ¬ baseIndex ≥ 2^64 := by omega
+  have before : ¬ baseIndex + offset + 1 < baseIndex := by omega
+  have equal : ¬ baseIndex + offset + 1 = baseIndex := by omega
+  have bias : ¬ baseIndex + offset + 1 - baseIndex < 1 := by omega
+  have position : baseIndex + offset + 1 - baseIndex - 1 = offset := by omega
+  have offsetRange : ¬ offset ≥ 2^bits := by omega
+  simp only [recordAt,show JarlStorage.state_State_install_ir.recordAt.guardField = ["index"] by rfl,baseRead]
+  simp only [indexRange,baseRange,ne_eq,false_or,not_true_eq_false,if_false,
+    show JarlStorage.state_State_install_ir.recordAt.equal = true by rfl,equal,decide_false]
+  simp only [lookupRecord,show JarlStorage.state_State_install_ir.recordAt.lookup.baseField = ["index"] by rfl,baseRead]
+  simp [JarlStorage.state_State_install_ir,indexRange,baseRange,before,bias,position,offsetRange,present]
+
+private theorem ordered_boundary_lookup (bits baseIndex : Nat) (view : α → Path → InitStore)
+    (records : SelectionStore) (hard base last : InitStore) (removed retained : List α) (padding : Nat)
+    (slots : List (Option α))
+    (selected : selectRecord JarlStorage.state_State_install_ir.recordAt.lookup.base records = base)
+    (baseRead : recordWord base ["index"] = some baseIndex)
+    (chain : OrderedEntries view hard base removed last)
+    (slotRep : slots = removed.map some ++ retained.map some ++ List.replicate padding none)
+    (range : baseIndex + removed.length < 2^64) (word : removed.length < 2^bits) :
+    recordAt JarlStorage.state_State_install_ir.recordAt bits
+      ⟨records,fun _ => slots.map (Option.map view)⟩ (baseIndex + removed.length) = .ok (some last) := by
+  have baseValue := (record_word_read base ["index"] baseIndex baseRead).1
+  cases chain with
+  | empty =>
+    simp only [List.length_nil,Nat.add_zero,recordAt,show JarlStorage.state_State_install_ir.recordAt.guardField = ["index"] by rfl,selected,baseValue]
+    simp [JarlStorage.state_State_install_ir,show ¬ baseIndex ≥ 2^64 by omega]
+  | @snoc front previous entry previousIndex index previousTerm term hardTerm chain previousRead indexRead previousTermRead termRead hardRead successor indexRange positive monotone upper =>
+    have present : (slots.map (Option.map view))[front.length]? = some (some (view entry)) := by
+      rw [slotRep]
+      simp only [List.map_append,List.map_cons,List.map_nil]
+      rw [List.getElem?_append_left (by simp),List.getElem?_append_left (by simp),List.getElem?_append_right (by simp)]
+      simp
+    have fetched := record_at_live_offset bits baseIndex front.length
+      ⟨records,fun _ => slots.map (Option.map view)⟩ (view entry) (by simpa [selected] using baseValue)
+      (by simpa [Nat.add_assoc] using range) (by simp only [List.length_append,List.length_singleton] at word;omega) present
+    simpa [Nat.add_assoc] using fetched
+private def SameLogId (left right : InitStore) : Prop :=
+  recordWord left ["index"] = recordWord right ["index"] ∧ recordWord left ["term"] = recordWord right ["term"]
+
+private theorem equality_log_id (left right : InitStore)
+    (equal : recordEquality (some left) right [["index"],["term"]] = some true) : SameLogId left right := by
+  cases li : recordWord left ["index"] <;>
+    cases lt : recordWord left ["term"] <;>
+    cases ri : recordWord right ["index"] <;>
+    cases rt : recordWord right ["term"] <;>
+    simp_all [recordEquality,recordWords,SameLogId,bind,pure,Option.bind]
+
+private theorem ordered_rebase (view : α → Path → InitStore) (hard base newBase : InitStore)
+    (entries : List α) (last : InitStore) (chain : OrderedEntries view hard base entries last)
+    (same : SameLogId base newBase) :
+    ∃ newLast, OrderedEntries view hard newBase entries newLast ∧ SameLogId last newLast := by
+  induction chain with
+  | empty => exact ⟨newBase,.empty,same⟩
+  | @snoc entries previous entry previousIndex index previousTerm term hardTerm chain previousRead indexRead previousTermRead termRead hardRead successor range positive monotone upper ih =>
+    obtain ⟨newPrevious,newChain,previousSame⟩ := ih
+    exact ⟨view entry ["id"],.snoc entry previousIndex index previousTerm term hardTerm newChain
+      (previousSame.1.symm.trans previousRead) indexRead (previousSame.2.symm.trans previousTermRead) termRead hardRead successor range positive monotone upper,⟨rfl,rfl⟩⟩
+private def splitBuffer (removed retained : List α) (padding : Nat) : BufferState α :=
+  ⟨removed.map some ++ retained.map some ++ List.replicate padding none,removed.length + retained.length⟩
+
+theorem installation_matching_preserves_log (bits capacity baseIndex commit : Nat)
+    (view : α → Path → InitStore) (snapshotView : β → Path → InitStore)
+    (hard base last : InitStore) (removed retained : List α) (padding : Nat)
+    (saved : Option β) (input : β) (found : Option InitStore)
+    (shape : Shape (splitBuffer removed retained padding) capacity)
+    (chain : OrderedEntries view hard base (removed ++ retained) last)
+    (selected : selectRecord JarlStorage.state_State_install_ir.recordAt.lookup.base
+      (installationView view snapshotView ⟨splitBuffer removed retained padding,commit,saved⟩).records = base)
+    (baseRead : recordWord base ["index"] = some baseIndex)
+    (inputRead : recordWord (snapshotView input ["last"]) ["index"] = some (baseIndex + removed.length))
+    (word : removed.length < 2^bits) (commitWord : commit < 2^64)
+    (commitBound : commit ≤ baseIndex + removed.length + retained.length)
+    (matched : recordAt JarlStorage.state_State_install_ir.recordAt bits
+      (installationView view snapshotView ⟨splitBuffer removed retained padding,commit,saved⟩)
+      (baseIndex + removed.length) = .ok found)
+    (equal : recordEquality found (snapshotView input ["last"]) [["index"],["term"]] = some true) :
+    ∃ next, resumeInstallation (JarlStorage.state_State_install bits view snapshotView
+        ⟨splitBuffer removed retained padding,commit,saved⟩ input) = .returned next ∧
+      LogRep view hard (snapshotView input ["last"]) next.buffer capacity ∧
+      next.snapshot = some input ∧ next.commit = max commit (baseIndex + removed.length) ∧
+      baseIndex + removed.length ≤ next.commit ∧ next.commit ≤ baseIndex + removed.length + next.buffer.len ∧
+      ∀ position, position < next.buffer.len →
+        next.buffer.slots[position]? = (splitBuffer removed retained padding).slots[removed.length + position]? := by
+  obtain ⟨middle,front,back⟩ := ordered_split view hard base (removed ++ retained) last chain removed.length (by simp)
+  simp only [List.take_left,List.drop_left] at front back
+  obtain ⟨inputValue,inputRange⟩ := record_word_read _ _ _ inputRead
+  have baseValue := (record_word_read base ["index"] baseIndex baseRead).1
+  have boundaryLookup := ordered_boundary_lookup bits baseIndex view
+    (installationView view snapshotView ⟨splitBuffer removed retained padding,commit,saved⟩).records
+    hard base middle removed retained padding (splitBuffer removed retained padding).slots selected baseRead front rfl inputRange word
+  change recordAt JarlStorage.state_State_install_ir.recordAt bits
+    (installationView view snapshotView ⟨splitBuffer removed retained padding,commit,saved⟩)
+    (baseIndex + removed.length) = .ok (some middle) at boundaryLookup
+  have foundEq : found = some middle := Except.ok.inj (matched.symm.trans boundaryLookup)
+  have same := equality_log_id middle (snapshotView input ["last"]) (by simpa only [foundEq] using equal)
+  obtain ⟨newLast,rebased,_⟩ := ordered_rebase view hard middle (snapshotView input ["last"]) retained last back same
+  have selectedValue := (congrArg (fun record => record ["index"]) selected).trans baseValue
+  have result := installation_matching_suffix_by_equality bits baseIndex commit view snapshotView
+    (removed.map some) (retained.map some) (List.replicate padding none) saved input found
+    (by simpa using inputValue) (by simpa using inputRange) (by simpa using word) commitWord
+    (by simpa only [splitBuffer,List.length_map] using selectedValue) (by simpa [splitBuffer] using matched) equal
+  simp only [List.length_map,List.length_replicate] at result
+  let next : InstallationState α β :=
+    ⟨⟨retained.map some ++ List.replicate (removed.length + padding) none,retained.length⟩,
+      max commit (baseIndex + removed.length),some input⟩
+  have execution : resumeInstallation (JarlStorage.state_State_install bits view snapshotView
+      ⟨splitBuffer removed retained padding,commit,saved⟩ input) = .returned next := result
+  have nextShape := installation_preserves_shape bits capacity view snapshotView
+    ⟨splitBuffer removed retained padding,commit,saved⟩ next input shape execution
+  have size := shape.1
+  simp only [splitBuffer,List.length_append,List.length_map,List.length_replicate] at size
+  have paddingEq : removed.length + padding = capacity - retained.length := by omega
+  refine ⟨next,execution,⟨nextShape,retained,newLast,?_,rfl,rebased⟩,rfl,rfl,?_,?_,?_⟩
+  · dsimp [next]
+    rw [paddingEq]
+  · dsimp [next];omega
+  · dsimp [next];omega
+  · intro position inside
+    dsimp [next,splitBuffer] at inside ⊢
+    rw [List.getElem?_append_left (by simpa using inside)]
+    rw [List.getElem?_append_left (by simp;omega),List.getElem?_append_right (by simp)]
+    simp
+theorem installation_mismatching_resets_log (bits capacity index commit : Nat)
+    (view : α → Path → InitStore) (snapshotView : β → Path → InitStore)
+    (hard : InitStore) (entries : List α) (padding : Nat) (saved : Option β) (input : β) (found : Option InitStore)
+    (shape : Shape (⟨entries.map some ++ List.replicate padding none,entries.length⟩ : BufferState α) capacity)
+    (inputRead : recordWord (snapshotView input ["last"]) ["index"] = some index)
+    (commitWord : commit < 2^64) (covered : commit ≤ index)
+    (different : recordEquality found (snapshotView input ["last"]) [["index"],["term"]] = some false)
+    (looked : recordAt JarlStorage.state_State_install_ir.recordAt bits
+      (installationView view snapshotView ⟨⟨entries.map some ++ List.replicate padding none,entries.length⟩,commit,saved⟩)
+      index = .ok found) :
+    ∃ next, resumeInstallation (JarlStorage.state_State_install bits view snapshotView
+        ⟨⟨entries.map some ++ List.replicate padding none,entries.length⟩,commit,saved⟩ input) = .returned next ∧
+      LogRep view hard (snapshotView input ["last"]) next.buffer capacity ∧
+      next.buffer.len = 0 ∧ next.commit = index ∧ next.snapshot = some input := by
+  obtain ⟨value,range⟩ := record_word_read _ _ _ inputRead
+  have result := installation_mismatching_prefix bits index commit view snapshotView
+    (entries.map some) (List.replicate padding none) saved input found value range commitWord different (by simpa using looked)
+  simp only [List.length_map] at result
+  let next : InstallationState α β :=
+    ⟨⟨List.replicate entries.length none ++ List.replicate padding none,0⟩,max commit index,some input⟩
+  have execution : resumeInstallation (JarlStorage.state_State_install bits view snapshotView
+      ⟨⟨entries.map some ++ List.replicate padding none,entries.length⟩,commit,saved⟩ input) = .returned next := result
+  have nextShape := installation_preserves_shape bits capacity view snapshotView
+    ⟨⟨entries.map some ++ List.replicate padding none,entries.length⟩,commit,saved⟩ next input shape execution
+  have size := shape.1
+  simp only [List.length_append,List.length_map,List.length_replicate] at size
+  refine ⟨next,execution,⟨nextShape,[],snapshotView input ["last"],?_,rfl,.empty⟩,rfl,?_,rfl⟩
+  · simp [next,List.replicate_append_replicate,size]
+  · dsimp [next];omega
 
 end Storage

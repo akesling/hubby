@@ -3881,7 +3881,7 @@
         "R05"
       ],
       "status": "component_evidence",
-      "note": "Complete original snapshot installation and record-at/lookup/base helpers in proofs/storage: all-field derived equality, target-word cast and rotation, exact matching suffix and mismatching prefix under lookup decisions, capacity/commit/snapshot postconditions, and source-ordered payload destruction. General shape preservation and append/grow/truncate/install buffer-history induction are checked. Restore, metadata/protocol reachability, log ordering, committed-prefix callers, source/layout refinement and destructor unwinding remain open."
+      "note": "Complete original snapshot installation and record-at/lookup/base helpers in proofs/storage: all-field derived equality, target-word cast and rotation, exact matching suffix and mismatching prefix under lookup decisions, capacity/commit/snapshot postconditions, and source-ordered payload destruction. General shape/history preservation and matching-suffix logical rebasing under actual lookup/index-term equality are checked, with exact shifted payloads and commit bounds. Mismatching snapshots covering old commit establish an empty logical log. Snapshot provenance/validity, metadata/protocol reachability, caller preconditions, source/layout refinement and destructor unwinding remain open."
     },
     "crate::state::<State < V , S , CAP >>::last": {
       "requirements": [

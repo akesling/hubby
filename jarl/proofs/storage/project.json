@@ -166,6 +166,18 @@
     {
       "theorem": "Storage.append_preserves_committed_prefix",
       "function": "state_State_push"
+    },
+    {
+      "theorem": "Storage.installation_matching_suffix_by_equality",
+      "function": "state_State_install"
+    },
+    {
+      "theorem": "Storage.installation_matching_preserves_log",
+      "function": "state_State_install"
+    },
+    {
+      "theorem": "Storage.installation_mismatching_resets_log",
+      "function": "state_State_install"
     }
   ]
 }

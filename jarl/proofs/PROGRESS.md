@@ -8,9 +8,9 @@ Continue with the next open source-linked obligation under the existing toolchai
 dependency, no_std/sans-I/O and approval constraints. Only the full specification's
 verified completion can close this work; a green component suite cannot.
 
-Immediate frontier: prove installation log validity and committed-prefix
-conditions, then discharge append/truncation/installation preconditions in the
-complete protocol callers and durable histories. Recovery, growth and truncation preserve the
+Immediate frontier: discharge append/truncation/installation preconditions in
+complete protocol callers and durable histories, including snapshot provenance
+and hard-state transitions. Branch contracts for installation are checked below. Recovery, growth and truncation preserve the
 logical log representation under the contracts below. Buffer-shape induction alone
 is not a source-level Raft correctness proof.
 
@@ -323,3 +323,18 @@ complete generated transitions, including durable votes and restart.
   committed entries and their range as well.
 - Actual protocol caller authorization and persistence remain to be proved; these
   local contracts do not establish global Raft committed-prefix safety.
+
+## Snapshot installation log branches (partial R02/R03 evidence)
+
+- The matching branch uses actual generated record lookup and Rust derived
+  equality on index/term, rather than assuming whole abstract record identity.
+  The proof splits the original ordered chain at the looked-up boundary and
+  reestablishes the retained chain from the incoming snapshot LogId.
+- Exact source execution preserves every retained payload at its shifted offset,
+  preserves LogRep and keeps commit between the new base and retained last index
+  when the old commit was in range.
+- A mismatching snapshot yields an empty LogRep with commit equal to its index
+  when the snapshot covers the old commit. This is a caller obligation, not an
+  assumption that the opaque snapshot represents correct application state.
+- Branch selection, snapshot provenance/validity and caller authorization still
+  need composition with the complete protocol and persistence implementation.
