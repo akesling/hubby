@@ -257,60 +257,6 @@ theorem truncation_preserves_shape (view : α → Path → InitStore) (records :
       (∀ i, i < next.len → next.slots[i]? = state.slots[i]?) := by
   exact truncate_shape _ view records boundary _ capacity state next shape execution
 
--- Capacity is part of the history index, so growth is not treated as a fixed
--- capacity assumption. These histories still exclude restore and snapshot installation.
-inductive StorageHistory (bits : Nat) : Nat → BufferState α → Prop where
-  | fresh (capacity : Nat) (word : capacity < 2^bits) :
-      StorageHistory bits capacity ⟨List.replicate capacity none, 0⟩
-  | append {capacity : Nat} {state next : BufferState α} (input : α) :
-      StorageHistory bits capacity state →
-      JarlStorage.state_State_push bits capacity state input = .returned (.ok ()) next →
-      StorageHistory bits capacity next
-  | grow {oldCapacity newCapacity : Nat} {state next : BufferState α} :
-      StorageHistory bits oldCapacity state → oldCapacity ≤ newCapacity → newCapacity < 2^bits →
-      JarlStorage.state_State_grow oldCapacity newCapacity state () = .returned next () →
-      StorageHistory bits newCapacity next
-
-  | truncate {capacity : Nat} {state next : BufferState α}
-      (view : α → Path → InitStore) (records : SelectionStore) (boundary : Nat) :
-      StorageHistory bits capacity state →
-      resumeTruncation (JarlStorage.state_State_truncate view records state boundary) = .returned next →
-      StorageHistory bits capacity next
-
-private theorem storage_history_valid (bits capacity : Nat) (state : BufferState α)
-    (history : StorageHistory bits capacity state) : Shape state capacity ∧ capacity < 2^bits := by
-  induction history with
-  | fresh capacity word => exact ⟨(fresh_representation (α := α) (fun _ => capacity)).2, word⟩
-  | @append capacity before next input previous execution ih =>
-    have space : before.len < capacity := by
-      have bound := ih.1.2.1
-      by_cases h : before.len < capacity
-      · exact h
-      · have full : before.len = capacity := by omega
-        rw [full_preserves_state_at_drop bits capacity before input full] at execution
-        contradiction
-    obtain ⟨result, computed, preserved, _⟩ :=
-      append_preserves_shape bits capacity before input ih.1 space ih.2
-    rw [computed] at execution
-    cases execution
-    exact ⟨preserved, ih.2⟩
-  | @grow oldCapacity newCapacity before next previous grows word execution ih =>
-    obtain ⟨result, computed, preserved, _, _⟩ :=
-      grow_preserves_shape oldCapacity newCapacity before () ih.1 grows
-    rw [computed] at execution
-    cases execution
-    exact ⟨preserved, word⟩
-  | @truncate capacity before next view records boundary previous execution ih =>
-    exact ⟨(truncation_preserves_shape view records boundary capacity before next ih.1 execution).1, ih.2⟩
-
-theorem history_supports_growth (bits capacity newCapacity : Nat) (state : BufferState α) (metadata : β)
-    (history : StorageHistory bits capacity state) (grows : capacity ≤ newCapacity) :
-    Shape state capacity ∧ capacity < 2^bits ∧
-      ∃ next, JarlStorage.state_State_grow capacity newCapacity state metadata = .returned next metadata ∧
-        Shape next newCapacity ∧ next.len = state.len ∧
-        (∀ i, i < state.len → next.slots[i]? = state.slots[i]?) := by
-  have valid := storage_history_valid bits capacity state history
-  exact ⟨valid.1, valid.2, grow_preserves_shape capacity newCapacity state metadata valid.1 grows⟩
 -- Bind the projected buffer state to the original Rust places and capacity
 -- parameters. Changing which fields a source method operates on must invalidate
 -- this contract, even if its arithmetic would still preserve an abstract buffer.
@@ -613,5 +559,232 @@ theorem installation_places (bits : Nat) (view : α → Path → InitStore)
     next.buffer.slots.length = state.buffer.slots.length ∧ next.buffer.len ≤ state.buffer.len ∧
       state.commit ≤ next.commit ∧ next.snapshot = some input := by
   exact ⟨rfl,rfl,rfl,rfl,installation_preserves_capacity_and_commit bits view snapshotView state next input execution⟩
+
+private theorem rotation_preserves_shape (state : BufferState α) (capacity amount : Nat)
+    (shape : Shape state capacity) (bound : amount ≤ state.len) :
+    Shape (⟨(state.slots.take state.len).drop amount ++ (state.slots.take state.len).take amount ++
+      state.slots.drop state.len,state.len⟩ : BufferState α) capacity := by
+  let front := state.slots.take state.len
+  have front_length : front.length = state.len := by
+    simp only [front,List.length_take,shape.1]
+    exact Nat.min_eq_left shape.2.1
+  let rotated := front.drop amount ++ front.take amount
+  have rotated_length : rotated.length = state.len := by
+    simp only [rotated,List.length_append,List.length_drop,List.length_take,front_length]
+    omega
+  have filled : ∀ entry, entry ∈ front → ∃ value, entry = some value := by
+    intro entry member
+    obtain ⟨i,hi,equal⟩ := List.getElem_of_mem member
+    have inside : i < state.len := by omega
+    obtain ⟨value,present⟩ := shape.2.2.1 i inside
+    have fetched : front[i]? = some entry := by simp [List.getElem?_eq_getElem hi,equal]
+    have original : front[i]? = state.slots[i]? := List.getElem?_take_of_lt inside
+    rw [original,present] at fetched
+    exact ⟨value,Option.some.inj fetched.symm⟩
+  have rotated_filled : ∀ entry, entry ∈ rotated → ∃ value, entry = some value := by
+    intro entry member
+    rcases List.mem_append.mp member with first | second
+    · exact filled entry (List.mem_of_mem_drop first)
+    · exact filled entry (List.mem_of_mem_take second)
+  change Shape ⟨rotated ++ state.slots.drop state.len,state.len⟩ capacity
+  refine ⟨?_,shape.2.1,?_,?_⟩
+  · simp only [List.length_append,rotated_length,List.length_drop,shape.1]
+    have := shape.2.1
+    omega
+  · intro i inside
+    dsimp at inside
+    have index : i < rotated.length := by omega
+    obtain ⟨value,equal⟩ := rotated_filled rotated[i] (List.getElem_mem index)
+    refine ⟨value,?_⟩
+    dsimp
+    rw [List.getElem?_append_left index,List.getElem?_eq_getElem index,equal]
+  · intro i after inside
+    dsimp at after
+    dsimp
+    rw [List.getElem?_append_right (by omega),List.getElem?_drop]
+    have index : state.len + (i - rotated.length) = i := by omega
+    rw [index]
+    exact shape.2.2.2 i after inside
+
+private theorem shortened_shape (state : BufferState α) (capacity keep : Nat)
+    (shape : Shape state capacity) (shorter : keep ≤ state.len) :
+    Shape (⟨state.slots.take keep ++ List.replicate (capacity - keep) none,keep⟩ : BufferState α) capacity := by
+  have bounded : keep ≤ state.slots.length := by rw [shape.1]; have := shape.2.1; omega
+  have count : (state.slots.take keep).length = keep := by simp [List.length_take,Nat.min_eq_left bounded]
+  refine ⟨?_,by dsimp; have := shape.2.1; omega,?_,?_⟩
+  · simp only [List.length_append,count,List.length_replicate]
+    have := shape.2.1
+    omega
+  · intro i inside
+    dsimp at inside ⊢
+    obtain ⟨value,present⟩ := shape.2.2.1 i (by omega)
+    refine ⟨value,?_⟩
+    rw [List.getElem?_append_left (by omega),List.getElem?_take_of_lt inside]
+    exact present
+  · intro i after inside
+    dsimp at after ⊢
+    rw [List.getElem?_append_right (by omega),List.getElem?_replicate]
+    rw [if_pos (by omega)]
+
+private theorem clearing_suffix_preserves_shape (program : Installation) (snapshotView : β → Path → InitStore)
+    (state next : InstallationState α β) (input : β) (capacity oldLength : Nat)
+    (maximum : program.maximum = true) (shape : Shape ⟨state.buffer.slots,oldLength⟩ capacity)
+    (shorter : state.buffer.len ≤ oldLength)
+    (execution : resumeInstallation (clearInstallation program snapshotView false input state.buffer.len
+      (state.buffer.slots.length - state.buffer.len) state) = .returned next) : Shape next.buffer capacity := by
+  rcases state with ⟨⟨slots,keep⟩,commit,saved⟩
+  dsimp [Shape] at shape
+  dsimp at shorter execution
+  have bounded : keep ≤ slots.length := by have := shape.1;have := shape.2.1;omega
+  have count : (slots.take keep).length = keep := by simp [List.length_take,Nat.min_eq_left bounded]
+  have clear := clear_installation_exact program snapshotView (slots.take keep) (slots.drop keep) []
+    keep commit saved input false
+  simp only [count,List.length_drop,List.append_nil,List.take_append_drop,Bool.false_eq_true,if_false] at clear
+  rw [clear] at execution
+  have result := finish_installation_frame program snapshotView _ next input maximum execution
+  rw [result.1]
+  have shortened := shortened_shape (⟨slots,oldLength⟩ : BufferState α) capacity keep shape shorter
+  simpa only [shape.1] using shortened
+
+private theorem clearing_prefix_preserves_shape (program : Installation) (snapshotView : β → Path → InitStore)
+    (state next : InstallationState α β) (input : β) (capacity : Nat)
+    (maximum : program.maximum = true) (shape : Shape state.buffer capacity)
+    (execution : resumeInstallation (clearInstallation program snapshotView true input 0 state.buffer.len state) = .returned next) :
+    Shape next.buffer capacity := by
+  rcases state with ⟨⟨slots,length⟩,commit,saved⟩
+  dsimp [Shape] at shape
+  dsimp at execution
+  have bounded : length ≤ slots.length := by have := shape.1;have := shape.2.1;omega
+  have count : (slots.take length).length = length := by simp [List.length_take,Nat.min_eq_left bounded]
+  have clear := clear_installation_exact program snapshotView [] (slots.take length) (slots.drop length)
+    length commit saved input true
+  simp only [count,List.length_nil,List.nil_append,List.take_append_drop,if_true] at clear
+  rw [clear] at execution
+  have result := finish_installation_frame program snapshotView _ next input maximum execution
+  rw [result.1]
+  refine ⟨?_,by simp,?_,?_⟩
+  · simp only [List.length_append,List.length_replicate,List.length_drop]
+    have := shape.1
+    omega
+  · intro i inside
+    dsimp at inside
+    omega
+  · intro i _ inside
+    dsimp
+    by_cases before : i < length
+    · rw [List.getElem?_append_left (by simpa using before),List.getElem?_replicate,if_pos before]
+    · rw [List.getElem?_append_right (by simp;omega),List.getElem?_drop,List.length_replicate]
+      have index : length + (i - length) = i := by omega
+      rw [index]
+      exact shape.2.2.2 i (by omega) inside
+
+private theorem clear_suffix_execution (program : Installation) (snapshotView : β → Path → InitStore)
+    (state next : InstallationState α β) (input : β) (capacity oldLength start count : Nat)
+    (execution : resumeInstallation (clearInstallation program snapshotView false input start count state) = .returned next)
+    (maximum : program.maximum = true) (shape : Shape ⟨state.buffer.slots,oldLength⟩ capacity)
+    (shorter : state.buffer.len ≤ oldLength)
+    (range : start = state.buffer.len ∧ count = state.buffer.slots.length - state.buffer.len) : Shape next.buffer capacity := by
+  rcases range with ⟨rfl,rfl⟩
+  exact clearing_suffix_preserves_shape program snapshotView state next input capacity oldLength maximum shape shorter execution
+
+theorem installation_preserves_shape (bits capacity : Nat) (view : α → Path → InitStore)
+    (snapshotView : β → Path → InitStore) (state next : InstallationState α β) (input : β)
+    (shape : Shape state.buffer capacity)
+    (execution : resumeInstallation (JarlStorage.state_State_install bits view snapshotView state input) = .returned next) :
+    Shape next.buffer capacity := by
+  unfold JarlStorage.state_State_install installSnapshot at execution
+  dsimp only [JarlStorage.state_State_install_ir] at execution
+  simp only [if_true] at execution
+  split at execution
+  · simp [resumeInstallation] at execution
+  · split at execution
+    · simp [resumeInstallation] at execution
+    · split at execution
+      · simp [resumeInstallation] at execution
+      · split at execution
+        · split at execution
+          · simp [resumeInstallation] at execution
+          · split at execution
+            · simp [resumeInstallation] at execution
+            · split at execution
+              · simp [resumeInstallation] at execution
+              · refine clear_suffix_execution _ snapshotView _ next input capacity state.buffer.len _ _ execution rfl ?_ ?_ ⟨rfl,rfl⟩
+                · exact rotation_preserves_shape state.buffer capacity _ shape (by omega)
+                · dsimp
+                  omega
+        · split at execution
+          · simp [resumeInstallation] at execution
+          · exact clearing_prefix_preserves_shape _ snapshotView state next input capacity rfl shape execution
+
+-- Capacity is part of the history index, so growth is not treated as a fixed
+-- capacity assumption. These histories still exclude restore and do not encode protocol reachability.
+inductive StorageHistory (bits : Nat) : Nat → BufferState α → Prop where
+  | fresh (capacity : Nat) (word : capacity < 2^bits) :
+      StorageHistory bits capacity ⟨List.replicate capacity none, 0⟩
+  | append {capacity : Nat} {state next : BufferState α} (input : α) :
+      StorageHistory bits capacity state →
+      JarlStorage.state_State_push bits capacity state input = .returned (.ok ()) next →
+      StorageHistory bits capacity next
+  | grow {oldCapacity newCapacity : Nat} {state next : BufferState α} :
+      StorageHistory bits oldCapacity state → oldCapacity ≤ newCapacity → newCapacity < 2^bits →
+      JarlStorage.state_State_grow oldCapacity newCapacity state () = .returned next () →
+      StorageHistory bits newCapacity next
+
+  | truncate {capacity : Nat} {state next : BufferState α}
+      (view : α → Path → InitStore) (records : SelectionStore) (boundary : Nat) :
+      StorageHistory bits capacity state →
+      resumeTruncation (JarlStorage.state_State_truncate view records state boundary) = .returned next →
+      StorageHistory bits capacity next
+
+  | install {β : Type} {capacity : Nat} {before after : InstallationState α β}
+      (view : α → Path → InitStore) (snapshotView : β → Path → InitStore) (input : β) :
+      StorageHistory bits capacity before.buffer →
+      resumeInstallation (JarlStorage.state_State_install bits view snapshotView before input) = .returned after →
+      StorageHistory bits capacity after.buffer
+
+private theorem storage_history_valid (bits capacity : Nat) (state : BufferState α)
+    (history : StorageHistory bits capacity state) : Shape state capacity ∧ capacity < 2^bits := by
+  induction history with
+  | fresh capacity word => exact ⟨(fresh_representation (α := α) (fun _ => capacity)).2, word⟩
+  | @append capacity before next input previous execution ih =>
+    have space : before.len < capacity := by
+      have bound := ih.1.2.1
+      by_cases h : before.len < capacity
+      · exact h
+      · have full : before.len = capacity := by omega
+        rw [full_preserves_state_at_drop bits capacity before input full] at execution
+        contradiction
+    obtain ⟨result, computed, preserved, _⟩ :=
+      append_preserves_shape bits capacity before input ih.1 space ih.2
+    rw [computed] at execution
+    cases execution
+    exact ⟨preserved, ih.2⟩
+  | @grow oldCapacity newCapacity before next previous grows word execution ih =>
+    obtain ⟨result, computed, preserved, _, _⟩ :=
+      grow_preserves_shape oldCapacity newCapacity before () ih.1 grows
+    rw [computed] at execution
+    cases execution
+    exact ⟨preserved, word⟩
+  | @truncate capacity before next view records boundary previous execution ih =>
+    exact ⟨(truncation_preserves_shape view records boundary capacity before next ih.1 execution).1, ih.2⟩
+  | @install β capacity before after view snapshotView input previous execution ih =>
+    exact ⟨installation_preserves_shape bits capacity view snapshotView before after input ih.1 execution,ih.2⟩
+
+theorem history_supports_growth (bits capacity newCapacity : Nat) (state : BufferState α) (metadata : β)
+    (history : StorageHistory bits capacity state) (grows : capacity ≤ newCapacity) :
+    Shape state capacity ∧ capacity < 2^bits ∧
+      ∃ next, JarlStorage.state_State_grow capacity newCapacity state metadata = .returned next metadata ∧
+        Shape next newCapacity ∧ next.len = state.len ∧
+        (∀ i, i < state.len → next.slots[i]? = state.slots[i]?) := by
+  have valid := storage_history_valid bits capacity state history
+  exact ⟨valid.1, valid.2, grow_preserves_shape capacity newCapacity state metadata valid.1 grows⟩
+theorem history_supports_installation (bits capacity : Nat) (view : α → Path → InitStore)
+    (snapshotView : β → Path → InitStore) (state next : InstallationState α β) (input : β)
+    (history : StorageHistory bits capacity state.buffer)
+    (execution : resumeInstallation (JarlStorage.state_State_install bits view snapshotView state input) = .returned next) :
+    Shape state.buffer capacity ∧ Shape next.buffer capacity ∧ state.commit ≤ next.commit ∧ next.snapshot = some input := by
+  have valid := storage_history_valid bits capacity state.buffer history
+  have effects := installation_preserves_capacity_and_commit bits view snapshotView state next input execution
+  exact ⟨valid.1,installation_preserves_shape bits capacity view snapshotView state next input valid.1 execution,effects.2.2⟩
 
 end Storage

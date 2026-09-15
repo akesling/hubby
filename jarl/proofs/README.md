@@ -109,7 +109,7 @@ Growth translates the original consuming `State::grow` body, including its const
 assertion, generic substitution, all metadata transfers, and indexed Option::take
 callback. The proof covers arbitrary nondecreasing capacities and preserves every
 live payload, length and metadata without invoking Drop. The storage-history
-induction allows repeated appends, growth and normally completed truncations; it is not fixed to one capacity.
+induction allows repeated appends, growth, truncation and installation; it is not fixed to one capacity.
 Native tests cover copied and moved metadata and disposal of out-of-prefix
 payloads in malformed states. Partial-record ownership during a failed
 construction, panic hooks, and destructor unwinding are outside the current
@@ -160,3 +160,8 @@ clear the mismatching prefix, preserve capacity, advance commit monotonically,
 and install the exact input snapshot. The branch contracts require their explicit
 lookup/equality decisions; proving every reachable caller satisfies the required
 log invariants remains open. Destructors and pre-unwind ownership are explicit.
+
+The general installation shape theorem covers every successful branch from any
+shape-valid buffer. Storage histories compose this with append, growth and
+truncation. Restoration and protocol/metadata reachability remain outside that
+history theorem; it does not establish global Raft safety.

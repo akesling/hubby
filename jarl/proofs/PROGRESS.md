@@ -8,10 +8,9 @@ Continue with the next open source-linked obligation under the existing toolchai
 dependency, no_std/sans-I/O and approval constraints. Only the full specification's
 verified completion can close this work; a green component suite cannot.
 
-Immediate frontier: compose installation into the storage-shape history, translate
-restoration with its original iterator/ownership interactions, then close log-ID
-ordering and committed-prefix preservation before claiming the storage invariant
-for every reachable state.
+Immediate frontier: translate restoration with its original iterator/ownership
+interactions, then close log-ID ordering and committed-prefix preservation before
+claiming the storage invariant for every reachable state.
 
 ## Source accounting (M0, C01–C12, P12)
 
@@ -234,3 +233,17 @@ complete generated transitions, including durable votes and restart.
   are required by the Jarl gate.
 - General storage-shape/history composition, protocol authorization, log ordering,
   committed-prefix preservation and physical view/unwinding refinement remain open.
+
+## Installation storage-history composition (partial R02/R03 evidence)
+
+- Successful `State::install` now preserves the full `Shape` predicate for every
+  shape-valid input buffer, across all lookup/equality decisions and every capacity.
+  The proof composes rotation and clearing lemmas without assuming a matching or
+  mismatching outcome. Normal destructor return is explicit in `resumeInstallation`.
+- Storage-history induction now includes fresh initialization, append, arbitrary
+  nondecreasing growth, truncation and installation. Each installation also retains
+  its capacity and nondecreasing commit postconditions.
+- These are buffer histories, not complete persistent/protocol histories: metadata
+  reachability and source memory refinement remain open. Restore is still excluded,
+  and log-ID ordering, committed-prefix preservation and network safety are not
+  consequences of the shape invariant alone.

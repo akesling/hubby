@@ -85,6 +85,14 @@
     {
       "theorem": "Storage.installation_places",
       "function": "state_State_install"
+    },
+    {
+      "theorem": "Storage.installation_preserves_shape",
+      "function": "state_State_install"
+    },
+    {
+      "theorem": "Storage.history_supports_installation",
+      "function": "state_State_install"
     }
   ]
 }
