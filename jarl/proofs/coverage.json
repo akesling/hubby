@@ -3828,12 +3828,10 @@
     "crate::state::<State < V , S , CAP >>::full": {
       "requirements": [
         "C02",
-        "R02",
-        "R03",
-        "R05"
+        "R02"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+      "status": "component_evidence",
+      "note": "Complete scalar query and const-generic capacity contracts in proofs/capacity; len <= CAP and callers remain separate proof obligations."
     },
     "crate::state::<State < V , S , CAP >>::get": {
       "requirements": [

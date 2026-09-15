@@ -1,0 +1,10 @@
+{
+  "scalar_method": {"crate_root":"../../src/lib.rs","method":"state::State::full"},
+  "namespace":"JarlCapacity",
+  "usize_bits":64,
+  "proofs":"Proofs.lean",
+  "obligations":[
+    {"theorem":"Capacity.full_exact","function":"state_State_full"},
+    {"theorem":"Capacity.not_full_has_space","function":"state_State_full"}
+  ]
+}

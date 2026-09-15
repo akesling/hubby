@@ -29,6 +29,7 @@ pub struct Evidence {
     pub rust: String,
     pub fields: Vec<Field>,
     pub projections: Vec<String>,
+    pub constants: Vec<(String, String)>,
     pub scope: &'static str,
 }
 pub struct Translation {
@@ -39,6 +40,9 @@ pub struct Translation {
 impl Crate {
     pub fn scalar_projections(&self, name: &str) -> Result<Translation, String> {
         let def = self.methods.get(name).ok_or("unknown scalar method")?;
+        if !matches!(def.item.sig.output, ReturnType::Default) {
+            return self.scalar_query(name);
+        }
         let f = &def.item;
         attrs(&f.attrs)?;
         let sig = &f.sig;
@@ -172,8 +176,149 @@ impl Crate {
         }
         Ok(Translation {source,files:self.files.clone(),evidence:Evidence {
             method:name.into(),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,
-            rust:tokens(f),fields,projections,
+            rust:tokens(f),fields,projections,constants:vec![],
             scope:"successful-state projections of the complete explicit scalar method body; all statements execute in every projection; panic-store effects, frontend/field/borrow refinement and whole-program correctness are not proved",
+        }})
+    }
+
+    fn scalar_query(&self, name: &str) -> Result<Translation, String> {
+        let def = self.methods.get(name).ok_or("unknown scalar query")?;
+        let f = &def.item;
+        attrs(&f.attrs)?;
+        let sig = &f.sig;
+        if sig.asyncness.is_some()
+            || sig.unsafety.is_some()
+            || sig.constness.is_some()
+            || sig.abi.is_some()
+            || !sig.generics.params.is_empty()
+            || sig.generics.where_clause.is_some()
+            || sig.inputs.len() != 1
+        {
+            return Err("scalar query requires a plain receiver-only signature".into());
+        }
+        let Some(FnArg::Receiver(receiver)) = sig.inputs.first() else {
+            return Err("scalar query needs &self".into());
+        };
+        attrs(&receiver.attrs)?;
+        if receiver.reference.is_none()
+            || receiver.mutability.is_some()
+            || receiver.colon_token.is_some()
+        {
+            return Err("scalar query needs &self".into());
+        }
+        let ReturnType::Type(_, output) = &sig.output else {
+            return Err("scalar query needs a return type".into());
+        };
+        fn builtin(ty: &syn::Type) -> bool {
+            ["bool", "u8", "u16", "u32", "u64", "usize"].contains(&tokens(ty).as_str())
+        }
+        if !builtin(output) {
+            return Err("scalar query must return a builtin scalar".into());
+        }
+        self.resolve(&def.module, &def.receiver, 0)?;
+        let mut constants = BTreeMap::new();
+        for constant in def.impl_generics.const_params() {
+            attrs(&constant.attrs)?;
+            if !builtin(&constant.ty) {
+                return Err("scalar query const parameter must have builtin scalar type".into());
+            }
+            constants.insert(constant.ident.to_string(), constant.ty.clone());
+        }
+        struct Flatten<'a> {
+            krate: &'a Crate,
+            def: &'a super::Definition,
+            constants: &'a BTreeMap<String, syn::Type>,
+            fields: BTreeMap<Vec<String>, Field>,
+            error: Option<String>,
+        }
+        impl VisitMut for Flatten<'_> {
+            fn visit_ident_mut(&mut self, id: &mut syn::Ident) {
+                if id.to_string().starts_with("provium_") {
+                    self.error =
+                        Some("source collides with reserved scalar query parameter prefix".into());
+                }
+            }
+            fn visit_pat_ident_mut(&mut self, pat: &mut syn::PatIdent) {
+                if self.constants.contains_key(&pat.ident.to_string()) {
+                    self.error = Some("local pattern shadows a const parameter".into());
+                }
+                syn::visit_mut::visit_pat_ident_mut(self, pat);
+            }
+            fn visit_expr_mut(&mut self, expr: &mut Expr) {
+                if matches!(expr, Expr::Field(_)) {
+                    let result = (|| {
+                        let path = path(expr)?;
+                        let ty = self.krate.field_type(self.def, &path)?;
+                        if !builtin(ty) {
+                            return Err(
+                                "scalar query reads require builtin scalar fields".to_owned()
+                            );
+                        }
+                        let parameter = format!("provium_field_{}", path.join("_"));
+                        self.fields.entry(path.clone()).or_insert(Field {
+                            path,
+                            rust_type: tokens(ty),
+                            parameter: parameter.clone(),
+                            written: false,
+                        });
+                        let id = format_ident!("{parameter}");
+                        *expr = syn::parse_quote!(#id);
+                        Ok(())
+                    })();
+                    if let Err(error) = result {
+                        self.error = Some(error);
+                    }
+                    return;
+                }
+                if let Expr::Path(p) = expr {
+                    if p.qself.is_none()
+                        && p.path.segments.len() == 1
+                        && matches!(p.path.segments[0].arguments, syn::PathArguments::None)
+                        && self
+                            .constants
+                            .contains_key(&p.path.segments[0].ident.to_string())
+                    {
+                        if let Err(error) = attrs(&p.attrs) {
+                            self.error = Some(error);
+                            return;
+                        }
+                        let id = format_ident!("provium_const_{}", p.path.segments[0].ident);
+                        *expr = syn::parse_quote!(#id);
+                        return;
+                    }
+                }
+                syn::visit_mut::visit_expr_mut(self, expr);
+            }
+        }
+        let mut flat = Flatten {
+            krate: self,
+            def,
+            constants: &constants,
+            fields: BTreeMap::new(),
+            error: None,
+        };
+        let mut body = f.block.clone();
+        flat.visit_block_mut(&mut body);
+        if let Some(error) = flat.error {
+            return Err(error);
+        }
+        let fields = flat.fields.into_values().collect::<Vec<_>>();
+        let mut parameters = vec![];
+        for field in &fields {
+            let id = format_ident!("{}", field.parameter);
+            let ty: syn::Type = syn::parse_str(&field.rust_type).map_err(|e| e.to_string())?;
+            parameters.push(quote!(#id:#ty));
+        }
+        for (name, ty) in &constants {
+            let id = format_ident!("provium_const_{name}");
+            parameters.push(quote!(#id:#ty));
+        }
+        let symbol = name.replace("::", "_");
+        let function = format_ident!("{symbol}");
+        let source = tokens(&quote!(fn #function(#(#parameters),*) -> #output #body));
+        Ok(Translation {source, files:self.files.clone(),evidence:Evidence {
+            method:name.into(),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),fields,projections:vec![symbol],constants:constants.into_iter().map(|(name,ty)|(name,tokens(&ty))).collect(),
+            scope:"complete shared scalar method body with explicit original const parameters; all statements and scalar failure outcomes retained; source/field/borrow refinement remains trusted",
         }})
     }
 }

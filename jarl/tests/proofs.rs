@@ -56,6 +56,32 @@ fn source_coverage_review_is_current() {
     );
 }
 
+#[test]
+fn cargo_subject_keeps_proof_tools_out_of_the_runtime_graph() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let mut request: provium::cargo_subject::Request =
+        serde_json::from_slice(&fs::read(root.join("proofs/builds.json")).unwrap()).unwrap();
+    request.manifest = root.join("proofs").join(request.manifest);
+    let report =
+        provium::cargo_subject::write(request, &root.join("artifacts/provium/build-profile"))
+            .unwrap();
+    assert_eq!(
+        report.packages.len(),
+        1,
+        "Jarl must retain its dependency-free runtime graph"
+    );
+    assert_eq!(report.packages[0].name, "jarl");
+    assert!(report.packages[0].normal_dependencies.is_empty());
+    assert!(report.packages[0].build_dependencies.is_empty());
+    assert!(report.target_cfg.contains("target_pointer_width"));
+    assert!(report
+        .workspace_inputs
+        .keys()
+        .any(|p| p.ends_with("Cargo.lock")));
+}
+
+#[path = "proof_cases/capacity.rs"]
+mod capacity;
 #[path = "proof_cases/lean.rs"]
 mod consensus;
 #[path = "proof_cases/scalar_methods.rs"]

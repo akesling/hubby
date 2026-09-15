@@ -1,0 +1,6 @@
+{
+  "manifest": "../Cargo.toml",
+  "target": "host",
+  "features": [],
+  "no_default_features": false
+}

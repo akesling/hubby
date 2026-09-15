@@ -149,6 +149,7 @@ impl Crate {
             file: def.file.clone(),
             item: f.clone(),
             receiver: record.clone(),
+            impl_generics: syn::Generics::default(),
         };
         let predicate = self.condition(&record_def, &relative(&closure.body, &member))?;
         Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],
@@ -267,6 +268,7 @@ impl Crate {
             file: def.file.clone(),
             item: f.clone(),
             receiver: record.clone(),
+            impl_generics: syn::Generics::default(),
         };
         let mut writes = vec![];
         let body = self.array_statements(

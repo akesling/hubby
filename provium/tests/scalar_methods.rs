@@ -86,3 +86,62 @@ fn complete_projections_keep_late_faults_and_all_destinations() {
         assert!(result.is_err(), "accepted {bad}");
     }
 }
+
+#[test]
+fn shared_queries_resolve_const_parameters_and_keep_failure_paths() {
+    let w = Work::new();
+    let source="struct State<const N:usize>{len:usize} impl<const CAP:usize> State<CAP>{fn full(&self)->bool{self.len==CAP}}";
+    let translation = Crate::load(&w.source(source))
+        .unwrap()
+        .scalar_projections("State::full")
+        .unwrap();
+    assert_eq!(
+        translation.evidence.constants,
+        [("CAP".into(), "usize".into())]
+    );
+    assert!(translation.evidence.fields.iter().all(|f| !f.written));
+    for bits in [32, 64] {
+        let functions = Compiler::parse(&translation.source, bits)
+            .unwrap()
+            .compile()
+            .unwrap();
+        for len in 0..8 {
+            for capacity in 0..8 {
+                assert_eq!(
+                    ir::run(
+                        &functions[0],
+                        &[
+                            ir::Value::UInt { bits, value: len },
+                            ir::Value::UInt {
+                                bits,
+                                value: capacity
+                            }
+                        ],
+                        bits
+                    ),
+                    Ok(ir::Value::Bool(len == capacity))
+                );
+            }
+        }
+    }
+    let source = source.replace("self.len==CAP", "let n=CAP/self.len; n>0");
+    let translation = Crate::load(&w.source(&source))
+        .unwrap()
+        .scalar_projections("State::full")
+        .unwrap();
+    let functions = Compiler::parse(&translation.source, 64)
+        .unwrap()
+        .compile()
+        .unwrap();
+    assert_eq!(
+        ir::run(
+            &functions[0],
+            &[
+                ir::Value::UInt { bits: 64, value: 0 },
+                ir::Value::UInt { bits: 64, value: 8 }
+            ],
+            64
+        ),
+        Err(ir::Fault::DivisionByZero)
+    );
+}

@@ -90,6 +90,12 @@ It currently supports `&mut self`, no ordinary arguments, unit returns, builtin
 `u64` fields, and bodies accepted by the scalar frontend after field resolution.
 A fault does not describe the partially mutated Rust store.
 
+Shared receiver-only methods returning builtin scalars can also use
+`scalar_method`. Their full bodies are translated with typed field inputs and
+explicit original impl const parameters; local computation and failure paths are
+retained. This supports const-generic capacity queries without rewriting the
+consumer's Rust. It does not prove callers' representation invariants.
+
 A state-method project uses `crate_root`, `namespace`, `methods`, `proofs`, and
 `obligations`. It resolves original field declarations and translates complete
 supported method bodies. Consumers use the same assertion API for either schema.
@@ -202,6 +208,15 @@ traits, derives, macros or Cargo build configurations; its report explicitly
 retains those limitations. A successful accounting check is not a proof.
 `verify-complete <crate-directory>` currently rejects all full-proof claims;
 editing ledger labels cannot bypass missing semantic preservation/root proofs.
+
+`inspect-cargo <build.json> --out <directory>` records an offline, locked Cargo
+normal/build dependency graph, manifests, workspace/lock hashes, features, target
+declarations, rustc identity and target cfg. Its input has `manifest` (relative
+to that JSON file), `target` (a triple or `host`), `features` and
+`no_default_features`. Dev-only edges are excluded. Git/alternate-registry
+dependencies are rejected; build scripts and proc macros remain explicitly
+unverified. This accounting does not establish compiler invocations, expanded
+source, semantic call closure or complete Cargo environment provenance.
 
 ```sh
 cargo run --locked -- compile examples/assertions/project.json --out artifacts/assertions

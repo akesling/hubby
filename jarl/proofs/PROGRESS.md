@@ -13,6 +13,11 @@ It is not a completion certificate. No full-correctness milestone is closed yet.
   inventoried. Calls, trait resolution, macro expansion and Cargo closure remain open.
 - Component-evidence labels do not constitute verification. The complete gate
   cannot pass by editing labels and currently rejects every full-proof claim.
+- `builds.json` selects the host profile for offline Cargo accounting. An ordinary
+  integration test records normal/build dependencies, manifest/lock hashes,
+  features, target declarations and rustc/cfg identity, and ensures proof tools
+  remain outside Jarl's dependency-free runtime graph. Expanded source,
+  effective compiler commands and ambient Cargo configuration remain open.
 
 ## Complete input-gating queries (M1/M5, C07, R08/R11)
 
@@ -31,6 +36,18 @@ It is not a completion certificate. No full-correctness milestone is closed yet.
 - An independent provider fixture compares the IR to native Rust across every
   dirty/reply/optional-array combination at capacities zero through four, and has
   its own kernel-checked contract and negative control.
+
+## Capacity predicates (M1, C02/R02)
+
+- Shared scalar methods now retain original impl const parameters and builtin
+  field types, including target-sized usize. Their complete bodies retain scalar
+  faults and local computation.
+- `State::full` is translated directly from Jarl and proved equal to the capacity
+  comparison. Given the separate `len ≤ CAP` invariant, non-full implies space.
+- The contract passes for 64-bit and installed wasm32 targets. Changing the
+  original equality to inequality must fail the Lean contract, not the parser.
+- Establishing `len ≤ CAP` through construction, restore and every mutation is
+  still open; this predicate proof does not assume those callers are correct.
 
 ## Outstanding dependency frontier
 
