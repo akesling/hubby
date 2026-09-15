@@ -357,4 +357,66 @@ def lastRecord (program : LastRecord) (state : TraversalStore (Path → InitStor
     | some place => match (state.lookups.slots place.path)[place.index]? with
       | some (some entry) => .ok (entry program.recordField)
       | _ => .error .input
+-- A record view reads metadata without consuming, copying or identifying the
+-- opaque application payload. Correspondence of this view with Rust memory is
+-- an explicit remaining frontend obligation.
+structure Truncation where
+  slotsPath : Path
+  lengthPath : Path
+  last : LastRecord
+  indexField : Path
+  inclusive : Bool
+inductive TruncationFault where
+  | read (reason : TraversalFault)
+  | input
+  | bounds
+  | exhausted
+  deriving DecidableEq
+inductive TruncationRun (α : Type) where
+  | returned (state : BufferState α)
+  | fault (reason : TruncationFault) (state : BufferState α)
+  | drop (payload : α) (before : BufferState α) (continuation : TruncationRun α)
+
+def truncationView (view : α → Path → InitStore) (records : SelectionStore)
+    (state : BufferState α) : TraversalStore (Path → InitStore) :=
+  ⟨⟨records, fun _ => state.slots.map (Option.map view)⟩, fun _ => state.len⟩
+-- Fuel is internal, bounded by the initial length plus the final condition
+-- read. Every body execution decreases length by one. Exhaustion is exposed,
+-- not silently reported as a successful return.
+def truncationCompare (inclusive : Bool) (index boundary : Nat) : Prop :=
+  if inclusive then index ≥ boundary else index > boundary
+instance (inclusive : Bool) (index boundary : Nat) : Decidable (truncationCompare inclusive index boundary) := by
+  unfold truncationCompare
+  infer_instance
+
+def truncateSteps (program : Truncation) (view : α → Path → InitStore)
+    (records : SelectionStore) (boundary : Nat) : Nat → BufferState α → TruncationRun α
+  | 0, state => .fault .exhausted state
+  | fuel + 1, state =>
+    match lastRecord program.last (truncationView view records state) with
+    | .error reason => .fault (.read reason) state
+    | .ok record => match record program.indexField with
+      | .unsigned rustType index =>
+        if rustType ≠ "u64" ∨ index ≥ 2^64 ∨ boundary ≥ 2^64 then .fault .input state
+        else if truncationCompare program.inclusive index boundary ∧ state.len > 0 then
+          let decreased := {state with len := state.len - 1}
+          match state.slots[decreased.len]? with
+          | none => .fault .bounds decreased
+          | some previous =>
+            let cleared := {decreased with slots := state.slots.set decreased.len none}
+            let next := truncateSteps program view records boundary fuel cleared
+            match previous with
+            | none => next
+            | some payload => .drop payload decreased next
+        else .returned state
+      | _ => .fault .input state
+
+def truncateBuffer (program : Truncation) (view : α → Path → InitStore)
+    (records : SelectionStore) (state : BufferState α) (boundary : Nat) : TruncationRun α :=
+  truncateSteps program view records boundary (state.len + 1) state
+
+def resumeTruncation : TruncationRun α → TruncationRun α
+  | .drop _ _ next => resumeTruncation next
+  | result => result
+
 end Provium.State

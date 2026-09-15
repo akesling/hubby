@@ -44,7 +44,7 @@ CI runs both ordinary tests and the full proof gate.
 | [input-gating](input-gating/Proofs.lean) | Complete `Node::available` and `idle`: exact Result, dirty-state/reply/outbox rejection, and clean/drained admission over arbitrary outbox lengths |
 | [capacity](capacity/Proofs.lean) | Complete `State::full`: exact equality against the original const-generic capacity; non-full implies room under the separate `len ≤ CAP` representation invariant |
 | [log-boundary](log-boundary/Proofs.lean) | Complete `State::base`, `get`, `id_at`, `entries` and `last`: snapshot boundary, checked borrowed lookup, ordered prefix iteration, and exact boundary/final-entry records |
-| [storage](storage/Proofs.lean) | Complete `State::push`, `new` and `grow`: no-drop append/growth, occupied-prefix/capacity and metadata preservation, explicit destruction boundaries, and induction over histories with changing capacity |
+| [storage](storage/Proofs.lean) | Complete `State::push`, `new`, `grow` and `truncate`: no-drop append/growth, occupied-prefix/capacity and metadata preservation, explicit destruction boundaries, and induction over histories with changing capacity |
 | [initialization](initialization/Proofs.lean) | Complete `State::new`: initial hard-state fields, absent snapshot, all slots empty for arbitrary capacity, and initial `len ≤ CAP` |
 
 Each directory's `project.json` binds production Rust to explicit theorem
@@ -76,7 +76,7 @@ gate checks this project against both the host and installed 32-bit target.
 
 Initialization derives the initial length bound from the generated constructor.
 Storage now composes it with append preservation. Neither project proves
-preservation through restore/truncate/install or
+preservation through restore/install or
 authorize resetting an existing voter. Builtin Default and array-construction
 semantics, source interpretation and Rust layout remain in the trusted boundary.
 
@@ -109,7 +109,7 @@ Growth translates the original consuming `State::grow` body, including its const
 assertion, generic substitution, all metadata transfers, and indexed Option::take
 callback. The proof covers arbitrary nondecreasing capacities and preserves every
 live payload, length and metadata without invoking Drop. The storage-history
-induction allows repeated appends and growth; it is not fixed to one capacity.
+induction allows repeated appends, growth and normally completed truncations; it is not fixed to one capacity.
 Native tests cover copied and moved metadata and disposal of out-of-prefix
 payloads in malformed states. Partial-record ownership during a failed
 construction, panic hooks, and destructor unwinding are outside the current
@@ -145,3 +145,11 @@ final present retained slot returns that entry's id even with holes earlier in
 the prefix. Native tests alternate both iterator ends and check that entry
 Drop is never invoked during those reads. Invalid-prefix panic hooks/unwinding
 and Rust lifetime/layout correspondence remain outside the current model.
+
+Truncation translates the entire original loop and its complete last-record,
+iterator and snapshot-boundary helpers. The proof preserves shape and every
+retained payload, exposes each destructor after decrementing length, and proves
+the internal interpreter fuel cannot run out. Native tests compare sparse and
+malformed buffers, bounds-panic state, removal boundaries and destructor order.
+Following a drop continuation requires normal destructor return; metadata-view
+refinement, panic/unwinding and committed-prefix preservation remain open.

@@ -273,3 +273,10 @@ sequence, retaining prefix bounds checks without attributing eager allocation to
 Rust. Final-record selection composes the complete iterator and base helpers.
 Native checks mix both iterator ends and track payload Drop; panic hooks and
 physical iterator/lifetime refinement remain outside the model.
+
+Complete suffix-removal loops can compose the borrowed iterator and last-record
+backends. Their denotation retains condition order, partial length updates and
+explicit destructor suspensions with normally returning continuations. Opaque
+payloads are separate from immutable record views; no payload Clone is imposed on
+the subject. Native tests compare boundaries, sparse storage and drop order.
+Physical record-view refinement and destructor panic/unwinding are still open.

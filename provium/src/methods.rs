@@ -82,6 +82,7 @@ pub struct Method {
     pub record_at: Option<records::At>,
     pub iteration: Option<iterations::Iteration>,
     pub last: Option<iterations::Last>,
+    pub truncation: Option<truncations::Truncation>,
 }
 struct Definition {
     module: String,
@@ -442,6 +443,12 @@ impl Crate {
             {
                 return self.lower_iteration(name);
             }
+            if matches!(
+                def.item.block.stmts.first(),
+                Some(syn::Stmt::Expr(Expr::While(_), _))
+            ) {
+                return self.lower_truncation(name);
+            }
             if iterations::last_expression(&def.item.block) {
                 return self.lower_last(name);
             }
@@ -555,6 +562,7 @@ impl Crate {
             record_at: None,
             iteration: None,
             last: None,
+            truncation: None,
         })
     }
     fn field_type<'a>(&'a self, def: &Definition, p: &[String]) -> Result<&'a Type, String> {
@@ -834,6 +842,10 @@ pub fn generate(methods: &[Method], namespace: &str) -> String {
     let mut text=format!("-- Generated from complete Rust method bodies; no sliced statements.\nimport Provium.State\nnamespace {namespace}\nopen Provium.State\n");
     for method in methods {
         let name = &method.symbol;
+        if method.truncation.is_some() {
+            text.push_str(&truncations::generate(method));
+            continue;
+        }
         if method.iteration.is_some() || method.last.is_some() {
             text.push_str(&iterations::generate(method));
             continue;
@@ -1084,3 +1096,5 @@ pub mod lookups;
 pub mod records;
 
 pub mod iterations;
+
+pub mod truncations;

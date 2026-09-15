@@ -4,7 +4,8 @@
   "methods": [
     "state::State::push",
     "state::State::new",
-    "state::State::grow"
+    "state::State::grow",
+    "state::State::truncate"
   ],
   "proofs": "Proofs.lean",
   "obligations": [
@@ -51,6 +52,22 @@
     {
       "theorem": "Storage.growth_representation",
       "function": "state_State_grow"
+    },
+    {
+      "theorem": "Storage.truncation_preserves_shape",
+      "function": "state_State_truncate"
+    },
+    {
+      "theorem": "Storage.truncation_drop_order",
+      "function": "state_State_truncate"
+    },
+    {
+      "theorem": "Storage.truncation_empty",
+      "function": "state_State_truncate"
+    },
+    {
+      "theorem": "Storage.truncation_fuel_sufficient",
+      "function": "state_State_truncate"
     }
   ]
 }

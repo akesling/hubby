@@ -147,6 +147,7 @@ impl Crate {
             query: Some(query),
             iteration: None,
             last: None,
+            truncation: None,
             record_at: None,
             lookup: None,
             selection: None,

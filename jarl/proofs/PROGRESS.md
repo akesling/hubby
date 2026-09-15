@@ -8,9 +8,10 @@ Continue with the next open source-linked obligation under the existing toolchai
 dependency, no_std/sans-I/O and approval constraints. Only the full specification's
 verified completion can close this work; a green component suite cannot.
 
-Immediate frontier: translate `State::truncate` with explicit payload-drop
-suspensions and complete `last` calls, then close restore/install preservation before
-claiming the storage invariant for every reachable state.
+Immediate frontier: translate snapshot installation and restoration with their
+original source ordering and owned-payload interactions, then close log-ID ordering
+and committed-prefix preservation before claiming the storage invariant for every
+reachable state.
 
 ## Source accounting (M0, C01–C12, P12)
 
@@ -195,3 +196,21 @@ The next implementation work is P01–P07/P10: resolve complete source/type/call
 dependencies and extend outcome semantics through state, election and persistence
 transitions. M2 requires an inductive historical election theorem over those
 complete generated transitions, including durable votes and restart.
+
+## Complete suffix truncation (partial R/S evidence)
+
+- The original `State::truncate` loop is translated with complete last/iterator/base
+  helpers, ordered short-circuit reads, decrement-before-clear and opaque payload
+  destructor suspensions. No payload Clone is added to Jarl.
+- Kernel proofs cover successful storage shape, every retained payload, descending
+  last-slot drop with the exact continuation, empty return, and sufficient internal
+  fuel for every input state. Interpreter exhaustion cannot masquerade as success.
+- Storage histories now admit normally completed truncations alongside append and
+  arbitrary nondecreasing capacity growth. Restore and snapshot installation remain
+  excluded, so this is not the global reachable-state invariant.
+- Native checks cover capacities 0/1/3, all occupancy masks and invalid lengths,
+  missing/present snapshot bases, comparison boundaries and destructor order.
+  Independent and original-Jarl mutations exercise comparison and helper drift.
+- Record views preserve opaque payload identity but do not prove physical Rust
+  layout/borrow correspondence. Destructor panic/unwinding, consumer side effects,
+  log-ID ordering and the protocol's committed-prefix callers remain open.

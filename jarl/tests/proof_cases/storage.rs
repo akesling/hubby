@@ -35,6 +35,8 @@ fn storage_shape_holds_on_32_bit_and_rejects_changed_effects() {
         ("self.len == CAP", "self.len != CAP"),
         ("if i < self.len", "if i <= self.len"),
         ("NEW >= CAP", "NEW <= CAP"),
+        ("self.last().index >= from", "self.last().index > from"),
+        ("self.last().index >= from", "self.last().term >= from"),
     ] {
         assert_eq!(source.matches(from).count(), 1);
         fs::write(&state, source.replace(from, to)).unwrap();

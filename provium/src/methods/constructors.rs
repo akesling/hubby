@@ -161,6 +161,7 @@ impl Crate {
             query: None,
             iteration: None,
             last: None,
+            truncation: None,
             record_at: None,
             lookup: None,
             selection: None,

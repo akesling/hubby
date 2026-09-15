@@ -3938,8 +3938,8 @@
         "R03",
         "R05"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+      "status": "component_evidence",
+      "note": "Complete original truncate loop and last/iterator/base helpers in proofs/storage: successful shape and retained-prefix preservation, descending payload Drop suspensions, empty return, sufficient internal fuel, and append/grow/truncate history induction. Destructors must return normally to follow continuations; restore/install, log ordering, committed-prefix callers and source/layout/unwinding refinement remain open."
     },
     "crate::state::<State < V , S , CAP >>::write": {
       "requirements": [
