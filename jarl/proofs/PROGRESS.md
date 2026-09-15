@@ -269,6 +269,15 @@ complete generated transitions, including durable votes and restart.
   consumer, including invalid checkpoints, bad ordering/terms, full buffers,
   commit bounds and u64 exhaustion. Mutations change validation or declaration
   cleanup order and must invalidate those original-source contracts.
-- General log-ID/term ordering, commit-bound interpretation, physical field-view
+- General log-ID/term ordering, physical field-view
   and ownership refinement, callback/unwind behavior and protocol reachability
   remain open. No full-correctness milestone or complete certificate is closed.
+
+## Recovery commit bounds (partial R02/R03 evidence)
+
+- Successful original-source restoration implies snapshot boundary ≤ commit ≤
+  last log index. The proof decodes actual short-circuit guard evaluation and
+  typed u64 reads, retaining the complete original last/iterator/base helpers.
+- Removing either bound check from Jarl must fail its own Lean contracts on the
+  installed 32-bit target. These bounds do not prove durable provenance or Raft
+  committed-prefix safety.

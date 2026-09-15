@@ -912,4 +912,71 @@ theorem recovery_loop_final_guard (program : Restoration) (bits capacity fuel : 
         · obtain ⟨buffer,_,continued⟩ := recovery_append_success program state output advanced _ _ execution
           exact ih {state with buffer := buffer} advanced continued
 
+theorem recovery_or_false (program : Restoration) (view : α → Path → InitStore)
+    (snapshotView : β → Path → InitStore) (hardView : δ → InitStore) (hardPresence : δ → Path → Bool)
+    (context : RecoveryContext α β δ) (first second : RecoveryPredicate)
+    (execution : recoveryPredicate program view snapshotView hardView hardPresence context (.or first second) = .ok false) :
+    recoveryPredicate program view snapshotView hardView hardPresence context first = .ok false ∧
+    recoveryPredicate program view snapshotView hardView hardPresence context second = .ok false := by
+  cases left : recoveryPredicate program view snapshotView hardView hardPresence context first with
+  | error reason => simp [bind, Except.bind, recoveryPredicate,left] at execution
+  | ok rejected =>
+    cases rejected
+    · exact ⟨rfl,by simpa [bind, Except.bind, recoveryPredicate,left] using execution⟩
+    · simp [bind, Except.bind, recoveryPredicate,left] at execution
+
+theorem recovery_less_false (program : Restoration) (view : α → Path → InitStore)
+    (snapshotView : β → Path → InitStore) (hardView : δ → InitStore) (hardPresence : δ → Path → Bool)
+    (context : RecoveryContext α β δ) (first second : RecoveryValue)
+    (execution : recoveryPredicate program view snapshotView hardView hardPresence context (.compare "lt" first second) = .ok false) :
+    ∃ left right, recoveryValue program view snapshotView hardView context first = .ok left ∧
+      recoveryValue program view snapshotView hardView context second = .ok right ∧ right ≤ left := by
+  cases left : recoveryValue program view snapshotView hardView context first with
+  | error reason => simp [bind, Except.bind, recoveryPredicate,left] at execution
+  | ok firstValue =>
+    cases right : recoveryValue program view snapshotView hardView context second with
+    | error reason => simp [bind, Except.bind, recoveryPredicate,left,right] at execution
+    | ok secondValue =>
+      refine ⟨firstValue,secondValue,rfl,rfl,?_⟩
+      simpa [bind, Except.bind, recoveryPredicate,left,right] using execution
+
+theorem recovery_greater_false (program : Restoration) (view : α → Path → InitStore)
+    (snapshotView : β → Path → InitStore) (hardView : δ → InitStore) (hardPresence : δ → Path → Bool)
+    (context : RecoveryContext α β δ) (first second : RecoveryValue)
+    (execution : recoveryPredicate program view snapshotView hardView hardPresence context (.compare "gt" first second) = .ok false) :
+    ∃ left right, recoveryValue program view snapshotView hardView context first = .ok left ∧
+      recoveryValue program view snapshotView hardView context second = .ok right ∧ left ≤ right := by
+  cases left : recoveryValue program view snapshotView hardView context first with
+  | error reason => simp [bind, Except.bind, recoveryPredicate,left] at execution
+  | ok firstValue =>
+    cases right : recoveryValue program view snapshotView hardView context second with
+    | error reason => simp [bind, Except.bind, recoveryPredicate,left,right] at execution
+    | ok secondValue =>
+      refine ⟨firstValue,secondValue,rfl,rfl,?_⟩
+      simpa [bind, Except.bind, recoveryPredicate,left,right] using execution
+
+theorem recovery_hard_value (program : Restoration) (view : α → Path → InitStore)
+    (snapshotView : β → Path → InitStore) (hardView : δ → InitStore) (context : RecoveryContext α β δ)
+    (path : Path) (value : Nat) :
+    recoveryValue program view snapshotView hardView context (.hard path) = .ok value ↔
+      recordWord (hardView context.state.hard) path = some value := by
+  cases word : recordWord (hardView context.state.hard) path <;> simp [bind, Except.bind, recoveryValue,word]
+
+theorem recovery_base_value (program : Restoration) (view : α → Path → InitStore)
+    (snapshotView : β → Path → InitStore) (hardView : δ → InitStore) (context : RecoveryContext α β δ)
+    (path : Path) (value : Nat) :
+    recoveryValue program view snapshotView hardView context (.base path) = .ok value ↔
+      recordWord context.base path = some value := by
+  cases word : recordWord context.base path <;> simp [bind, Except.bind, recoveryValue,word]
+
+theorem recovery_last_value (program : Restoration) (view : α → Path → InitStore)
+    (snapshotView : β → Path → InitStore) (hardView : δ → InitStore) (context : RecoveryContext α β δ)
+    (path : Path) (value : Nat) :
+    recoveryValue program view snapshotView hardView context (.callLast path) = .ok value ↔
+      ∃ record, recoveryLast program view snapshotView context.state = .ok record ∧ recordWord record path = some value := by
+  cases last : recoveryLast program view snapshotView context.state with
+  | error reason => simp [bind, Except.bind, recoveryValue,last]
+  | ok record =>
+    cases word : recordWord record path <;> simp [bind, pure, Except.bind, Except.pure, recoveryValue,last,word]
+
 end Provium.State

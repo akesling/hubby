@@ -940,4 +940,25 @@ theorem restoration_places (bits : Nat) (sizes : String → Nat)
     Shape output.buffer (sizes "CAP") ∧ output.hard = hard ∧ output.snapshot = snapshot := by
   exact ⟨rfl,rfl,rfl,rfl,rfl,restoration_preserves_shape bits sizes view snapshotView hardView hardPresence hard snapshot source output word execution⟩
 
+theorem restoration_commit_bounds (bits : Nat) (sizes : String → Nat)
+    (view : α → Path → InitStore) (snapshotView : β → Path → InitStore)
+    (hardView : δ → InitStore) (hardPresence : δ → Path → Bool)
+    (hard : δ) (snapshot : Option β) (source : σ) (output : RecoveryState α β δ)
+    (execution : RecoveryReturns (JarlStorage.state_State_restore bits sizes view snapshotView hardView hardPresence hard snapshot source : RecoveryRun α β δ σ ι) (.ok output)) :
+    ∃ commit boundary lastIndex record,
+      recordWord (hardView output.hard) ["commit"] = some commit ∧
+      recordWord (selectRecord JarlStorage.state_State_restore_ir.last.base (fun _ => snapshot.map snapshotView)) ["index"] = some boundary ∧
+      recoveryLast JarlStorage.state_State_restore_ir view snapshotView output = .ok record ∧
+      recordWord record ["index"] = some lastIndex ∧ boundary ≤ commit ∧ commit ≤ lastIndex := by
+  have guarded := restoration_final_guard bits sizes view snapshotView hardView hardPresence hard snapshot source output execution
+  have both := recovery_or_false _ _ _ _ _ _ _ _ guarded
+  obtain ⟨commit,boundary,readCommit,readBoundary,lower⟩ := recovery_less_false _ _ _ _ _ _ _ _ both.1
+  obtain ⟨commit',lastIndex,readCommit',readLast,upper⟩ := recovery_greater_false _ _ _ _ _ _ _ _ both.2
+  have same : commit = commit' := Except.ok.inj (readCommit.symm.trans readCommit')
+  subst commit'
+  have hardRead := (recovery_hard_value _ _ _ _ _ _ _).mp readCommit
+  have baseRead := (recovery_base_value _ _ _ _ _ _ _).mp readBoundary
+  obtain ⟨record,lastRead,indexRead⟩ := (recovery_last_value _ _ _ _ _ _ _).mp readLast
+  exact ⟨commit,boundary,lastIndex,record,hardRead,baseRead,lastRead,indexRead,lower,upper⟩
+
 end Storage

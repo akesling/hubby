@@ -3919,7 +3919,7 @@
         "R05"
       ],
       "status": "component_evidence",
-      "note": "Complete original restore and constructor/append/last/iterator/base helpers in proofs/storage: arbitrary iterator responses and explicit external/destructor boundaries, successful shape and exact metadata retention, sufficient interpreter fuel, final validation and source-place contracts. Buffer histories include restoration. General log ordering, durable/protocol reachability, committed-prefix refinement and physical source/ownership/unwinding correspondence remain open."
+      "note": "Complete original restore and constructor/append/last/iterator/base helpers in proofs/storage: arbitrary iterator responses and explicit external/destructor boundaries, successful shape and exact metadata retention, sufficient interpreter fuel, concrete snapshot-index/commit/last-index bounds and source-place contracts. Buffer histories include restoration. General log ordering, durable/protocol reachability, committed-prefix refinement and physical source/ownership/unwinding correspondence remain open."
     },
     "crate::state::<State < V , S , CAP >>::snapshot": {
       "requirements": [

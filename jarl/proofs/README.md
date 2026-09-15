@@ -162,12 +162,14 @@ log invariants remains open. Destructors and pre-unwind ownership are explicit.
 
 The general installation shape theorem covers every successful branch from any
 shape-valid buffer. Storage histories compose this with append, growth and
-truncation. Restoration and protocol/metadata reachability remain outside that
+truncation and restoration. Protocol/metadata reachability remains outside that
 history theorem; it does not establish global Raft safety.
 
 Restoration translates all original validation and helper bodies. Iterator calls
 and destruction remain external interactions. Successful returns preserve buffer
 shape and the supplied metadata; the interpreter bound is sufficient for every
-response sequence. Restoration now participates in the buffer-history theorem.
+response sequence. Successful recovery also establishes the concrete bounds
+`snapshot.index ≤ hard.commit ≤ last().index` using the translated final guard.
+Restoration now participates in the buffer-history theorem.
 This closes the listed storage operations for that shape predicate, not log-ID
 ordering, valid durable recovery, protocol safety or Rust memory refinement.

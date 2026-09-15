@@ -31,6 +31,8 @@ fn storage_shape_holds_on_32_bit_and_rejects_changed_effects() {
     project["crate_root"] = "src/lib.rs".into();
     fs::write(&config, project.to_string()).unwrap();
     for (from, to) in [
+        ("hard.commit < base.index", "false"),
+        ("hard.commit > state.last().index", "false"),
         ("self.len += 1;", "self.len += 2;"),
         ("self.len == CAP", "self.len != CAP"),
         ("if i < self.len", "if i <= self.len"),

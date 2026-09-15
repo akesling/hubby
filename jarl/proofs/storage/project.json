@@ -110,6 +110,10 @@
     {
       "theorem": "Storage.restoration_places",
       "function": "state_State_restore"
+    },
+    {
+      "theorem": "Storage.restoration_commit_bounds",
+      "function": "state_State_restore"
     }
   ]
 }
