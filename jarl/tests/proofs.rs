@@ -97,3 +97,6 @@ mod persistence;
 
 #[path = "proof_cases/storage.rs"]
 mod storage;
+
+#[path = "proof_cases/boundary.rs"]
+mod boundary;

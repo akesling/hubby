@@ -249,3 +249,9 @@ or taken from an Option, and custom receiver Drop is rejected. The generated
 slot-move semantics expose residual payload disposal and preserve metadata as an
 opaque value. They do not model metadata ownership during failed construction,
 panic hooks or unwinding; source/layout/ownership refinement remains open.
+
+Shared optional-record selectors retain their receiver and payload field paths
+in Lean and check eager default computation. Storage IR also records source
+array/length paths and capacity names so consumer obligations can bind projected
+stores to specific source places. These source-place checks are complementary to,
+and do not replace, the still-open Rust layout and borrow refinement proof.

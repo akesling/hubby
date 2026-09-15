@@ -3812,8 +3812,8 @@
         "R03",
         "R05"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+      "status": "component_evidence",
+      "note": "Complete original shared record selector in proofs/log-boundary: absent snapshot yields zero index/term; present snapshot returns its last record. Eager builtin Default, source field paths and projection checked; lookup/caller invariants and source/borrow/layout refinement remain open."
     },
     "crate::state::<State < V , S , CAP >>::entries": {
       "requirements": [

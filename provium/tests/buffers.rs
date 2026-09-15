@@ -142,6 +142,7 @@ fn independent_append_contract_rejects_source_drift() {
         r#"import Generated
 open Provium.State
 theorem advances (input : Nat) :
+    Subject.Buffer_push_ir.slotsPath = ["slots"] ∧
     Subject.Buffer_push 64 1 ⟨[none], 0⟩ input =
       .returned (.ok ()) ⟨[some input], 1⟩ := by
   simp [Subject.Buffer_push, Subject.Buffer_push_ir, appendBuffer]
@@ -155,6 +156,7 @@ theorem advances (input : Nat) :
     for mutated in [
         SOURCE.replace("self.len+=1;", "self.len+=2;"),
         SOURCE.replace("self.len==CAP", "self.len!=CAP"),
+        SOURCE.replace("slots", "other"),
     ] {
         fs::write(w.0.join("lib.rs"), mutated).unwrap();
         let error = provium::methods::verify(&config, &out).unwrap_err();

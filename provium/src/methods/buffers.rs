@@ -237,13 +237,13 @@ impl Crate {
             syn::BinOp::Ne(_) => false,
             _ => return Err("unsupported buffer comparison".into()),
         };
-        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],array:None,query:None,constructor:None,relocation:None,buffer:Some(Append{slots,length,capacity,guard_method,guard_rust:tokens(&helper.item),equal,increment,error:format!("{resolved}::{}",variant.ident),scope:"complete bounded append and source-resolved guard; drop suspension resumes only when destruction returns; destructor unwinding, Rust layout/borrow and frontend correspondence remain unproved"})})
+        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],array:None,query:None,constructor:None,selection:None,relocation:None,buffer:Some(Append{slots,length,capacity,guard_method,guard_rust:tokens(&helper.item),equal,increment,error:format!("{resolved}::{}",variant.ident),scope:"complete bounded append and source-resolved guard; drop suspension resumes only when destruction returns; destructor unwinding, Rust layout/borrow and frontend correspondence remain unproved"})})
     }
 }
 pub(super) fn generate(method: &Method) -> String {
     let a = method.buffer.as_ref().unwrap();
     let name = &method.symbol;
-    format!("def {name}_ir : BufferAppend := ⟨{}, {}, {:?}⟩\ndef {name} (bits capacity : Nat) (state : BufferState α) (input : α) : BufferRun α :=\n  appendBuffer {name}_ir bits capacity state input\ntheorem {name}_correspondence (bits capacity : Nat) (state : BufferState α) (input : α) :\n  appendBuffer {name}_ir bits capacity state input = {name} bits capacity state input := by rfl\n",a.equal,a.increment,a.error)
+    format!("def {name}_ir : BufferAppend := ⟨{}, {}, {:?}, {}, {}, {:?}⟩\ndef {name} (bits capacity : Nat) (state : BufferState α) (input : α) : BufferRun α :=\n  appendBuffer {name}_ir bits capacity state input\ntheorem {name}_correspondence (bits capacity : Nat) (state : BufferState α) (input : α) :\n  appendBuffer {name}_ir bits capacity state input = {name} bits capacity state input := by rfl\n",lean_path(&a.slots),lean_path(&a.length),a.capacity,a.equal,a.increment,a.error)
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

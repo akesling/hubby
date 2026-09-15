@@ -8,4 +8,5 @@ cargo test --locked --test queries -- --ignored
 cargo test --locked --test constructors -- --ignored
 cargo test --locked --test buffers -- --ignored
 cargo test --locked --test relocations -- --ignored
+cargo test --locked --test selectors -- --ignored
 cargo test --locked --test suite -- --ignored

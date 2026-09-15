@@ -222,6 +222,7 @@ fn independent_growth_contract_rejects_source_drift() {
         r#"import Generated
 open Provium.State
 theorem preserves (input : Nat) (metadata : Nat) :
+    Subject.Buffer_grow_ir.slotsPath = ["slots"] ∧
     Subject.Buffer_grow 1 2 ⟨[some input],1⟩ metadata =
       .returned ⟨[some input,none],1⟩ metadata := by
   simp [Subject.Buffer_grow,Subject.Buffer_grow_ir,relocate,moveSlots,disposeSlots]
@@ -235,6 +236,7 @@ theorem preserves (input : Nat) (metadata : Nat) :
     for source in [
         SOURCE.replace("i<self.len", "i<=self.len"),
         SOURCE.replace("NEW>=OLD", "NEW<=OLD"),
+        SOURCE.replace("slots", "other"),
     ] {
         fs::write(w.0.join("lib.rs"), source).unwrap();
         let error = provium::methods::verify(&config, &out).unwrap_err();

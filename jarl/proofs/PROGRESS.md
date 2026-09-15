@@ -106,6 +106,22 @@ It is not a completion certificate. No full-correctness milestone is closed yet.
   mutate the static relation and loop boundary and must fail the Lean contract.
   Jarl's storage project also runs against installed wasm32.
 
+## Snapshot boundary and source-place bindings (M1, C02/R03)
+
+- Provium translates the entire shared Option record selector, including its
+  eager builtin-derived Default. Source-resolved record types and both accessed
+  field paths remain in the generated program; unsupported effects and generic
+  name shadowing are rejected.
+- Jarl's `State::base` now proves exact zero index/term without a snapshot and
+  exact preservation of the snapshot's `last` record when present. The contract
+  also runs against installed wasm32. It does not yet prove `get` or `id_at`.
+- Provider native checks exercise both same-typed projected records; changing
+  which source field is selected must fail the independent Lean contract.
+- Append/growth IR now also retain source array/length paths and capacity names.
+  Explicit Jarl obligations bind the abstract buffer to those original places;
+  provider source-renaming mutations cannot pass merely because the abstract
+  arithmetic is unchanged. Physical layout and borrow refinement remain open.
+
 ## Outstanding dependency frontier
 
 The source inventory is not a resolved call closure or Cargo build proof. Query

@@ -188,6 +188,9 @@ inductive BufferRun (α : Type) where
   | fault (reason : BufferFault) (state : BufferState α)
   | drop (payload : α) (before : BufferState α) (continuation : BufferRun α)
 structure BufferAppend where
+  slotsPath : Path
+  lengthPath : Path
+  capacityName : String
   equal : Bool
   increment : Nat
   error : String
@@ -214,6 +217,10 @@ def resumeDrops : BufferRun α → BufferRun α
   | .drop _ _ next => resumeDrops next
   | result => result
 structure Relocation where
+  slotsPath : Path
+  lengthPath : Path
+  oldCapacityName : String
+  newCapacityName : String
   ascending : Bool
   inclusive : Bool
 inductive SlotMoves (α : Type) where
@@ -249,4 +256,14 @@ def relocate (program : Relocation) (oldCapacity newCapacity : Nat)
     | .done moved remaining => disposeSlots remaining (.returned ⟨moved, state.len⟩ metadata)
     | .bounds index moved remaining => .bounds index moved remaining metadata
   else .invalidInstantiation
+abbrev SelectionStore := Path → Option (Path → InitStore)
+structure RecordSelection where
+  optional : Path
+  recordField : Path
+  fallback : List InitField
+
+def selectRecord (program : RecordSelection) (state : SelectionStore) : InitStore :=
+  match state program.optional with
+  | none => initializeFields program.fallback (fun _ => 0)
+  | some payload => payload program.recordField
 end Provium.State

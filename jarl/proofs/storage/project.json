@@ -43,6 +43,14 @@
     {
       "theorem": "Storage.history_supports_growth",
       "function": "state_State_grow"
+    },
+    {
+      "theorem": "Storage.append_representation",
+      "function": "state_State_push"
+    },
+    {
+      "theorem": "Storage.growth_representation",
+      "function": "state_State_grow"
     }
   ]
 }

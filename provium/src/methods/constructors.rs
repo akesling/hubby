@@ -54,40 +54,7 @@ impl Crate {
                 "constructor requires a plain argument-free Self-returning function".into(),
             );
         }
-        // The accepted standard operations must not resolve to local names.
-        if self
-            .imports
-            .keys()
-            .any(|(_, n)| ["core", "Default"].contains(&n.as_str()))
-            || self
-                .struct_modules
-                .keys()
-                .any(|n| ["core", "Default"].contains(&n.as_str()))
-            || def
-                .impl_generics
-                .type_params()
-                .any(|p| p.ident == "core" || p.ident == "Default")
-        {
-            return Err("constructor builtin namespace is shadowed".into());
-        }
-        for source in self.files.values() {
-            for item in syn::parse_file(source).map_err(|e| e.to_string())?.items {
-                match item {
-                    Item::Mod(m) if m.ident == "core" || m.ident == "Default" => {
-                        return Err("constructor builtin namespace is shadowed".into())
-                    }
-                    Item::Trait(t) if t.ident == "Default" => {
-                        return Err("constructor Default trait is shadowed".into())
-                    }
-                    Item::ExternCrate(e)
-                        if e.rename.as_ref().is_some_and(|(_, id)| id == "core") =>
-                    {
-                        return Err("constructor core crate is shadowed".into())
-                    }
-                    _ => {}
-                }
-            }
-        }
+        self.constructor_namespaces(def)?;
         let structure = self
             .structs
             .get(&def.receiver)
@@ -192,6 +159,7 @@ impl Crate {
             body: vec![],
             array: None,
             query: None,
+            selection: None,
             relocation: None,
             buffer: None,
             constructor: Some(Constructor {
@@ -199,6 +167,43 @@ impl Crate {
                 constants: constants.into_keys().collect(),
             }),
         })
+    }
+    pub(super) fn constructor_namespaces(&self, def: &Definition) -> Result<(), String> {
+        // The accepted standard operations must not resolve to local names.
+        if self
+            .imports
+            .keys()
+            .any(|(_, n)| ["core", "Default"].contains(&n.as_str()))
+            || self
+                .struct_modules
+                .keys()
+                .any(|n| ["core", "Default"].contains(&n.as_str()))
+            || def
+                .impl_generics
+                .type_params()
+                .any(|p| p.ident == "core" || p.ident == "Default")
+        {
+            return Err("constructor builtin namespace is shadowed".into());
+        }
+        for source in self.files.values() {
+            for item in syn::parse_file(source).map_err(|e| e.to_string())?.items {
+                match item {
+                    Item::Mod(m) if m.ident == "core" || m.ident == "Default" => {
+                        return Err("constructor builtin namespace is shadowed".into())
+                    }
+                    Item::Trait(t) if t.ident == "Default" => {
+                        return Err("constructor Default trait is shadowed".into())
+                    }
+                    Item::ExternCrate(e)
+                        if e.rename.as_ref().is_some_and(|(_, id)| id == "core") =>
+                    {
+                        return Err("constructor core crate is shadowed".into())
+                    }
+                    _ => {}
+                }
+            }
+        }
+        Ok(())
     }
     fn capacity(expr: &Expr, constants: &BTreeMap<String, Capacity>) -> Result<Capacity, String> {
         match expr {
@@ -225,7 +230,7 @@ impl Crate {
             _ => Err("unsupported constructor capacity expression".into()),
         }
     }
-    fn initial(
+    pub(super) fn initial(
         &self,
         module: &str,
         ty: &Type,
@@ -353,7 +358,7 @@ impl Crate {
         ))
     }
 }
-fn initial(i: &Initial) -> String {
+pub(super) fn initial(i: &Initial) -> String {
     match i {
         Initial::Boolean(b) => format!(".boolean {b}"),
         Initial::Unsigned { rust_type, value } => format!(".unsigned {rust_type:?} {value}"),

@@ -1,0 +1,10 @@
+{
+  "crate_root":"../../src/lib.rs",
+  "namespace":"JarlBoundary",
+  "methods":["state::State::base"],
+  "proofs":"Proofs.lean",
+  "obligations":[
+    {"theorem":"Boundary.without_snapshot","function":"state_State_base"},
+    {"theorem":"Boundary.snapshot_boundary","function":"state_State_base"}
+  ]
+}

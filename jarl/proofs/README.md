@@ -43,6 +43,7 @@ CI runs both ordinary tests and the full proof gate.
 | [membership](membership/Proofs.lean) | Complete `Membership::finalized` and `is_joint`: arbitrary capacity, correct retention/removal, cleared old flags, surviving identities/fields preserved, no longer joint |
 | [input-gating](input-gating/Proofs.lean) | Complete `Node::available` and `idle`: exact Result, dirty-state/reply/outbox rejection, and clean/drained admission over arbitrary outbox lengths |
 | [capacity](capacity/Proofs.lean) | Complete `State::full`: exact equality against the original const-generic capacity; non-full implies room under the separate `len ≤ CAP` representation invariant |
+| [log-boundary](log-boundary/Proofs.lean) | Complete `State::base`: zero index/term without a snapshot, otherwise exactly the snapshot boundary record, with source field paths retained |
 | [storage](storage/Proofs.lean) | Complete `State::push`, `new` and `grow`: no-drop append/growth, occupied-prefix/capacity and metadata preservation, explicit destruction boundaries, and induction over histories with changing capacity |
 | [initialization](initialization/Proofs.lean) | Complete `State::new`: initial hard-state fields, absent snapshot, all slots empty for arbitrary capacity, and initial `len ≤ CAP` |
 
@@ -113,3 +114,10 @@ Native tests cover copied and moved metadata and disposal of out-of-prefix
 payloads in malformed states. Partial-record ownership during a failed
 construction, panic hooks, and destructor unwinding are outside the current
 relocation model; the verified valid-state path encounters none of those effects.
+
+Snapshot-boundary selection includes its eager derived Default computation and
+complete shared Option projection. Its generated program retains both receiver
+and payload field paths; an independent provider mutation selecting another
+same-typed record must fail the proof. Storage contracts also bind their
+projected arrays, lengths and capacity parameters to the original source names.
+These bindings guard source drift; they are not Rust memory-layout proofs.

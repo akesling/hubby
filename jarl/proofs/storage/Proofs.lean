@@ -247,4 +247,26 @@ theorem history_supports_growth (bits capacity newCapacity : Nat) (state : Buffe
         (∀ i, i < state.len → next.slots[i]? = state.slots[i]?) := by
   have valid := storage_history_valid bits capacity state history
   exact ⟨valid.1, valid.2, grow_preserves_shape capacity newCapacity state metadata valid.1 grows⟩
+-- Bind the projected buffer state to the original Rust places and capacity
+-- parameters. Changing which fields a source method operates on must invalidate
+-- this contract, even if its arithmetic would still preserve an abstract buffer.
+theorem append_representation (bits capacity : Nat) (state : BufferState α) (input : α)
+    (shape : Shape state capacity) (space : state.len < capacity) (word : capacity < 2^bits) :
+    JarlStorage.state_State_push_ir.slotsPath = ["entries"] ∧
+    JarlStorage.state_State_push_ir.lengthPath = ["len"] ∧
+    JarlStorage.state_State_push_ir.capacityName = "CAP" ∧
+    JarlStorage.state_State_push bits capacity state input =
+      .returned (.ok ()) ⟨state.slots.set state.len (some input), state.len + 1⟩ := by
+  exact ⟨rfl, rfl, rfl, append_exact bits capacity state input shape space word⟩
+
+theorem growth_representation (oldCapacity newCapacity : Nat) (live : List α) (metadata : β)
+    (fits : live.length ≤ oldCapacity) (grows : oldCapacity ≤ newCapacity) :
+    JarlStorage.state_State_grow_ir.slotsPath = ["entries"] ∧
+    JarlStorage.state_State_grow_ir.lengthPath = ["len"] ∧
+    JarlStorage.state_State_grow_ir.oldCapacityName = "CAP" ∧
+    JarlStorage.state_State_grow_ir.newCapacityName = "NEW" ∧
+    JarlStorage.state_State_grow oldCapacity newCapacity
+      ⟨live.map some ++ List.replicate (oldCapacity - live.length) none, live.length⟩ metadata =
+      .returned ⟨live.map some ++ List.replicate (newCapacity - live.length) none, live.length⟩ metadata := by
+  exact ⟨rfl, rfl, rfl, rfl, grow_exact oldCapacity newCapacity live metadata fits grows⟩
 end Storage
