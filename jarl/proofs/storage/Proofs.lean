@@ -1311,4 +1311,199 @@ theorem truncation_preserves_log (view : α → Path → InitStore) (records : S
   obtain ⟨shape,shorter,unchanged⟩ := truncation_preserves_shape view records boundary capacity state next valid.1 execution
   exact ⟨log_rep_prefix view hard base state next capacity capacity valid shape shorter unchanged,shorter⟩
 
+private theorem ordered_last_record (view : α → Path → InitStore) (records : SelectionStore)
+    (hard base : InitStore) (entries : List α) (last : InitStore) (padding : Nat)
+    (selected : selectRecord JarlStorage.state_State_truncate_ir.last.base records = base)
+    (chain : OrderedEntries view hard base entries last) :
+    lastRecord JarlStorage.state_State_truncate_ir.last
+      (truncationView view records ⟨entries.map some ++ List.replicate padding none,entries.length⟩) = .ok last := by
+  cases chain with
+  | empty =>
+    simpa [lastRecord,iterateRecords,truncationView,JarlStorage.state_State_truncate_ir,presentPlaces] using congrArg (Except.ok (ε := TraversalFault)) selected
+  | @snoc entries previous entry previousIndex index previousTerm term hardTerm chain previousRead indexRead previousTermRead termRead hardRead successor range positive monotone upper =>
+    simpa only [List.map_append,List.map_cons,List.map_nil,List.length_append,List.length_singleton,List.length_map]
+      using last_before_truncation view records (entries.map some) (List.replicate padding none) entry
+
+private theorem record_word_read (record : InitStore) (path : Path) (value : Nat)
+    (read : recordWord record path = some value) :
+    record path = .unsigned "u64" value ∧ value < 2^64 := by
+  cases cell : record path <;> simp only [recordWord,cell] at read
+  all_goals try contradiction
+  split at read
+  · rename_i valid
+    cases read
+    obtain ⟨rfl,range⟩ := valid
+    exact ⟨rfl,range⟩
+  · contradiction
+
+private theorem log_rep_last_index (view : α → Path → InitStore) (records : SelectionStore)
+    (hard base : InitStore) (state : BufferState α) (capacity baseIndex : Nat)
+    (selected : selectRecord JarlStorage.state_State_truncate_ir.last.base records = base)
+    (baseRead : recordWord base ["index"] = some baseIndex)
+    (valid : LogRep view hard base state capacity) :
+    ∃ record, lastRecord JarlStorage.state_State_truncate_ir.last (truncationView view records state) = .ok record ∧
+      record ["index"] = .unsigned "u64" (baseIndex + state.len) ∧ baseIndex + state.len < 2^64 := by
+  obtain ⟨_,entries,last,slots,length,chain⟩ := valid
+  have stateEq : state = ⟨entries.map some ++ List.replicate (capacity - state.len) none,entries.length⟩ := by
+    cases state
+    simp_all
+  have fetched := ordered_last_record view records hard base entries last (capacity - state.len) selected chain
+  have read := ordered_last_index view hard base entries last baseIndex baseRead chain
+  refine ⟨last,?_,?_⟩
+  · rw [← stateEq] at fetched
+    exact fetched
+  · rw [length]
+    exact record_word_read last ["index"] _ read
+
+private theorem truncation_length_exact (view : α → Path → InitStore) (records : SelectionStore)
+    (hard base : InitStore) (boundary capacity baseIndex fuel : Nat) (state next : BufferState α)
+    (selected : selectRecord JarlStorage.state_State_truncate_ir.last.base records = base)
+    (baseRead : recordWord base ["index"] = some baseIndex)
+    (valid : LogRep view hard base state capacity) (boundaryWord : boundary < 2^64)
+    (execution : resumeTruncation (truncateSteps JarlStorage.state_State_truncate_ir view records boundary fuel state) = .returned next) :
+    next.len = min state.len (boundary - (baseIndex + 1)) := by
+  induction fuel generalizing state with
+  | zero => simp [truncateSteps,resumeTruncation] at execution
+  | succ fuel ih =>
+    obtain ⟨record,fetched,read,range⟩ := log_rep_last_index view records hard base state capacity baseIndex selected baseRead valid
+    rw [truncateSteps,fetched] at execution
+    simp only [show JarlStorage.state_State_truncate_ir.indexField = ["index"] by rfl,read] at execution
+    simp only [show JarlStorage.state_State_truncate_ir.inclusive = true by rfl,truncationCompare,↓reduceIte] at execution
+    rw [if_neg (by simp;omega)] at execution
+    by_cases cut : baseIndex + state.len ≥ boundary ∧ state.len > 0
+    · rw [if_pos cut] at execution
+      have occupied := valid.1.2.2.1 (state.len - 1) (by omega)
+      obtain ⟨entry,present⟩ := occupied
+      simp only [present,resumeTruncation] at execution
+      have shape := clear_preserves_shape state capacity valid.1 cut.2
+      have retained : LogRep view hard base
+          ⟨state.slots.set (state.len - 1) none,state.len - 1⟩ capacity :=
+        log_rep_prefix view hard base state _ capacity capacity valid shape (by dsimp;omega)
+          (fun i inside => List.getElem?_set_ne (by dsimp at inside;omega))
+      have shorter := ih _ retained execution
+      dsimp at shorter
+      omega
+    · rw [if_neg cut] at execution
+      simp only [resumeTruncation,TruncationRun.returned.injEq] at execution
+      subst next
+      omega
+
+theorem truncation_preserves_committed_prefix (view : α → Path → InitStore) (records : SelectionStore)
+    (hard base : InitStore) (boundary capacity baseIndex commit : Nat) (state next : BufferState α)
+    (selected : selectRecord JarlStorage.state_State_truncate_ir.last.base records = base)
+    (baseRead : recordWord base ["index"] = some baseIndex)
+    (valid : LogRep view hard base state capacity) (boundaryWord : boundary < 2^64)
+    (commitBounds : baseIndex ≤ commit ∧ commit ≤ baseIndex + state.len)
+    (authorized : commit < boundary)
+    (execution : resumeTruncation (JarlStorage.state_State_truncate view records state boundary) = .returned next) :
+    LogRep view hard base next capacity ∧ commit ≤ baseIndex + next.len ∧
+      ∀ position, position < commit - baseIndex → next.slots[position]? = state.slots[position]? := by
+  have length := truncation_length_exact view records hard base boundary capacity baseIndex _ state next selected baseRead valid boundaryWord execution
+  have shape := truncation_preserves_shape view records boundary capacity state next valid.1 execution
+  refine ⟨(truncation_preserves_log view records hard base boundary capacity state next valid execution).1,by omega,?_⟩
+  intro position committed
+  exact shape.2.2 position (by omega)
+private theorem truncation_returns (view : α → Path → InitStore) (records : SelectionStore)
+    (hard base : InitStore) (boundary capacity baseIndex fuel : Nat) (state : BufferState α)
+    (selected : selectRecord JarlStorage.state_State_truncate_ir.last.base records = base)
+    (baseRead : recordWord base ["index"] = some baseIndex)
+    (valid : LogRep view hard base state capacity) (boundaryWord : boundary < 2^64)
+    (enough : state.len < fuel) :
+    ∃ next, resumeTruncation (truncateSteps JarlStorage.state_State_truncate_ir view records boundary fuel state) = .returned next := by
+  induction fuel generalizing state with
+  | zero => omega
+  | succ fuel ih =>
+    obtain ⟨record,fetched,read,range⟩ := log_rep_last_index view records hard base state capacity baseIndex selected baseRead valid
+    rw [truncateSteps,fetched]
+    simp only [show JarlStorage.state_State_truncate_ir.indexField = ["index"] by rfl,read]
+    simp only [show JarlStorage.state_State_truncate_ir.inclusive = true by rfl,truncationCompare,↓reduceIte]
+    rw [if_neg (by simp;omega)]
+    by_cases cut : baseIndex + state.len ≥ boundary ∧ state.len > 0
+    · rw [if_pos cut]
+      obtain ⟨entry,present⟩ := valid.1.2.2.1 (state.len - 1) (by omega)
+      simp only [present,resumeTruncation]
+      have shape := clear_preserves_shape state capacity valid.1 cut.2
+      have retained : LogRep view hard base
+          ⟨state.slots.set (state.len - 1) none,state.len - 1⟩ capacity :=
+        log_rep_prefix view hard base state _ capacity capacity valid shape (by dsimp;omega)
+          (fun i inside => List.getElem?_set_ne (by dsimp at inside;omega))
+      exact ih _ retained (by dsimp;omega)
+    · rw [if_neg cut]
+      exact ⟨state,rfl⟩
+
+-- Following all Drop continuations is explicit in resumeTruncation. This
+-- completion theorem does not assume arbitrary user destructors must return.
+theorem truncation_complete_result (view : α → Path → InitStore) (records : SelectionStore)
+    (hard base : InitStore) (boundary capacity baseIndex : Nat) (state : BufferState α)
+    (selected : selectRecord JarlStorage.state_State_truncate_ir.last.base records = base)
+    (baseRead : recordWord base ["index"] = some baseIndex)
+    (valid : LogRep view hard base state capacity) (boundaryWord : boundary < 2^64) :
+    ∃ next, resumeTruncation (JarlStorage.state_State_truncate view records state boundary) = .returned next ∧
+      LogRep view hard base next capacity ∧ next.len = min state.len (boundary - (baseIndex + 1)) ∧
+      ∀ position, position < next.len → next.slots[position]? = state.slots[position]? := by
+  obtain ⟨next,execution⟩ := truncation_returns view records hard base boundary capacity baseIndex (state.len + 1) state selected baseRead valid boundaryWord (by omega)
+  have shape := truncation_preserves_shape view records boundary capacity state next valid.1 execution
+  exact ⟨next,execution,(truncation_preserves_log view records hard base boundary capacity state next valid execution).1,
+    truncation_length_exact view records hard base boundary capacity baseIndex _ state next selected baseRead valid boundaryWord execution,
+    shape.2.2⟩
+
+-- The append caller must establish these scalar relationships. push itself
+-- deliberately remains a readable bounded-storage operation.
+def LogSuccessor (hard previous entry : InitStore) : Prop :=
+  ∃ previousIndex index previousTerm term hardTerm,
+    recordWord previous ["index"] = some previousIndex ∧
+    recordWord entry ["index"] = some index ∧
+    recordWord previous ["term"] = some previousTerm ∧
+    recordWord entry ["term"] = some term ∧
+    recordWord hard ["term"] = some hardTerm ∧
+    index = previousIndex + 1 ∧ index < 2^64 ∧ 0 < term ∧ previousTerm ≤ term ∧ term ≤ hardTerm
+
+theorem append_preserves_log (bits capacity : Nat) (view : α → Path → InitStore) (records : SelectionStore)
+    (hard base last : InitStore) (state : BufferState α) (entry : α)
+    (selected : selectRecord JarlStorage.state_State_truncate_ir.last.base records = base)
+    (valid : LogRep view hard base state capacity) (space : state.len < capacity) (word : capacity < 2^bits)
+    (fetched : lastRecord JarlStorage.state_State_truncate_ir.last (truncationView view records state) = .ok last)
+    (follows : LogSuccessor hard last (view entry ["id"])) :
+    ∃ next, JarlStorage.state_State_push bits capacity state entry = .returned (.ok ()) next ∧
+      LogRep view hard base next capacity ∧ next.len = state.len + 1 ∧
+      ∀ position, position < state.len → next.slots[position]? = state.slots[position]? := by
+  obtain ⟨shape,entries,previous,slots,length,chain⟩ := valid
+  have stateEq : state = ⟨entries.map some ++ List.replicate (capacity - state.len) none,entries.length⟩ := by
+    cases state
+    simp_all
+  have read := ordered_last_record view records hard base entries previous (capacity - state.len) selected chain
+  rw [← stateEq] at read
+  have same : previous = last := Except.ok.inj (read.symm.trans fetched)
+  subst previous
+  obtain ⟨previousIndex,index,previousTerm,term,hardTerm,readPrevious,readIndex,readPreviousTerm,readTerm,readHard,successor,range,positive,monotone,upper⟩ := follows
+  have nextChain : OrderedEntries view hard base (entries ++ [entry]) (view entry ["id"]) :=
+    .snoc entry previousIndex index previousTerm term hardTerm chain readPrevious readIndex readPreviousTerm readTerm readHard successor range positive monotone upper
+  obtain ⟨next,execution,nextShape,nextLength⟩ := append_preserves_shape bits capacity state entry shape space word
+  have nextEq : next = ⟨state.slots.set state.len (some entry),state.len + 1⟩ := by
+    rw [append_exact bits capacity state entry shape space word] at execution
+    exact (BufferRun.returned.inj execution).2.symm
+  refine ⟨next,execution,⟨nextShape,entries ++ [entry],view entry ["id"],?_,by simpa [length] using nextLength,nextChain⟩,nextLength,?_⟩
+  · rw [nextEq]
+    dsimp
+    rw [slots,length]
+    have padding : capacity - entries.length = (capacity - (entries.length + 1)) + 1 := by omega
+    rw [padding,List.replicate_succ]
+    simp [List.set_append_right,List.map_append,List.append_assoc]
+  · intro position inside
+    rw [nextEq]
+    exact List.getElem?_set_ne (by omega)
+
+theorem append_preserves_committed_prefix (bits capacity baseIndex commit : Nat) (state : BufferState α) (entry : α)
+    (shape : Shape state capacity) (space : state.len < capacity) (word : capacity < 2^bits)
+    (commitBounds : baseIndex ≤ commit ∧ commit ≤ baseIndex + state.len) :
+    ∃ next, JarlStorage.state_State_push bits capacity state entry = .returned (.ok ()) next ∧
+      commit ≤ baseIndex + next.len ∧
+      ∀ position, position < commit - baseIndex → next.slots[position]? = state.slots[position]? := by
+  obtain ⟨next,execution,_,length⟩ := append_preserves_shape bits capacity state entry shape space word
+  obtain ⟨framed,same,unchanged⟩ := append_preserves_prefix bits capacity state entry shape space word
+  rw [execution] at same
+  have identical := (BufferRun.returned.inj same).2
+  subst framed
+  exact ⟨next,execution,by omega,fun position inside => unchanged position (by omega)⟩
+
 end Storage

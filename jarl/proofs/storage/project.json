@@ -150,6 +150,22 @@
     {
       "theorem": "Storage.truncation_preserves_log",
       "function": "state_State_truncate"
+    },
+    {
+      "theorem": "Storage.truncation_preserves_committed_prefix",
+      "function": "state_State_truncate"
+    },
+    {
+      "theorem": "Storage.truncation_complete_result",
+      "function": "state_State_truncate"
+    },
+    {
+      "theorem": "Storage.append_preserves_log",
+      "function": "state_State_push"
+    },
+    {
+      "theorem": "Storage.append_preserves_committed_prefix",
+      "function": "state_State_push"
     }
   ]
 }

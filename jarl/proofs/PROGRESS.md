@@ -8,9 +8,9 @@ Continue with the next open source-linked obligation under the existing toolchai
 dependency, no_std/sans-I/O and approval constraints. Only the full specification's
 verified completion can close this work; a green component suite cannot.
 
-Immediate frontier: prove committed-prefix preservation and append/installation
-log validity under actual caller conditions, then compose complete protocol
-callers and durable histories. Recovery, growth and truncation preserve the
+Immediate frontier: prove installation log validity and committed-prefix
+conditions, then discharge append/truncation/installation preconditions in the
+complete protocol callers and durable histories. Recovery, growth and truncation preserve the
 logical log representation under the contracts below. Buffer-shape induction alone
 is not a source-level Raft correctness proof.
 
@@ -308,3 +308,18 @@ complete generated transitions, including durable votes and restart.
 - These contracts retain term and index order, not merely slot presence. They
   do not authorize truncating committed entries; that requires caller conditions
   and a separate committed-prefix contract.
+
+## Append and truncation commitment boundaries (partial R02/R03 evidence)
+
+- Append preserves the ordered log when its caller supplies a checked successor
+  LogId with positive, nondecreasing term bounded by the hard term. Original push
+  remains unchanged; the proof records its caller obligation explicitly.
+- Truncation has an exact normal-resumption result of
+  min(old_len, boundary - (base_index + 1)). Valid logs and a u64 boundary cannot
+  produce an internal traversal, bounds, input or fuel fault when all destructors
+  return normally. Every retained payload is unchanged.
+- When commit lies in the original log and commit < boundary, truncation preserves
+  all committed entries and leaves the commit index in range. Append preserves
+  committed entries and their range as well.
+- Actual protocol caller authorization and persistence remain to be proved; these
+  local contracts do not establish global Raft committed-prefix safety.

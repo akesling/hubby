@@ -3909,7 +3909,7 @@
         "R05"
       ],
       "status": "component_evidence",
-      "note": "Complete bounded append and original full helper in proofs/storage: exact no-drop success, shape/prefix preservation, full-input drop suspension, and append-only induction from generated initialization. Restore/truncate/install/grow, destructor unwinding, log semantics and source/layout refinement remain open."
+      "note": "Complete bounded append and original full helper in proofs/storage: exact no-drop success, shape/prefix preservation, full-input drop suspension, and append-only induction from generated initialization. Conditional ordered-log and committed-prefix append preservation are checked; actual caller validation, destructor unwinding and source/layout refinement remain open."
     },
     "crate::state::<State < V , S , CAP >>::restore": {
       "requirements": [
@@ -3939,7 +3939,7 @@
         "R05"
       ],
       "status": "component_evidence",
-      "note": "Complete original truncate loop and last/iterator/base helpers in proofs/storage: successful shape and retained-prefix preservation, descending payload Drop suspensions, empty return, sufficient internal fuel, and append/grow/truncate history induction. Destructors must return normally to follow continuations; restore/install, log ordering, committed-prefix callers and source/layout/unwinding refinement remain open."
+      "note": "Complete original truncate loop and last/iterator/base helpers in proofs/storage: successful shape and retained-prefix preservation, descending payload Drop suspensions, empty return, sufficient internal fuel, and append/grow/truncate history induction. Ordered-prefix preservation, exact normal-resumption length and committed-prefix protection above commit are checked. Destructors must return normally to follow continuations; actual committed-prefix callers and source/layout/unwinding refinement remain open."
     },
     "crate::state::<State < V , S , CAP >>::write": {
       "requirements": [

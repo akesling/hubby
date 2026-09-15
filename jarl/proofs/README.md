@@ -178,7 +178,8 @@ nondecreasing, and all terms are bounded by the hard-state term. Exact-index
 contracts bind live slots and the original last() result to their offsets.
 Snapshot validity and the term-zero vote rule are checked from the initial guard.
 Growth and truncation preserve this logical representation: growth retains the
-chain, and truncation retains an ordered prefix. Committed-prefix protection
-requires additional caller conditions. Preservation through append, installation
-and every protocol caller,
+chain, and truncation retains an ordered prefix. Append preserves the chain under explicit successor/term preconditions.
+Truncation proves an exact retained length and protects committed entries when
+the boundary is above commit; append protects the existing committed prefix.
+Discharging these conditions in every protocol caller, proving installation,
 valid durable recovery, protocol safety and Rust memory refinement remain open.
