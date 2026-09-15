@@ -103,7 +103,7 @@ impl Compiler<'_> {
                 match name.as_str() {
                     "bool" => Ty::Bool,
                     "u64" => Ty::Number("u64"),
-                    "i32" => Ty::Number("i32"),
+                    "i32" => return Err("signed source values are not modeled; i32 is reserved for inferred nonnegative locals".into()),
                     "Option" => {
                         let syn::PathArguments::AngleBracketed(a) = &s.arguments else {
                             return Err("invalid Option type".into());

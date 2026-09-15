@@ -331,3 +331,10 @@ The pure machine supplies kernel-proved error-propagation and array-loop rules.
 array length, provided it proves preservation for the actual generated body.
 All five rules are audited for transitive axioms. A separate universal check
 ensures derived record equality evaluates effectful operands exactly once.
+
+`pure_eval_step` provides a checked single-step equation for symbolic execution,
+with a nonzero-fuel guard and a non-loop guard. Consumers can simplify surrounding
+expressions while applying a separate invariant or scan theorem at each loop.
+Its axiom audit and a symbolic evaluation regression run in the verifier gates.
+Signed source fields are rejected: the current `i32` support is restricted to
+inferred nonnegative locals and positive literals, such as array-loop counters.

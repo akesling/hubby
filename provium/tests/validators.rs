@@ -97,6 +97,7 @@ fn complete_pure_body_and_helper_are_retained_and_unsupported_rust_rejected() {
             "struct Checker;",
             "impl Position {fn default()->Self{Self{offset:1,epoch:1}}} struct Checker;",
         ),
+        "enum Packet { Data { value: i32 } } struct Checker; impl Checker { fn check(packet: &Packet) -> bool { match packet { Packet::Data{value} => *value > 0 } } }".to_owned(),
         format!("struct i32;{SOURCE}"),
         format!("struct Other<i32>{{value:i32}}{SOURCE}"),
         SOURCE.replace("let good=", "let Some=|value:u64|value;let good="),
@@ -255,6 +256,12 @@ import Provium.Audit
 #provium_check Provium.State.pure_fold_invariant references Provium.State.pureEval
 #provium_check Provium.State.pure_each_invariant references Provium.State.pureEval
 #provium_check Provium.State.pure_fold_history references Provium.State.pureEval
+#provium_check Provium.State.pure_eval_step references Provium.State.pureEval
+open Provium.State
+theorem symbolic_literal (env : PureEnv) :
+    pureEval 256 (.literal (.boolean true)) env = .ok (.boolean true,env) := by
+  simp (disch := decide) [pure_eval_step]
+#provium_check symbolic_literal references Provium.State.pureEval
 "#,
     )
     .unwrap();
@@ -283,6 +290,6 @@ import Provium.Audit
         String::from_utf8_lossy(&checked.stdout)
             .matches("PROVIUM_VERIFIED ")
             .count(),
-        5
+        7
     );
 }

@@ -1359,4 +1359,73 @@ theorem pure_fold_history (fuel slot : Nat) (body : PureExpr)
         (by simpa [evaluated,bind,Except.bind] using returned)
       simpa [List.append_assoc] using tail
 
+
+def pureIsLoop : PureExpr → Bool
+  | .each .. => true
+  | _ => false
+
+/-- Unfold one non-loop step, retaining loops as proof boundaries. This prevents
+    symbolic simplification from expanding the body under an unknown array fold.
+    The identity loop case adds no execution assumption. -/
+theorem pure_eval_step (fuel : Nat) (expression : PureExpr) (env : PureEnv)
+    (nonzero : (fuel == 0) = false)
+    (_notLoop : pureIsLoop expression = false) :
+    pureEval fuel expression env = (match expression with
+
+    | .literal value => .ok (value, env)
+    | .read slot => match env slot with
+      | some value => .ok (value, env)
+      | none => .error (.fault .representation)
+    | .copy value => pureEval (fuel-1) value env
+    | .present value => do
+      let (value, env) ← pureEval (fuel-1) value env
+      return (.present value, env)
+    | .field value name => do
+      let (value, env) ← pureEval (fuel-1) value env
+      match pureField value name with
+      | some value => return (value, env)
+      | none => .error (.fault .representation)
+    | .negate value => do
+      let (.boolean value, env) ← pureEval (fuel-1) value env
+        | .error (.fault .representation)
+      return (.boolean (!value), env)
+    | .binary op left right => do
+      let (left, env) ← pureEval (fuel-1) left env
+      if op = "&&" || op = "||" then
+        let .boolean value := left | .error (.fault .representation)
+        if (op = "&&" && !value) || (op = "||" && value) then
+          return (.boolean value, env)
+        else
+          let (.boolean value, env) ← pureEval (fuel-1) right env
+            | .error (.fault .representation)
+          return (.boolean value, env)
+      else
+        let (right, env) ← pureEval (fuel-1) right env
+        let value ← pureBinary op left right
+        return (value, env)
+    | .sequence first second => do
+      let (_, env) ← pureEval (fuel-1) first env
+      pureEval (fuel-1) second env
+    | .write slot value => do
+      let (value, env) ← pureEval (fuel-1) value env
+      return (.unit, pureSet env slot value)
+    | .branch condition yes no => do
+      let (.boolean condition, env) ← pureEval (fuel-1) condition env
+        | .error (.fault .representation)
+      pureEval (fuel-1) (if condition then yes else no) env
+    | .choose value arms => do
+      let (value, env) ← pureEval (fuel-1) value env
+      match arms.findSome? (fun arm =>
+        (pureMatch (fuel-1) arm.1 value env).map (fun env => (arm.2,env))) with
+      | some (body, env) => pureEval (fuel-1) body env
+      | none => .error (.fault .representation)
+    | .each value slot body => pureEval fuel (.each value slot body) env
+    | .ret value => do
+      let (value, _) ← pureEval (fuel-1) value env
+      .error (.returned value)
+) := by
+  cases fuel with
+  | zero => simp at nonzero
+  | succ fuel => cases expression <;> rfl
+
 end Provium.State
