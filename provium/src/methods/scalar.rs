@@ -173,7 +173,7 @@ impl Crate {
         Ok(Translation {source,files:self.files.clone(),evidence:Evidence {
             method:name.into(),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,
             rust:tokens(f),fields,projections,
-            scope:"successful-state projections of the complete explicit scalar method body; all statements execute in every projection; panic-store effects, frontend/field/borrow refinement and whole-Raft correctness are not proved",
+            scope:"successful-state projections of the complete explicit scalar method body; all statements execute in every projection; panic-store effects, frontend/field/borrow refinement and whole-program correctness are not proved",
         }})
     }
 }

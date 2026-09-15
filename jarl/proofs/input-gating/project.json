@@ -1,0 +1,44 @@
+{
+  "crate_root": "../../src/lib.rs",
+  "namespace": "JarlGate",
+  "methods": [
+    "node::Node::available",
+    "node::Node::idle",
+    "ready::Ready::persisted"
+  ],
+  "proofs": "Proofs.lean",
+  "obligations": [
+    {
+      "theorem": "JarlGateProofs.exact_result",
+      "function": "node_Node_available"
+    },
+    {
+      "theorem": "JarlGateProofs.dirty_blocks",
+      "function": "node_Node_available"
+    },
+    {
+      "theorem": "JarlGateProofs.pending_reply_blocks",
+      "function": "node_Node_available"
+    },
+    {
+      "theorem": "JarlGateProofs.pending_outbox_blocks",
+      "function": "node_Node_available"
+    },
+    {
+      "theorem": "JarlGateProofs.clean_allows",
+      "function": "node_Node_available"
+    },
+    {
+      "theorem": "JarlGateProofs.idle_agrees",
+      "function": "node_Node_idle"
+    },
+    {
+      "theorem": "JarlGateProofs.after_ack_exact",
+      "function": "node_Node_available"
+    },
+    {
+      "theorem": "JarlGateProofs.ack_preserves_pending_outputs",
+      "function": "ready_Ready_persisted"
+    }
+  ]
+}

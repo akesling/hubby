@@ -1,0 +1,4009 @@
+{
+  "schema": 1,
+  "inventory": {
+    "schema": 1,
+    "sources": [
+      {
+        "path": "src/cluster.rs",
+        "sha256": "e38ba92c63cd8a039d1203c5c7d6b1dc64d9c3ca7e2513382fd9623d7ca38a1a"
+      },
+      {
+        "path": "src/host.rs",
+        "sha256": "331020a63b198c93ab2d7be72d55f0141452ca2e2bd47d071f249eede26f43e0"
+      },
+      {
+        "path": "src/lib.rs",
+        "sha256": "0014e082357784a4db9adf5d8bb6e41ba3d74e3dc1d51706fc102ecca8523107"
+      },
+      {
+        "path": "src/membership.rs",
+        "sha256": "dd47be268b58f742055715cd487ce6b268aefb4449012af96679c126d94f695d"
+      },
+      {
+        "path": "src/node.rs",
+        "sha256": "e856f044cc1101a1aa80bc17637413c87507a1c585613a72c5347367b9f14d17"
+      },
+      {
+        "path": "src/ready.rs",
+        "sha256": "c9b492d092d709901161d57fe59c913f0b445d44b1a602dc8817f14303fa0feb"
+      },
+      {
+        "path": "src/state.rs",
+        "sha256": "8f64797a70cd85bb2da89b035303475570e7488bfcd9b5e03e332c105be40944"
+      }
+    ],
+    "items": [
+      {
+        "id": "crate::<Config < N >>::new",
+        "kind": "method",
+        "source": "src/lib.rs",
+        "line": 85,
+        "public": true,
+        "syntax_sha256": "a706a1462fd13c25736361886e6ab39384df602514d4f6ae1da94dc4b23249ea",
+        "calls": [
+          "method wrapping_add"
+        ]
+      },
+      {
+        "id": "crate::<Envelope < & V , & S >>::cloned",
+        "kind": "method",
+        "source": "src/lib.rs",
+        "line": 258,
+        "public": true,
+        "syntax_sha256": "5e93a2e9ff17b8ea7819e69fed0e16803b811cab9a805dd07071ee18a8a12bdd",
+        "calls": [
+          "call core :: array :: from_fn",
+          "method as_ref",
+          "method clone",
+          "method cloned",
+          "method map"
+        ]
+      },
+      {
+        "id": "crate::<Error as core :: fmt :: Display>::fmt",
+        "kind": "method",
+        "source": "src/lib.rs",
+        "line": 123,
+        "public": false,
+        "syntax_sha256": "4f3c51af4adeed31d639c7d4d793e1cbd3974cdbe6206f4eaea1fa10c342ff95",
+        "calls": [
+          "macro write",
+          "method write_str"
+        ]
+      },
+      {
+        "id": "crate::<Message < V , S >>::term",
+        "kind": "method",
+        "source": "src/lib.rs",
+        "line": 232,
+        "public": false,
+        "syntax_sha256": "b7bea85c210944f2b28bd4a9a84d29440b36065a2045260d6096976d8c6eac50",
+        "calls": []
+      },
+      {
+        "id": "crate::<item:10>",
+        "kind": "other",
+        "source": "src/lib.rs",
+        "line": 21,
+        "public": false,
+        "syntax_sha256": "268b9c3d969b4eede9c603ec6abda2201ab2192c8eaa14dcd531c108c23890fe",
+        "calls": []
+      },
+      {
+        "id": "crate::<item:11>",
+        "kind": "other",
+        "source": "src/lib.rs",
+        "line": 22,
+        "public": false,
+        "syntax_sha256": "04faa8f338c576662f556b819f0817f7f7f726622e237971036c822bd60e5f6c",
+        "calls": []
+      },
+      {
+        "id": "crate::<item:12>",
+        "kind": "other",
+        "source": "src/lib.rs",
+        "line": 23,
+        "public": false,
+        "syntax_sha256": "d0646a498fb726f5d72b1a3c5fdb98c9191e1c2fe2e4fa0c8625ea050b27eb85",
+        "calls": []
+      },
+      {
+        "id": "crate::<item:13>",
+        "kind": "other",
+        "source": "src/lib.rs",
+        "line": 24,
+        "public": false,
+        "syntax_sha256": "319c1bd63aa4c15547bd4479e2e4f208eff66786a1de2c2464d207a4a182a569",
+        "calls": []
+      },
+      {
+        "id": "crate::<item:20>",
+        "kind": "impl",
+        "source": "src/lib.rs",
+        "line": 84,
+        "public": false,
+        "syntax_sha256": "dd1aa249d3d69457be988a167df64569e292a2df5e6f0a3433103a37413a8142",
+        "calls": []
+      },
+      {
+        "id": "crate::<item:22>",
+        "kind": "impl",
+        "source": "src/lib.rs",
+        "line": 122,
+        "public": false,
+        "syntax_sha256": "8e815451828204a8ab187a202e52b0eacf1ed464d09c28b6e632ecef3d71a205",
+        "calls": []
+      },
+      {
+        "id": "crate::<item:23>",
+        "kind": "impl",
+        "source": "src/lib.rs",
+        "line": 140,
+        "public": false,
+        "syntax_sha256": "45b77095c9ea5cbe7644ad2c48f86fe27d4e22b442fa18523982346c4cd9c3a5",
+        "calls": []
+      },
+      {
+        "id": "crate::<item:25>",
+        "kind": "other",
+        "source": "src/lib.rs",
+        "line": 154,
+        "public": false,
+        "syntax_sha256": "8b2347069a6fb4d1ce7360be1bfc02b0726c6f073e75e5bd802307041f36a061",
+        "calls": []
+      },
+      {
+        "id": "crate::<item:27>",
+        "kind": "impl",
+        "source": "src/lib.rs",
+        "line": 231,
+        "public": false,
+        "syntax_sha256": "aff7bbd620d854933244f88edb8a8a3c719da856295210d6a5bcb9fdc982acfe",
+        "calls": []
+      },
+      {
+        "id": "crate::<item:29>",
+        "kind": "impl",
+        "source": "src/lib.rs",
+        "line": 257,
+        "public": false,
+        "syntax_sha256": "df1ec4cba6e8449cc39036f3c57f460d986f894c70ad1bd5a67ca8f0ad429955",
+        "calls": []
+      },
+      {
+        "id": "crate::<item:6>",
+        "kind": "other",
+        "source": "src/lib.rs",
+        "line": 13,
+        "public": false,
+        "syntax_sha256": "40dc183b30ae54d024fad500a70f5ccf59b44f51799580dfa42854d7716a8c88",
+        "calls": []
+      },
+      {
+        "id": "crate::<item:9>",
+        "kind": "other",
+        "source": "src/lib.rs",
+        "line": 20,
+        "public": false,
+        "syntax_sha256": "651c60d516f0d11ee07f3b94633228beb914ba57102cef596b6ce7d9f116b433",
+        "calls": []
+      },
+      {
+        "id": "crate::Config",
+        "kind": "struct",
+        "source": "src/lib.rs",
+        "line": 68,
+        "public": true,
+        "syntax_sha256": "eb7b9d02ce97bdb37e7a4800cbdf6d2f195e0f0589d41b4d3b5c5195383b3077",
+        "calls": []
+      },
+      {
+        "id": "crate::Entry",
+        "kind": "struct",
+        "source": "src/lib.rs",
+        "line": 39,
+        "public": true,
+        "syntax_sha256": "20d9c6bd5239574d1c51a04a3b6becc6f214fd4f460cffcd928b27518570534c",
+        "calls": []
+      },
+      {
+        "id": "crate::Envelope",
+        "kind": "struct",
+        "source": "src/lib.rs",
+        "line": 246,
+        "public": true,
+        "syntax_sha256": "c9c16bbe15541b91aaad174ca787fff11fc36a440dfd62a787e698cc4e2733d4",
+        "calls": []
+      },
+      {
+        "id": "crate::Error",
+        "kind": "enum",
+        "source": "src/lib.rs",
+        "line": 97,
+        "public": true,
+        "syntax_sha256": "237286b4d0f8354bb65d5ea6ab0251347da9fd33cdb279dc4f9799313c9bb3da",
+        "calls": []
+      },
+      {
+        "id": "crate::Id",
+        "kind": "struct",
+        "source": "src/lib.rs",
+        "line": 26,
+        "public": true,
+        "syntax_sha256": "2903fc6c69bac6bd52e249e3f8cab7886767224b561930a18c04628a3de8684f",
+        "calls": []
+      },
+      {
+        "id": "crate::LogId",
+        "kind": "struct",
+        "source": "src/lib.rs",
+        "line": 30,
+        "public": true,
+        "syntax_sha256": "3676b0d7577364bcbfc6ca42a422045c2e080383164c1e9e7e5045812695b041",
+        "calls": []
+      },
+      {
+        "id": "crate::Message",
+        "kind": "enum",
+        "source": "src/lib.rs",
+        "line": 157,
+        "public": true,
+        "syntax_sha256": "93493e0075c57dab7dace126ad0b86cfb7b8f4806d67691c8f323f39a1a07477",
+        "calls": []
+      },
+      {
+        "id": "crate::PeerProgress",
+        "kind": "struct",
+        "source": "src/lib.rs",
+        "line": 370,
+        "public": true,
+        "syntax_sha256": "65b778341def5f76517b8aa2d62f1f3ba12e0b1df8711eb12500578bca49c69a",
+        "calls": []
+      },
+      {
+        "id": "crate::ProposalRange",
+        "kind": "struct",
+        "source": "src/lib.rs",
+        "line": 338,
+        "public": true,
+        "syntax_sha256": "4ba99ccdc3eafdf83872eaafcfb5693dc4205264480ec47da1d0ff25c21ae35b",
+        "calls": []
+      },
+      {
+        "id": "crate::Rejection",
+        "kind": "enum",
+        "source": "src/lib.rs",
+        "line": 142,
+        "public": true,
+        "syntax_sha256": "c7282b704322aadadd7f70e19be96aa73b4b50ca89148f6476f00c2351f9af43",
+        "calls": []
+      },
+      {
+        "id": "crate::Role",
+        "kind": "enum",
+        "source": "src/lib.rs",
+        "line": 57,
+        "public": true,
+        "syntax_sha256": "b7d5b4671395540a9f63888afe6277a9f89b456b2bf793b131feec5adf9bbf54",
+        "calls": []
+      },
+      {
+        "id": "crate::Snapshot",
+        "kind": "struct",
+        "source": "src/lib.rs",
+        "line": 48,
+        "public": true,
+        "syntax_sha256": "6bc315adcb6ae3bdc676df4152438226c4cc07f2070f6cf076bbe61bc81dcc93",
+        "calls": []
+      },
+      {
+        "id": "crate::Status",
+        "kind": "struct",
+        "source": "src/lib.rs",
+        "line": 347,
+        "public": true,
+        "syntax_sha256": "9ea16a03d8d57c2dc5fd9caec5e06aa487351a4d54347757ede7902ffb528e42",
+        "calls": []
+      },
+      {
+        "id": "crate::cluster",
+        "kind": "module",
+        "source": "src/lib.rs",
+        "line": 6,
+        "public": false,
+        "syntax_sha256": "034d578643566467b25e90022bcf63408b50a4a4f99d97f13539b993396fddf2",
+        "calls": []
+      },
+      {
+        "id": "crate::cluster::<Cluster < V , S , MAX , CAP >>::change_available",
+        "kind": "method",
+        "source": "src/cluster.rs",
+        "line": 225,
+        "public": false,
+        "syntax_sha256": "c1cbbbf21d56b684664867e780046b7133d86a486869d061dc4dffbbcdad1d74",
+        "calls": [
+          "call Err",
+          "call Error :: NotLeader",
+          "call Ok",
+          "call Some",
+          "method entries",
+          "method filter",
+          "method find",
+          "method hard",
+          "method idle",
+          "method is_joint",
+          "method last",
+          "method leader",
+          "method map",
+          "method membership_at",
+          "method or_else",
+          "method role",
+          "method snapshot",
+          "method state"
+        ]
+      },
+      {
+        "id": "crate::cluster::<Cluster < V , S , MAX , CAP >>::committed",
+        "kind": "method",
+        "source": "src/cluster.rs",
+        "line": 165,
+        "public": true,
+        "syntax_sha256": "6b3d9788c33af331d47b4a47f4f3ae8f5e0596e6efe2b38b44308e6620602d69",
+        "calls": [
+          "method committed"
+        ]
+      },
+      {
+        "id": "crate::cluster::<Cluster < V , S , MAX , CAP >>::committed_membership",
+        "kind": "method",
+        "source": "src/cluster.rs",
+        "line": 157,
+        "public": true,
+        "syntax_sha256": "0236b08256f19b3018534dfa7783b637107fcf3426d49702737faf0cea37e718",
+        "calls": [
+          "method hard",
+          "method membership_at",
+          "method state"
+        ]
+      },
+      {
+        "id": "crate::cluster::<Cluster < V , S , MAX , CAP >>::compact",
+        "kind": "method",
+        "source": "src/cluster.rs",
+        "line": 312,
+        "public": true,
+        "syntax_sha256": "09e186d71a5d9c6e85c4ee5c0d5a143b6d816ddbaecbefffd2684f8f16848bce",
+        "calls": [
+          "method clone",
+          "method compact_with",
+          "method membership_at"
+        ]
+      },
+      {
+        "id": "crate::cluster::<Cluster < V , S , MAX , CAP >>::finish_reconfiguration",
+        "kind": "method",
+        "source": "src/cluster.rs",
+        "line": 295,
+        "public": true,
+        "syntax_sha256": "c275be60d08d6354071372749a74999dc2fda43dc6f6daef2d837d8000ec586a",
+        "calls": [
+          "call Err",
+          "call Error :: NotLeader",
+          "call Record :: Configuration",
+          "method finalized",
+          "method hard",
+          "method idle",
+          "method is_joint",
+          "method last",
+          "method leader",
+          "method membership_at",
+          "method propose",
+          "method role",
+          "method state"
+        ]
+      },
+      {
+        "id": "crate::cluster::<Cluster < V , S , MAX , CAP >>::grow",
+        "kind": "method",
+        "source": "src/cluster.rs",
+        "line": 321,
+        "public": true,
+        "syntax_sha256": "1e9a3de928a24dd475d07dc96edba8ce10e865413e176c8a6d79ec08fb5746e7",
+        "calls": [
+          "method grow"
+        ]
+      },
+      {
+        "id": "crate::cluster::<Cluster < V , S , MAX , CAP >>::leader",
+        "kind": "method",
+        "source": "src/cluster.rs",
+        "line": 149,
+        "public": true,
+        "syntax_sha256": "b44c60e8f2e4436648a87d7203769366f91e79bc5f0f49ac8ae89fa410a4760c",
+        "calls": [
+          "method leader"
+        ]
+      },
+      {
+        "id": "crate::cluster::<Cluster < V , S , MAX , CAP >>::matched",
+        "kind": "method",
+        "source": "src/cluster.rs",
+        "line": 220,
+        "public": true,
+        "syntax_sha256": "d5a05ea691708adb00b8c8d19dd153fb7ce8a9c13c7cc78bb267f129d968b5e9",
+        "calls": [
+          "method matched"
+        ]
+      },
+      {
+        "id": "crate::cluster::<Cluster < V , S , MAX , CAP >>::membership",
+        "kind": "method",
+        "source": "src/cluster.rs",
+        "line": 153,
+        "public": true,
+        "syntax_sha256": "a09dfe5db9ca7c20fabf12783b947e9692774164287ca09dc470f1b9f9eaa48a",
+        "calls": []
+      },
+      {
+        "id": "crate::cluster::<Cluster < V , S , MAX , CAP >>::new",
+        "kind": "method",
+        "source": "src/cluster.rs",
+        "line": 102,
+        "public": true,
+        "syntax_sha256": "ed214adb0719ece9260dec39c80a6617f7ef63d58538e1956ef8dd1a60ec35b4",
+        "calls": [
+          "call Err",
+          "call Node :: build",
+          "call Ok",
+          "call Some"
+        ]
+      },
+      {
+        "id": "crate::cluster::<Cluster < V , S , MAX , CAP >>::next_message",
+        "kind": "method",
+        "source": "src/cluster.rs",
+        "line": 141,
+        "public": true,
+        "syntax_sha256": "e2b5369ef68f17b2847e5cf02e0acf884798ef9a3756216728797a0455409f7f",
+        "calls": [
+          "method next_message"
+        ]
+      },
+      {
+        "id": "crate::cluster::<Cluster < V , S , MAX , CAP >>::progress",
+        "kind": "method",
+        "source": "src/cluster.rs",
+        "line": 212,
+        "public": true,
+        "syntax_sha256": "385e6fb983640329b24a3574ca6be8be9e639b9998d4c742d5926781886e90ec",
+        "calls": [
+          "method progress"
+        ]
+      },
+      {
+        "id": "crate::cluster::<Cluster < V , S , MAX , CAP >>::propose",
+        "kind": "method",
+        "source": "src/cluster.rs",
+        "line": 174,
+        "public": true,
+        "syntax_sha256": "038a2fec650fe6bf641fd66e1fc7dab1b583b0fedcdc64fc64252fc6a15de102",
+        "calls": [
+          "call Err",
+          "call Error :: NotLeader",
+          "call Ok",
+          "call Record :: Command",
+          "call core :: iter :: once_with",
+          "method clone",
+          "method idle",
+          "method leader",
+          "method propose_many",
+          "method remaining",
+          "method role"
+        ]
+      },
+      {
+        "id": "crate::cluster::<Cluster < V , S , MAX , CAP >>::propose_batch",
+        "kind": "method",
+        "source": "src/cluster.rs",
+        "line": 193,
+        "public": true,
+        "syntax_sha256": "6bc046ac58690e2de53c634658e870277b5f21669dab72b4f461dc8bdca85bf3",
+        "calls": [
+          "call Err",
+          "call Error :: NotLeader",
+          "method cloned",
+          "method idle",
+          "method iter",
+          "method leader",
+          "method len",
+          "method map",
+          "method propose_many",
+          "method remaining",
+          "method role",
+          "method saturating_sub"
+        ]
+      },
+      {
+        "id": "crate::cluster::<Cluster < V , S , MAX , CAP >>::ready",
+        "kind": "method",
+        "source": "src/cluster.rs",
+        "line": 137,
+        "public": true,
+        "syntax_sha256": "9c36e7ad23a89721a2665d56dbbb3e14d3f2decc199ef27304c7b1ac31945036",
+        "calls": [
+          "method ready"
+        ]
+      },
+      {
+        "id": "crate::cluster::<Cluster < V , S , MAX , CAP >>::reconfigure",
+        "kind": "method",
+        "source": "src/cluster.rs",
+        "line": 271,
+        "public": true,
+        "syntax_sha256": "f81bfd82c97cb488ea0a6f1be8d0f8f2d818b7001bc8397bae2b4a045121a116",
+        "calls": [
+          "call Err",
+          "call Record :: Configuration",
+          "method any",
+          "method change_available",
+          "method filter",
+          "method is_joint",
+          "method is_voter",
+          "method joint",
+          "method last",
+          "method learners",
+          "method matched",
+          "method membership",
+          "method propose",
+          "method remaining",
+          "method state",
+          "method voters"
+        ]
+      },
+      {
+        "id": "crate::cluster::<Cluster < V , S , MAX , CAP >>::remaining",
+        "kind": "method",
+        "source": "src/cluster.rs",
+        "line": 216,
+        "public": true,
+        "syntax_sha256": "2c8c488f1be3e508dbe1d96f8a0500cd627ea82afac8527c1b62793af0067fdd",
+        "calls": [
+          "method count",
+          "method entries",
+          "method state"
+        ]
+      },
+      {
+        "id": "crate::cluster::<Cluster < V , S , MAX , CAP >>::role",
+        "kind": "method",
+        "source": "src/cluster.rs",
+        "line": 145,
+        "public": true,
+        "syntax_sha256": "1bf7dea28a8e36755f33af65c1c4db706f76ed3ce4a861b39e68ca854ebeac74",
+        "calls": [
+          "method role"
+        ]
+      },
+      {
+        "id": "crate::cluster::<Cluster < V , S , MAX , CAP >>::set_learners",
+        "kind": "method",
+        "source": "src/cluster.rs",
+        "line": 256,
+        "public": true,
+        "syntax_sha256": "99dd9cf6a732ef798e3d7a98cde099c60baa427f425f8c6a79fbbd38b67577e3",
+        "calls": [
+          "call Err",
+          "call Record :: Configuration",
+          "method change_available",
+          "method count",
+          "method len",
+          "method membership",
+          "method propose",
+          "method remaining",
+          "method voters",
+          "method with_learners"
+        ]
+      },
+      {
+        "id": "crate::cluster::<Cluster < V , S , MAX , CAP >>::snapshot",
+        "kind": "method",
+        "source": "src/cluster.rs",
+        "line": 170,
+        "public": true,
+        "syntax_sha256": "522466cf50b0ac354893306a477950d68c2f1f583331137a1d1031497e52e1f4",
+        "calls": [
+          "method snapshot"
+        ]
+      },
+      {
+        "id": "crate::cluster::<Cluster < V , S , MAX , CAP >>::state",
+        "kind": "method",
+        "source": "src/cluster.rs",
+        "line": 161,
+        "public": true,
+        "syntax_sha256": "b457360b15f854c66740581c2c0cdeb418c81a12281c2f3259d40029416b031f",
+        "calls": [
+          "method state"
+        ]
+      },
+      {
+        "id": "crate::cluster::<Cluster < V , S , MAX , CAP >>::status",
+        "kind": "method",
+        "source": "src/cluster.rs",
+        "line": 208,
+        "public": true,
+        "syntax_sha256": "14cfc526b53c6c90b3fefc7e9fc35374b27643d0e9200dd0675d79b08f15dee2",
+        "calls": [
+          "method status"
+        ]
+      },
+      {
+        "id": "crate::cluster::<Cluster < V , S , MAX , CAP >>::step",
+        "kind": "method",
+        "source": "src/cluster.rs",
+        "line": 130,
+        "public": true,
+        "syntax_sha256": "f2de5971c86bd9e06929da67af5acc39b2965891911a66f3dc49af5610edb60a",
+        "calls": [
+          "method step"
+        ]
+      },
+      {
+        "id": "crate::cluster::<Cluster < V , S , MAX , CAP >>::tick",
+        "kind": "method",
+        "source": "src/cluster.rs",
+        "line": 126,
+        "public": true,
+        "syntax_sha256": "014a2363a6eaa977e59a07ce4b64609c93a05a207307ff2dcbc4c4cc3621893e",
+        "calls": [
+          "method tick"
+        ]
+      },
+      {
+        "id": "crate::cluster::<ClusterState < V , S , MAX , CAP >>::genesis",
+        "kind": "method",
+        "source": "src/cluster.rs",
+        "line": 78,
+        "public": true,
+        "syntax_sha256": "df7afcbd2eba02d48e51be9e09361acf244e8bda3e0df86e6d4208d8aa05f7ee",
+        "calls": []
+      },
+      {
+        "id": "crate::cluster::<ClusterState < V , S , MAX , CAP >>::id",
+        "kind": "method",
+        "source": "src/cluster.rs",
+        "line": 74,
+        "public": true,
+        "syntax_sha256": "d5447bcebf757f357d1a6d22936410774c0d56ffd1f3cd55208e0ff2963ad130",
+        "calls": []
+      },
+      {
+        "id": "crate::cluster::<ClusterState < V , S , MAX , CAP >>::new",
+        "kind": "method",
+        "source": "src/cluster.rs",
+        "line": 58,
+        "public": true,
+        "syntax_sha256": "57f2c648e0c9f8c932354a7d0921961396b0da355ddb6e7a0a3f53969a85ab5b",
+        "calls": [
+          "call Self :: restore",
+          "call State :: new"
+        ]
+      },
+      {
+        "id": "crate::cluster::<ClusterState < V , S , MAX , CAP >>::restore",
+        "kind": "method",
+        "source": "src/cluster.rs",
+        "line": 63,
+        "public": true,
+        "syntax_sha256": "7d7bbcd3fe29f7e466abe6efcd1b72d39cdc06be7dffa95fd71909ec33f1f42d",
+        "calls": [
+          "call Err",
+          "call Ok",
+          "method is_joint"
+        ]
+      },
+      {
+        "id": "crate::cluster::<ClusterState < V , S , MAX , CAP >>::state",
+        "kind": "method",
+        "source": "src/cluster.rs",
+        "line": 82,
+        "public": true,
+        "syntax_sha256": "0f8933fe866aa95b4e0c6956f88309446099ea07555223f06864097257a3e1ad",
+        "calls": []
+      },
+      {
+        "id": "crate::cluster::<Settings as Default>::default",
+        "kind": "method",
+        "source": "src/cluster.rs",
+        "line": 36,
+        "public": false,
+        "syntax_sha256": "61616e78ed27bc9ff7a93cc390c7f547ecd23ad9ce6f6bbd5831df9d579d0db4",
+        "calls": []
+      },
+      {
+        "id": "crate::cluster::<item:0>",
+        "kind": "other",
+        "source": "src/cluster.rs",
+        "line": 1,
+        "public": false,
+        "syntax_sha256": "27c427824146c7509e46620ff5d80de3735ab32a55e2fab4b4c2231becc1329b",
+        "calls": []
+      },
+      {
+        "id": "crate::cluster::<item:4>",
+        "kind": "impl",
+        "source": "src/cluster.rs",
+        "line": 35,
+        "public": false,
+        "syntax_sha256": "4bc28c9378a07e2f3c2dfcff6a223e025e076e93923d36b73e553bdeae3ef3a0",
+        "calls": []
+      },
+      {
+        "id": "crate::cluster::<item:6>",
+        "kind": "impl",
+        "source": "src/cluster.rs",
+        "line": 57,
+        "public": false,
+        "syntax_sha256": "35b0e2661f37f8c8ed2f6e0539650434f845027bd6a9a42232b3802432ed4419",
+        "calls": []
+      },
+      {
+        "id": "crate::cluster::<item:8>",
+        "kind": "impl",
+        "source": "src/cluster.rs",
+        "line": 101,
+        "public": false,
+        "syntax_sha256": "329557c94464d1a2e1f8c92cd431735616de29c9b0db064b0a6ed0bc6a480aed",
+        "calls": []
+      },
+      {
+        "id": "crate::cluster::Checkpoint",
+        "kind": "struct",
+        "source": "src/cluster.rs",
+        "line": 16,
+        "public": true,
+        "syntax_sha256": "98131901986301428cf75f09b4a40ba3f1682ffa9f012eea494d865dcfbe40d1",
+        "calls": []
+      },
+      {
+        "id": "crate::cluster::Cluster",
+        "kind": "struct",
+        "source": "src/cluster.rs",
+        "line": 88,
+        "public": true,
+        "syntax_sha256": "7e09116b67a7b99d789dacde9cab4af9fea07788fc80a5fa6d59fd211d7ce209",
+        "calls": []
+      },
+      {
+        "id": "crate::cluster::ClusterState",
+        "kind": "struct",
+        "source": "src/cluster.rs",
+        "line": 45,
+        "public": true,
+        "syntax_sha256": "f053eceafac54b0c5e7b7deaac76195883442539fd24efe27de12d349a71def8",
+        "calls": []
+      },
+      {
+        "id": "crate::cluster::Record",
+        "kind": "enum",
+        "source": "src/cluster.rs",
+        "line": 6,
+        "public": true,
+        "syntax_sha256": "02e2e36dc6011960db8ac2950936ae2198b1358e21ff653cc61b1dda1a75e9b2",
+        "calls": []
+      },
+      {
+        "id": "crate::cluster::Settings",
+        "kind": "struct",
+        "source": "src/cluster.rs",
+        "line": 25,
+        "public": true,
+        "syntax_sha256": "b52ecbcf610e57181a6c8c6ac8b4b992024b0edce69512622b8416db82412b39",
+        "calls": []
+      },
+      {
+        "id": "crate::explore",
+        "kind": "module",
+        "source": "src/lib.rs",
+        "line": 15,
+        "public": false,
+        "syntax_sha256": "6dd35101d304e070f5e094579d286c3a6a48ec42f51463c777e1fa19dd7d0b91",
+        "calls": []
+      },
+      {
+        "id": "crate::explore_dynamic",
+        "kind": "module",
+        "source": "src/lib.rs",
+        "line": 17,
+        "public": false,
+        "syntax_sha256": "f564fc5afda0bbaa31a119fdfbedeaf7d36150ea149a9cc51654665e537c6483",
+        "calls": []
+      },
+      {
+        "id": "crate::host",
+        "kind": "module",
+        "source": "src/lib.rs",
+        "line": 7,
+        "public": true,
+        "syntax_sha256": "0b625bbc22eb33f2fd758b39e5348a5403e95d5b57e7f8b3320145cb42a23c74",
+        "calls": []
+      },
+      {
+        "id": "crate::host::<item:0>",
+        "kind": "other",
+        "source": "src/host.rs",
+        "line": 6,
+        "public": false,
+        "syntax_sha256": "3536effb90c1cd23eac2d9cb2d2613bbf544e3319dff9d7b001ab75bc7ba075d",
+        "calls": []
+      },
+      {
+        "id": "crate::host::<item:1>",
+        "kind": "other",
+        "source": "src/host.rs",
+        "line": 7,
+        "public": false,
+        "syntax_sha256": "912b874384db5af54d17da9cde11fb730803a989922afd1d9adcd175d87ba2b9",
+        "calls": []
+      },
+      {
+        "id": "crate::host::AsyncStorage",
+        "kind": "trait",
+        "source": "src/host.rs",
+        "line": 19,
+        "public": true,
+        "syntax_sha256": "aff21945ceab585eebb59f5940258c2fa9ff9c2a164646df2f0c1a30a76ba571",
+        "calls": []
+      },
+      {
+        "id": "crate::host::AsyncStorage::save",
+        "kind": "trait_method",
+        "source": "src/host.rs",
+        "line": 27,
+        "public": true,
+        "syntax_sha256": "bbc48eee53cab1cc0ac89f1422c62eb974a1a67e5eb7305c836a3edca226c3d4",
+        "calls": []
+      },
+      {
+        "id": "crate::host::Storage",
+        "kind": "trait",
+        "source": "src/host.rs",
+        "line": 9,
+        "public": true,
+        "syntax_sha256": "76969802ca8039ad974b75ec2e0572b83a5abb3f3b74f98560f47918f3d41e9e",
+        "calls": []
+      },
+      {
+        "id": "crate::host::Storage::save",
+        "kind": "trait_method",
+        "source": "src/host.rs",
+        "line": 13,
+        "public": true,
+        "syntax_sha256": "3a2474f7499bfdefa38c9fee07abaa04cd39ed9d669812e7056d150800348fd0",
+        "calls": []
+      },
+      {
+        "id": "crate::host::persist",
+        "kind": "function",
+        "source": "src/host.rs",
+        "line": 31,
+        "public": true,
+        "syntax_sha256": "ceb5534d0093aa2817d3ac3d90ee723bdd5d3ce9c62aa9b02272ef882d28bc91",
+        "calls": [
+          "call Ok",
+          "method persisted",
+          "method save",
+          "method write"
+        ]
+      },
+      {
+        "id": "crate::host::persist_async",
+        "kind": "function",
+        "source": "src/host.rs",
+        "line": 41,
+        "public": true,
+        "syntax_sha256": "f59c36260031d625e42989823da9530b3cf9c8a10a9bd4d325b15f2716a6d13c",
+        "calls": [
+          "call Ok",
+          "method persisted",
+          "method save",
+          "method write"
+        ]
+      },
+      {
+        "id": "crate::membership",
+        "kind": "module",
+        "source": "src/lib.rs",
+        "line": 8,
+        "public": false,
+        "syntax_sha256": "a8c5260b3d4b9c9ef67970b44fb6ec809d5feeef3fadd7c47d35a516a8b7b3f7",
+        "calls": []
+      },
+      {
+        "id": "crate::membership::<Membership < MAX >>::contains",
+        "kind": "method",
+        "source": "src/membership.rs",
+        "line": 102,
+        "public": true,
+        "syntax_sha256": "04a1b396c000864707bc906e39e2896a5284fd46e977a2feb5a496cbb5780313",
+        "calls": [
+          "method any",
+          "method flatten",
+          "method iter"
+        ]
+      },
+      {
+        "id": "crate::membership::<Membership < MAX >>::finalized",
+        "kind": "method",
+        "source": "src/membership.rs",
+        "line": 133,
+        "public": false,
+        "syntax_sha256": "b0b07caa2ac0bdbb97fbff497ea2b78d8221b5b6268eac0aa33e932b23ae742e",
+        "calls": []
+      },
+      {
+        "id": "crate::membership::<Membership < MAX >>::include",
+        "kind": "method",
+        "source": "src/membership.rs",
+        "line": 47,
+        "public": false,
+        "syntax_sha256": "e8ae619bd5717e15623ddd07dfc3fc15994bc0ea36331e3a68b79e0b7fe3a188",
+        "calls": [
+          "call Ok",
+          "method get_or_insert",
+          "method is_some_and",
+          "method iter",
+          "method ok_or",
+          "method or_else",
+          "method position"
+        ]
+      },
+      {
+        "id": "crate::membership::<Membership < MAX >>::is_joint",
+        "kind": "method",
+        "source": "src/membership.rs",
+        "line": 91,
+        "public": true,
+        "syntax_sha256": "5a3e93d6a75f15afd9bca3f32384aa59d5df36bf8f4a8b8ac310b30159fbfba5",
+        "calls": [
+          "method any",
+          "method flatten",
+          "method iter"
+        ]
+      },
+      {
+        "id": "crate::membership::<Membership < MAX >>::is_voter",
+        "kind": "method",
+        "source": "src/membership.rs",
+        "line": 95,
+        "public": true,
+        "syntax_sha256": "c9f515fdff1ad485918a24b62f9309c42d07b88ad4cca608a3dcae639418b04b",
+        "calls": [
+          "method any",
+          "method flatten",
+          "method iter"
+        ]
+      },
+      {
+        "id": "crate::membership::<Membership < MAX >>::joint",
+        "kind": "method",
+        "source": "src/membership.rs",
+        "line": 124,
+        "public": false,
+        "syntax_sha256": "96d692b357fdb45af16b9435492eafdedc39f3a27797b6891173629ad6ef8984",
+        "calls": [
+          "call Err",
+          "call Ok",
+          "method include",
+          "method is_joint",
+          "method map_err",
+          "method voters"
+        ]
+      },
+      {
+        "id": "crate::membership::<Membership < MAX >>::learners",
+        "kind": "method",
+        "source": "src/membership.rs",
+        "line": 83,
+        "public": true,
+        "syntax_sha256": "a20927274f78838e5b2510674f25b43325c5750768ad97bce38a524b61e2f3c1",
+        "calls": [
+          "method filter",
+          "method flatten",
+          "method iter",
+          "method map"
+        ]
+      },
+      {
+        "id": "crate::membership::<Membership < MAX >>::new",
+        "kind": "method",
+        "source": "src/membership.rs",
+        "line": 22,
+        "public": true,
+        "syntax_sha256": "10ba2600c09e89bc9c3dc72c3e3bf463112330536a625fe009c46c3d2d520511",
+        "calls": [
+          "call Self :: restore"
+        ]
+      },
+      {
+        "id": "crate::membership::<Membership < MAX >>::old_voters",
+        "kind": "method",
+        "source": "src/membership.rs",
+        "line": 75,
+        "public": true,
+        "syntax_sha256": "248439633e58d555234931b424508e9c46118c98ac33e7727a03ed6407e952e8",
+        "calls": [
+          "method filter",
+          "method flatten",
+          "method iter",
+          "method map"
+        ]
+      },
+      {
+        "id": "crate::membership::<Membership < MAX >>::peers",
+        "kind": "method",
+        "source": "src/membership.rs",
+        "line": 106,
+        "public": false,
+        "syntax_sha256": "bb405658b308a6b4843faadb37106e968ab150286fc62a863a28396305a95f6f",
+        "calls": [
+          "method map"
+        ]
+      },
+      {
+        "id": "crate::membership::<Membership < MAX >>::quorum",
+        "kind": "method",
+        "source": "src/membership.rs",
+        "line": 166,
+        "public": false,
+        "syntax_sha256": "b09f0d145f7a7b7ffb1134e7d53c7098e428eae517e8e0f9c5bdf8b1ba3c30df",
+        "calls": [
+          "call acknowledged",
+          "call majority",
+          "method clone",
+          "method count",
+          "method filter",
+          "method flatten",
+          "method is_joint",
+          "method iter"
+        ]
+      },
+      {
+        "id": "crate::membership::<Membership < MAX >>::quorum_index",
+        "kind": "method",
+        "source": "src/membership.rs",
+        "line": 144,
+        "public": false,
+        "syntax_sha256": "dd2967ba4437aa6cc04fa3bfac1c1f2c2232a7f4f6d587748a3ce265d9c021f4",
+        "calls": [
+          "call matched",
+          "method is_joint",
+          "method min",
+          "method old_voters",
+          "method sort_unstable",
+          "method voters"
+        ]
+      },
+      {
+        "id": "crate::membership::<Membership < MAX >>::restore",
+        "kind": "method",
+        "source": "src/membership.rs",
+        "line": 28,
+        "public": true,
+        "syntax_sha256": "d4d78490070cb062c63c5748e38d1745f380973ceecdfb3c434d822551836345",
+        "calls": [
+          "call Err",
+          "call Ok",
+          "method contains",
+          "method enumerate",
+          "method include",
+          "method is_empty",
+          "method iter"
+        ]
+      },
+      {
+        "id": "crate::membership::<Membership < MAX >>::voters",
+        "kind": "method",
+        "source": "src/membership.rs",
+        "line": 67,
+        "public": true,
+        "syntax_sha256": "c0332e10b632f64343872c16a9760798368544e2871ab4e3d3816513db779c75",
+        "calls": [
+          "method filter",
+          "method flatten",
+          "method iter",
+          "method map"
+        ]
+      },
+      {
+        "id": "crate::membership::<Membership < MAX >>::with_learners",
+        "kind": "method",
+        "source": "src/membership.rs",
+        "line": 109,
+        "public": false,
+        "syntax_sha256": "e3223f0e7c2c6ed893566e2fdae2a80d1ab75265dc04a60f019d8a2923aad49b",
+        "calls": [
+          "call Err",
+          "call Ok",
+          "method contains",
+          "method enumerate",
+          "method include",
+          "method is_voter",
+          "method iter",
+          "method voters"
+        ]
+      },
+      {
+        "id": "crate::membership::<item:0>",
+        "kind": "other",
+        "source": "src/membership.rs",
+        "line": 1,
+        "public": false,
+        "syntax_sha256": "4934c6b42b6377a22ffc19d68239396c0d48b392b99c2bcf724ebc8d60ab0a45",
+        "calls": []
+      },
+      {
+        "id": "crate::membership::<item:3>",
+        "kind": "impl",
+        "source": "src/membership.rs",
+        "line": 21,
+        "public": false,
+        "syntax_sha256": "3b274d1df0b0737fde5cc23ccdeaa81ae7f01f2bc45a5652902d2b1675d9549c",
+        "calls": []
+      },
+      {
+        "id": "crate::membership::Member",
+        "kind": "struct",
+        "source": "src/membership.rs",
+        "line": 3,
+        "public": false,
+        "syntax_sha256": "efd783496d6d9fc68f878b64a8d9c03b26f63f3afa1f85d497bca40c2ae3f5b4",
+        "calls": []
+      },
+      {
+        "id": "crate::membership::Membership",
+        "kind": "struct",
+        "source": "src/membership.rs",
+        "line": 11,
+        "public": true,
+        "syntax_sha256": "476b9470cbd19284dab1536f5f8721ade2733571d4065ff8c3df7d4902ee7b41",
+        "calls": []
+      },
+      {
+        "id": "crate::membership::tests",
+        "kind": "module",
+        "source": "src/membership.rs",
+        "line": 182,
+        "public": false,
+        "syntax_sha256": "904afddbd5b2cbd42ff3aee57e91ffd4a66ed67525d6ba3fe1bdcfce3bca08cc",
+        "calls": [
+          "call Membership :: < 3 > :: restore",
+          "call expected",
+          "call ids",
+          "macro assert_eq",
+          "method collect",
+          "method count",
+          "method count_ones",
+          "method filter",
+          "method map",
+          "method unwrap"
+        ]
+      },
+      {
+        "id": "crate::node",
+        "kind": "module",
+        "source": "src/lib.rs",
+        "line": 9,
+        "public": false,
+        "syntax_sha256": "a712d76b7f594280f73933a50e9c3e6cea47a6e39b5da481f280e3afe1351784",
+        "calls": []
+      },
+      {
+        "id": "crate::node::<BatchRollback < '_ , V , S , CAP > as Drop>::drop",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 14,
+        "public": false,
+        "syntax_sha256": "cee934a4b6b364942c8798b56918785ddf80afe789e8832415536ba7c08bb7dd",
+        "calls": [
+          "method truncate"
+        ]
+      },
+      {
+        "id": "crate::node::<MembershipHooks < V , S , N > as Clone>::clone",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 38,
+        "public": false,
+        "syntax_sha256": "06a7c7c1714af44ba5510cf02198e69d37fc7386a1168802628da197799ba804",
+        "calls": []
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::advance_commit",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 1003,
+        "public": false,
+        "syntax_sha256": "12c387a7d45807efd40934f84a1328ebbfc2e54ce3285ea4b6465aa8faef8cd0",
+        "calls": [
+          "method commit_to",
+          "method id_at",
+          "method is_some_and",
+          "method matched",
+          "method quorum_index"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::append",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 918,
+        "public": false,
+        "syntax_sha256": "7995be17f457ca8104de316a66c8a307963544f1775c97115b2904ccd3bd37ce",
+        "calls": [
+          "call Some",
+          "method base",
+          "method clone",
+          "method commit_to",
+          "method full",
+          "method id_at",
+          "method is_err",
+          "method last",
+          "method map_or",
+          "method max",
+          "method min",
+          "method push",
+          "method refresh_membership",
+          "method saturating_add",
+          "method truncate"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::available",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 706,
+        "public": false,
+        "syntax_sha256": "fcabb643c2dd2e899e6e15d946a48c187691f289bd930c08a16765db12f24e31",
+        "calls": [
+          "call Err",
+          "call Ok",
+          "method any",
+          "method is_some",
+          "method iter"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::barrier",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 896,
+        "public": false,
+        "syntax_sha256": "bfc025768c648f780e5c5aebef72dbc439f032c6876094bfbf9a3e198d86c35a",
+        "calls": [
+          "call Some",
+          "method advance_commit",
+          "method checked_add",
+          "method full",
+          "method is_ok",
+          "method last",
+          "method push"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::become_leader",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 881,
+        "public": false,
+        "syntax_sha256": "740973c780eedba571c6a96ce7eef336867c827c5390a738914ce929264c5744",
+        "calls": [
+          "call Some",
+          "method barrier",
+          "method broadcast",
+          "method fill",
+          "method last",
+          "method saturating_add"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::broadcast",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 1040,
+        "public": false,
+        "syntax_sha256": "919e758f813cd54bde6035ba1637e9ed9779965e97adc3a2e31264d46dc3ed62",
+        "calls": [
+          "method contains",
+          "method is_some_and",
+          "method replicate"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::build",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 110,
+        "public": false,
+        "syntax_sha256": "14d6d257ff8fc3348ba2e9ec8aee0212fa31883f09a56498b6519ed0088f0cd6",
+        "calls": [
+          "call Err",
+          "call Ok",
+          "call Some",
+          "call core :: array :: from_fn",
+          "method iter",
+          "method peers",
+          "method position",
+          "method refresh_membership",
+          "method reset_election",
+          "method unwrap_or"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::campaign",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 858,
+        "public": false,
+        "syntax_sha256": "54e6095d16454ffe2dfd0d335e2aa0783c73043ebee1ccecc0ba9eb1f24e0d1f",
+        "calls": [
+          "call Some",
+          "method become_leader",
+          "method election_quorum",
+          "method fill",
+          "method is_some_and",
+          "method is_voter",
+          "method reset_election",
+          "method send"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::commit_to",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 1018,
+        "public": false,
+        "syntax_sha256": "29eca8d427a600f9babdb8e8bdb508422ff939bc1e07421078ec0a46d2f5460c",
+        "calls": [
+          "method refresh_membership"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::committed",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 306,
+        "public": true,
+        "syntax_sha256": "3dad53530cf3454d54ada5b92cbc7f1c696d45602d6f7a006c18bdef2614e9bb",
+        "calls": [
+          "method entries",
+          "method take_while"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::compact",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 675,
+        "public": true,
+        "syntax_sha256": "21e53d33317595b405f6f8c215d8e80e721d3f1ab37e3992e9fb67b3e0a3eb92",
+        "calls": [
+          "method clone",
+          "method compact_with"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::compact_with",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 683,
+        "public": false,
+        "syntax_sha256": "44b0d80d7804b005660475961ec4e51df94ee0b85a45a8dbabfba7a351ff4f2e",
+        "calls": [
+          "call Err",
+          "call Ok",
+          "call value",
+          "method available",
+          "method barrier",
+          "method base",
+          "method broadcast",
+          "method id_at",
+          "method install",
+          "method ok_or"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::election_quorum",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 793,
+        "public": false,
+        "syntax_sha256": "8ee5c50f7c13aac4ad5de79ca9d400e47f1b96a2e8f44408715450a26e3dfc44",
+        "calls": [
+          "call Some",
+          "method is_some_and",
+          "method iter",
+          "method position",
+          "method quorum"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::follow",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 783,
+        "public": false,
+        "syntax_sha256": "8ca735c851ee3988379dced6f53fac491c45bf72d89578577281633219f046ab",
+        "calls": [
+          "method is_some",
+          "method reset_election"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::grow",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 176,
+        "public": true,
+        "syntax_sha256": "580304ae0846264a619f8f0a9d8c46df85e51ee3c8982bfb3b05497513a72262",
+        "calls": [
+          "method grow"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::idle",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 854,
+        "public": false,
+        "syntax_sha256": "3680f6fbe170703b48b87a845b3daa220151339c44ba25b8b442777c5055fbfc",
+        "calls": [
+          "method available"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::leader",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 166,
+        "public": true,
+        "syntax_sha256": "fccda349077dee33e808618ea160c435325667a8ead92a3d6878ec75204b5835",
+        "calls": []
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::matched",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 847,
+        "public": false,
+        "syntax_sha256": "68345dafbaa3d06d714801839d8395d6663b172d8b3a2b4a141b4b8ce05f8361",
+        "calls": [
+          "call Some",
+          "method iter",
+          "method map_or",
+          "method position"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::membership_at",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 802,
+        "public": false,
+        "syntax_sha256": "41ae5e84216259aa95373de46499d7e78ee930946b8a49e525f410a901284ac5",
+        "calls": [
+          "call (hooks . snapshot)",
+          "method and_then",
+          "method as_ref",
+          "method entries",
+          "method map_or",
+          "method snapshot",
+          "method take_while"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::new",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 79,
+        "public": true,
+        "syntax_sha256": "27595f1a94d21e5bca92c31fbc359fb904a15bf77eb9391bab570515d6898725",
+        "calls": [
+          "call Err",
+          "call Membership :: new",
+          "call Self :: build",
+          "method any",
+          "method contains",
+          "method enumerate",
+          "method is_none",
+          "method is_some_and",
+          "method iter",
+          "method position"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::next_message",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 222,
+        "public": true,
+        "syntax_sha256": "3bb390e8a8fd13843ff732132aa27a91ffc9e5d5164a4744291e5593a072d19c",
+        "calls": [
+          "call Some",
+          "call core :: array :: from_fn",
+          "method and_then",
+          "method as_ref",
+          "method base",
+          "method checked_add",
+          "method get",
+          "method id_at",
+          "method is_some",
+          "method iter",
+          "method last",
+          "method map",
+          "method position",
+          "method take"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::progress",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 661,
+        "public": true,
+        "syntax_sha256": "a114745ab76f7343d5f48601b14f81a932e6628429ef5c8fa0fd8d2fa41bbd9c",
+        "calls": [
+          "method contains",
+          "method enumerate",
+          "method filter_map",
+          "method is_voter",
+          "method iter",
+          "method then_some"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::propose",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 573,
+        "public": true,
+        "syntax_sha256": "cfaf076329ab4cb35eb2b2f7eae92b0c6842da3102d7f0447d0930b73d66a254",
+        "calls": [
+          "call Ok",
+          "call core :: iter :: once_with",
+          "method clone",
+          "method propose_many"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::propose_batch",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 583,
+        "public": true,
+        "syntax_sha256": "3c5126f8a63b95db2fae4864d2145bf07c9106aaed1a5e9504c822cdbeb21a5e",
+        "calls": [
+          "method cloned",
+          "method iter",
+          "method len",
+          "method propose_many"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::propose_many",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 589,
+        "public": false,
+        "syntax_sha256": "7e4eecae2eccf4abcf3bff3d859dab23d780b1ddcbe7335bd99872fafef07008",
+        "calls": [
+          "call Err",
+          "call Error :: NotLeader",
+          "call Ok",
+          "call Some",
+          "call drop",
+          "call u64 :: try_from",
+          "method advance_commit",
+          "method available",
+          "method broadcast",
+          "method checked_add",
+          "method count",
+          "method entries",
+          "method enumerate",
+          "method last",
+          "method map_err",
+          "method ok_or",
+          "method push",
+          "method refresh_membership"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::ready",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 216,
+        "public": true,
+        "syntax_sha256": "ad7546481903928a622d7e0f961e7804baca6f1640519bb3ecfe78aeec3477bd",
+        "calls": [
+          "method then_some"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::refresh_membership",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 817,
+        "public": false,
+        "syntax_sha256": "61bcfe3c36d8a61fad2f005bee4c6312209b58b50bddbe25d9ab80e43c27a137",
+        "calls": [
+          "call Some",
+          "method contains",
+          "method expect",
+          "method flatten",
+          "method follow",
+          "method is_none_or",
+          "method is_voter",
+          "method iter",
+          "method last",
+          "method membership_at",
+          "method peers",
+          "method position",
+          "method unwrap_or"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::replicate",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 1049,
+        "public": false,
+        "syntax_sha256": "8d3918d42ab4d226dfb1ad346ba9a24c6aa4a82ba2a8d37ab9a07bfe13aa029d",
+        "calls": [
+          "method send"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::replicated",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 970,
+        "public": false,
+        "syntax_sha256": "1556235a6ec84cdaa2b8140da61c001ad3c7963073ded4905dfee49f28e642bc",
+        "calls": [
+          "call Some",
+          "method advance_commit",
+          "method broadcast",
+          "method checked_add",
+          "method clamp",
+          "method last",
+          "method max",
+          "method replicate",
+          "method saturating_add"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::reply",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 1036,
+        "public": false,
+        "syntax_sha256": "196eb9ec15afd274724c5daa95a9ef2ae8c7d0ee2c2f947eb5d0c9884aa02e2b",
+        "calls": [
+          "call Outbound :: Replicated",
+          "method send"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::reset_election",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 772,
+        "public": false,
+        "syntax_sha256": "ffd993cb10e9693bb4c1c542f513dc14f070b461cfc29e145bdc40b9d65d318c",
+        "calls": [
+          "method wrapping_add",
+          "method wrapping_mul"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::role",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 161,
+        "public": true,
+        "syntax_sha256": "8b59d02122298a73e286284d13a3f4f18561a60ecc7ca034a8a0fa55ffae5670",
+        "calls": []
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::send",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 1026,
+        "public": false,
+        "syntax_sha256": "75402db9b9196784344ca2c2b7a07940d08ab2d96a43f80b6b32bfafd87c6c9a",
+        "calls": [
+          "call Some"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::snapshot",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 317,
+        "public": true,
+        "syntax_sha256": "88ef3d6d24ea5df6f0f55a0e3a6dd4c1392722feb6878dc6ac59c67bc6fc1c1a",
+        "calls": [
+          "method filter",
+          "method snapshot"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::state",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 171,
+        "public": true,
+        "syntax_sha256": "230d2957c2c862dbc5b7268dee921dd9244e03ab62f04c8531bc37c04afef4e7",
+        "calls": []
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::status",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 645,
+        "public": true,
+        "syntax_sha256": "5f2e350ad7343f718467c0e9e58486e3e63a480c6e498e41a7d6d2f325748847",
+        "calls": [
+          "call usize :: from",
+          "method count",
+          "method entries",
+          "method flatten",
+          "method is_some",
+          "method iter",
+          "method last"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::step",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 383,
+        "public": true,
+        "syntax_sha256": "a87d105d99da71c68c8950c8c875f83c05ffb12e83fa7341e188f73b0738be0c",
+        "calls": [
+          "call Err",
+          "call Ok",
+          "call Outbound :: PreVoted",
+          "call Outbound :: Voted",
+          "call Self :: valid",
+          "call Some",
+          "macro matches",
+          "macro unreachable",
+          "method append",
+          "method as_ref",
+          "method available",
+          "method base",
+          "method become_leader",
+          "method campaign",
+          "method checked_add",
+          "method clone",
+          "method election_quorum",
+          "method flatten",
+          "method follow",
+          "method id_at",
+          "method install",
+          "method is_none_or",
+          "method is_some",
+          "method is_some_and",
+          "method iter",
+          "method last",
+          "method ok_or",
+          "method or_else",
+          "method position",
+          "method refresh_membership",
+          "method replicated",
+          "method reply",
+          "method reset_election",
+          "method saturating_add",
+          "method send",
+          "method term",
+          "method then_some"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::tick",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 322,
+        "public": true,
+        "syntax_sha256": "b9eca92faa5b92e397d97d0ad3dbd44b7d0b2fd2265a33bcd3a6bdb9f5291c70",
+        "calls": [
+          "call Ok",
+          "call Outbound :: PreVote",
+          "call Some",
+          "method available",
+          "method barrier",
+          "method broadcast",
+          "method campaign",
+          "method checked_add",
+          "method election_quorum",
+          "method fill",
+          "method follow",
+          "method is_some",
+          "method is_some_and",
+          "method is_voter",
+          "method iter",
+          "method ok_or",
+          "method position",
+          "method quorum",
+          "method reset_election",
+          "method saturating_add",
+          "method send"
+        ]
+      },
+      {
+        "id": "crate::node::<Node < V , S , N , CAP >>::valid",
+        "kind": "method",
+        "source": "src/node.rs",
+        "line": 714,
+        "public": false,
+        "syntax_sha256": "fdc296e6d08f8a3cb92def186ee6f086f9a1c909e3065b1dd479820f43e580e8",
+        "calls": [
+          "call LogId :: default",
+          "call Some",
+          "call valid_id",
+          "method as_ref",
+          "method checked_add",
+          "method is_none_or",
+          "method term"
+        ]
+      },
+      {
+        "id": "crate::node::<item:0>",
+        "kind": "other",
+        "source": "src/node.rs",
+        "line": 1,
+        "public": false,
+        "syntax_sha256": "bc60d76715bed3f38ef1cd30e831718f7e9692fdf7836a7a0f2ed5b14ebf62e4",
+        "calls": []
+      },
+      {
+        "id": "crate::node::<item:2>",
+        "kind": "impl",
+        "source": "src/node.rs",
+        "line": 13,
+        "public": false,
+        "syntax_sha256": "7971fa343d69cd328a68f0ced8408bf62ef519b229b6c5c8734f10c8577ed429",
+        "calls": []
+      },
+      {
+        "id": "crate::node::<item:5>",
+        "kind": "impl",
+        "source": "src/node.rs",
+        "line": 36,
+        "public": false,
+        "syntax_sha256": "9b7c36867dd06e6909db4865c4e03022d332bb09e887a7f019122e7dc4924625",
+        "calls": []
+      },
+      {
+        "id": "crate::node::<item:6>",
+        "kind": "impl",
+        "source": "src/node.rs",
+        "line": 37,
+        "public": false,
+        "syntax_sha256": "e8f69a4fc9ce6ddd169769dac11f644d4e2885e8cff1859f7b0e1ac5840ee0cc",
+        "calls": []
+      },
+      {
+        "id": "crate::node::<item:8>",
+        "kind": "impl",
+        "source": "src/node.rs",
+        "line": 78,
+        "public": false,
+        "syntax_sha256": "26a5ea2a89da1cf0662a7333d7c8a2940bd6f1c390f192009325d5d5de9ce72a",
+        "calls": []
+      },
+      {
+        "id": "crate::node::BatchRollback",
+        "kind": "struct",
+        "source": "src/node.rs",
+        "line": 8,
+        "public": false,
+        "syntax_sha256": "2e46d4302c2b57cbf9963f26178f5a79df3c70a010af74ee2315218505b7aba8",
+        "calls": []
+      },
+      {
+        "id": "crate::node::MembershipHooks",
+        "kind": "struct",
+        "source": "src/node.rs",
+        "line": 31,
+        "public": false,
+        "syntax_sha256": "449c1489a2cff03fa4725b303eeae39a23032b7d5752de9eaf94b6120affbb7f",
+        "calls": []
+      },
+      {
+        "id": "crate::node::Node",
+        "kind": "struct",
+        "source": "src/node.rs",
+        "line": 43,
+        "public": true,
+        "syntax_sha256": "1f64fa4be0cc1beceedae16734b7824fe3675680544c7c575bbc1571fcc4db91",
+        "calls": []
+      },
+      {
+        "id": "crate::node::Outbound",
+        "kind": "enum",
+        "source": "src/node.rs",
+        "line": 21,
+        "public": false,
+        "syntax_sha256": "0ef280a0b13c714f32ef1c94bd2108b9562423d61f56064383948d72dd16ef45",
+        "calls": []
+      },
+      {
+        "id": "crate::ready",
+        "kind": "module",
+        "source": "src/lib.rs",
+        "line": 10,
+        "public": false,
+        "syntax_sha256": "5770b9ee6b5c596fa54c10ceb65a2e4f851fb8231cd565cf84f368964eaffb2f",
+        "calls": []
+      },
+      {
+        "id": "crate::ready::<Ready < '_ , V , S , N , CAP >>::persisted",
+        "kind": "method",
+        "source": "src/ready.rs",
+        "line": 61,
+        "public": true,
+        "syntax_sha256": "ff3ce1aea8c7b847c78d949f7630928df14b2276c7c0a07227184e53554bb314",
+        "calls": []
+      },
+      {
+        "id": "crate::ready::<Ready < '_ , V , S , N , CAP >>::state",
+        "kind": "method",
+        "source": "src/ready.rs",
+        "line": 56,
+        "public": true,
+        "syntax_sha256": "1cc5da2cb79f154602a8542bc207034bdfbc1317e0f4e44d2bfed6eec05e749d",
+        "calls": []
+      },
+      {
+        "id": "crate::ready::<Ready < '_ , V , S , N , CAP >>::write",
+        "kind": "method",
+        "source": "src/ready.rs",
+        "line": 49,
+        "public": true,
+        "syntax_sha256": "2696897f5fc457bee8847a645e63d09a63781ea2e1b6bd59fdc77bda5b41805d",
+        "calls": [
+          "method write"
+        ]
+      },
+      {
+        "id": "crate::ready::<Write < '_ , V , S >>::entries",
+        "kind": "method",
+        "source": "src/ready.rs",
+        "line": 22,
+        "public": true,
+        "syntax_sha256": "db824f6335d258c90f8d349162ff36f72735ed8fd2a99f7a4be2ab3921b11639",
+        "calls": [
+          "method flatten",
+          "method iter"
+        ]
+      },
+      {
+        "id": "crate::ready::<item:0>",
+        "kind": "other",
+        "source": "src/ready.rs",
+        "line": 1,
+        "public": false,
+        "syntax_sha256": "7d05b0b9b73d9801d9586eb616512f085d93a1da334d3455e3f877f1b6782d58",
+        "calls": []
+      },
+      {
+        "id": "crate::ready::<item:2>",
+        "kind": "impl",
+        "source": "src/ready.rs",
+        "line": 21,
+        "public": false,
+        "syntax_sha256": "1ea3728c462b2a7eb56afe722ea5d95a2cc6892bb94e8276385c4d378b03b923",
+        "calls": []
+      },
+      {
+        "id": "crate::ready::<item:4>",
+        "kind": "impl",
+        "source": "src/ready.rs",
+        "line": 48,
+        "public": false,
+        "syntax_sha256": "d74e843de1369c79c10d7335f59772f0a6ef1059b1f5a94fbf4c5049fed11c37",
+        "calls": []
+      },
+      {
+        "id": "crate::ready::Ready",
+        "kind": "struct",
+        "source": "src/ready.rs",
+        "line": 28,
+        "public": true,
+        "syntax_sha256": "2c4f35c4067511c8aa7925b60329752be9504acb8c49eb9362cd4a1e1017b167",
+        "calls": []
+      },
+      {
+        "id": "crate::ready::Write",
+        "kind": "struct",
+        "source": "src/ready.rs",
+        "line": 3,
+        "public": true,
+        "syntax_sha256": "3145aabdf7c204e00f63f0eaf0efd0733225058e08631f2996d3ca3f4f611aa7",
+        "calls": []
+      },
+      {
+        "id": "crate::state",
+        "kind": "module",
+        "source": "src/lib.rs",
+        "line": 11,
+        "public": false,
+        "syntax_sha256": "270903f325616707af7f04e253ac93ff1303c8088181e98802f8ba7b6fbd9d75",
+        "calls": []
+      },
+      {
+        "id": "crate::state::<State < V , S , CAP > as Default>::default",
+        "kind": "method",
+        "source": "src/state.rs",
+        "line": 28,
+        "public": false,
+        "syntax_sha256": "616b7a531330186b34a52d14b2933e4fdfa74cc5a675d788f0931ebdcd8c0d8e",
+        "calls": [
+          "call Self :: new"
+        ]
+      },
+      {
+        "id": "crate::state::<State < V , S , CAP >>::base",
+        "kind": "method",
+        "source": "src/state.rs",
+        "line": 97,
+        "public": false,
+        "syntax_sha256": "5a532532594f84662c38f138dc4982ecc76855e8ac358ac33094eb4ef4e17738",
+        "calls": [
+          "call LogId :: default",
+          "method as_ref",
+          "method map_or"
+        ]
+      },
+      {
+        "id": "crate::state::<State < V , S , CAP >>::entries",
+        "kind": "method",
+        "source": "src/state.rs",
+        "line": 87,
+        "public": true,
+        "syntax_sha256": "4073a6db24f0ac740eb4f356d62f1ecdd104a603ee228a07ad7faeb12ff69cbc",
+        "calls": [
+          "method flatten",
+          "method iter"
+        ]
+      },
+      {
+        "id": "crate::state::<State < V , S , CAP >>::full",
+        "kind": "method",
+        "source": "src/state.rs",
+        "line": 147,
+        "public": false,
+        "syntax_sha256": "4efc827ef83fe99a0a856c9784eba87beb52deda7cdd91fa27d981b8bb1afaf9",
+        "calls": []
+      },
+      {
+        "id": "crate::state::<State < V , S , CAP >>::get",
+        "kind": "method",
+        "source": "src/state.rs",
+        "line": 133,
+        "public": false,
+        "syntax_sha256": "d5246045f1fdd6cdb59ce6a4ab541ec2d303ec9ef5548d3314249ce416c58023",
+        "calls": [
+          "call usize :: try_from",
+          "method as_ref",
+          "method base",
+          "method checked_sub",
+          "method get",
+          "method ok"
+        ]
+      },
+      {
+        "id": "crate::state::<State < V , S , CAP >>::grow",
+        "kind": "method",
+        "source": "src/state.rs",
+        "line": 115,
+        "public": false,
+        "syntax_sha256": "ea7e68da8e488f771975a47d760f6f47ad144b3bb5ffb37d9f583c02c7f2807a",
+        "calls": [
+          "call core :: array :: from_fn",
+          "macro assert",
+          "method take"
+        ]
+      },
+      {
+        "id": "crate::state::<State < V , S , CAP >>::hard",
+        "kind": "method",
+        "source": "src/state.rs",
+        "line": 77,
+        "public": true,
+        "syntax_sha256": "f0d6c0f77cba8ad2deb718f321230c2d600a08b733798e191492c43b58b11430",
+        "calls": []
+      },
+      {
+        "id": "crate::state::<State < V , S , CAP >>::id_at",
+        "kind": "method",
+        "source": "src/state.rs",
+        "line": 139,
+        "public": false,
+        "syntax_sha256": "42eadf9b66063e9c34306e709ff408579dc4e13d1a99dd8079f875e82fef303a",
+        "calls": [
+          "call Some",
+          "method base",
+          "method get",
+          "method map"
+        ]
+      },
+      {
+        "id": "crate::state::<State < V , S , CAP >>::install",
+        "kind": "method",
+        "source": "src/state.rs",
+        "line": 167,
+        "public": false,
+        "syntax_sha256": "f34c18085c647bca9ea6cddc6280f34389773456049231714da3623e67134f79",
+        "calls": [
+          "call Some",
+          "method base",
+          "method id_at",
+          "method max",
+          "method rotate_left"
+        ]
+      },
+      {
+        "id": "crate::state::<State < V , S , CAP >>::last",
+        "kind": "method",
+        "source": "src/state.rs",
+        "line": 92,
+        "public": true,
+        "syntax_sha256": "0a2ac3c099e52d51d174302f12512fd60db2677ee5904ffde448a86952b6f88a",
+        "calls": [
+          "method base",
+          "method entries",
+          "method map_or",
+          "method next_back"
+        ]
+      },
+      {
+        "id": "crate::state::<State < V , S , CAP >>::new",
+        "kind": "method",
+        "source": "src/state.rs",
+        "line": 34,
+        "public": true,
+        "syntax_sha256": "13c8b97944a0f75c54695f57c6c3290eb933fb954d44adf23c3e7ccf9c02be89",
+        "calls": [
+          "call HardState :: default",
+          "call core :: array :: from_fn"
+        ]
+      },
+      {
+        "id": "crate::state::<State < V , S , CAP >>::push",
+        "kind": "method",
+        "source": "src/state.rs",
+        "line": 151,
+        "public": false,
+        "syntax_sha256": "8cdfd21f1ec3aa7ebd312db35061b46ebd1bc52d1fdc88445d28d966b30faef8",
+        "calls": [
+          "call Err",
+          "call Ok",
+          "call Some",
+          "method full"
+        ]
+      },
+      {
+        "id": "crate::state::<State < V , S , CAP >>::restore",
+        "kind": "method",
+        "source": "src/state.rs",
+        "line": 44,
+        "public": true,
+        "syntax_sha256": "98dfa1f5f5fcdcba10b6cee11ed6972f3348f7f3a812545816e76b098dffac3e",
+        "calls": [
+          "call Err",
+          "call Ok",
+          "call Self :: new",
+          "call Some",
+          "method base",
+          "method checked_add",
+          "method is_some",
+          "method last",
+          "method push"
+        ]
+      },
+      {
+        "id": "crate::state::<State < V , S , CAP >>::snapshot",
+        "kind": "method",
+        "source": "src/state.rs",
+        "line": 82,
+        "public": true,
+        "syntax_sha256": "596dc16d60e768a8aa8d11981aabe2a889b3c2d536e18f1fb176f638f5fef9fa",
+        "calls": [
+          "method as_ref"
+        ]
+      },
+      {
+        "id": "crate::state::<State < V , S , CAP >>::truncate",
+        "kind": "method",
+        "source": "src/state.rs",
+        "line": 160,
+        "public": false,
+        "syntax_sha256": "ad5880ed611c51caa3eed2417331808324e251a5af42a6361dfa883f6b534fba",
+        "calls": [
+          "method last"
+        ]
+      },
+      {
+        "id": "crate::state::<State < V , S , CAP >>::write",
+        "kind": "method",
+        "source": "src/state.rs",
+        "line": 101,
+        "public": false,
+        "syntax_sha256": "45ee5efb7fb8957763f8effe9526c3b4c64b087455d4fe81c37977a10bb6b268",
+        "calls": [
+          "call usize :: try_from",
+          "method as_ref",
+          "method base",
+          "method filter",
+          "method map_or",
+          "method min",
+          "method saturating_sub",
+          "method unwrap_or"
+        ]
+      },
+      {
+        "id": "crate::state::<item:0>",
+        "kind": "other",
+        "source": "src/state.rs",
+        "line": 1,
+        "public": false,
+        "syntax_sha256": "791f55feddd03f1b3ef100e6331b9fa87b3d330aca1fc192b1886e1d18fac1ff",
+        "calls": []
+      },
+      {
+        "id": "crate::state::<item:3>",
+        "kind": "impl",
+        "source": "src/state.rs",
+        "line": 27,
+        "public": false,
+        "syntax_sha256": "881089fcb9c439aeda9f0e8df8b7434cce15a1fd95b6c0ee5389e3314d931396",
+        "calls": []
+      },
+      {
+        "id": "crate::state::<item:4>",
+        "kind": "impl",
+        "source": "src/state.rs",
+        "line": 33,
+        "public": false,
+        "syntax_sha256": "83d401dbefc2647ebeadfddd29636c18a2a904f7515be9f2cb869239fec6a060",
+        "calls": []
+      },
+      {
+        "id": "crate::state::HardState",
+        "kind": "struct",
+        "source": "src/state.rs",
+        "line": 3,
+        "public": true,
+        "syntax_sha256": "fd1ebdb7e596b2f956c80ba9d5322baeb3ff62204c2d2a5d46c89d2143621b91",
+        "calls": []
+      },
+      {
+        "id": "crate::state::State",
+        "kind": "struct",
+        "source": "src/state.rs",
+        "line": 14,
+        "public": true,
+        "syntax_sha256": "7aede57b697066df1e2fc67a518d28312afd9e47e713d8dfbd77c67d92f894df",
+        "calls": []
+      }
+    ],
+    "limitations": [
+      "syntactic inventory; call/type/trait/derive resolution is not proved",
+      "cfg other than exact cfg(test) modules is conservatively included",
+      "no Cargo build/dependency identity or macro expansion is established",
+      "source-to-IR preservation and composed safety/progress roots remain required"
+    ]
+  },
+  "entries": {
+    "crate::<Config < N >>::new": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::<Envelope < & V , & S >>::cloned": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::<Error as core :: fmt :: Display>::fmt": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::<Message < V , S >>::term": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::<item:10>": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::<item:11>": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::<item:12>": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::<item:13>": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::<item:20>": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::<item:22>": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::<item:23>": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::<item:25>": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::<item:27>": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::<item:29>": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::<item:6>": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::<item:9>": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::Config": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::Entry": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::Envelope": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::Error": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::Id": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::LogId": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::Message": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::PeerProgress": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::ProposalRange": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::Rejection": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::Role": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::Snapshot": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::Status": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<Cluster < V , S , MAX , CAP >>::change_available": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<Cluster < V , S , MAX , CAP >>::committed": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<Cluster < V , S , MAX , CAP >>::committed_membership": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<Cluster < V , S , MAX , CAP >>::compact": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<Cluster < V , S , MAX , CAP >>::finish_reconfiguration": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<Cluster < V , S , MAX , CAP >>::grow": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<Cluster < V , S , MAX , CAP >>::leader": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<Cluster < V , S , MAX , CAP >>::matched": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<Cluster < V , S , MAX , CAP >>::membership": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<Cluster < V , S , MAX , CAP >>::new": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<Cluster < V , S , MAX , CAP >>::next_message": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<Cluster < V , S , MAX , CAP >>::progress": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<Cluster < V , S , MAX , CAP >>::propose": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<Cluster < V , S , MAX , CAP >>::propose_batch": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<Cluster < V , S , MAX , CAP >>::ready": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<Cluster < V , S , MAX , CAP >>::reconfigure": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<Cluster < V , S , MAX , CAP >>::remaining": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<Cluster < V , S , MAX , CAP >>::role": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<Cluster < V , S , MAX , CAP >>::set_learners": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<Cluster < V , S , MAX , CAP >>::snapshot": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<Cluster < V , S , MAX , CAP >>::state": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<Cluster < V , S , MAX , CAP >>::status": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<Cluster < V , S , MAX , CAP >>::step": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<Cluster < V , S , MAX , CAP >>::tick": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<ClusterState < V , S , MAX , CAP >>::genesis": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<ClusterState < V , S , MAX , CAP >>::id": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<ClusterState < V , S , MAX , CAP >>::new": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<ClusterState < V , S , MAX , CAP >>::restore": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<ClusterState < V , S , MAX , CAP >>::state": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<Settings as Default>::default": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<item:0>": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<item:4>": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<item:6>": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::<item:8>": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::Checkpoint": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::Cluster": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::ClusterState": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::Record": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::cluster::Settings": {
+      "requirements": [
+        "C09",
+        "C10"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::explore": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::explore_dynamic": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::host": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::host::<item:0>": {
+      "requirements": [
+        "C11",
+        "R09",
+        "R15"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::host::<item:1>": {
+      "requirements": [
+        "C11",
+        "R09",
+        "R15"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::host::AsyncStorage": {
+      "requirements": [
+        "C11",
+        "R09",
+        "R15"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::host::AsyncStorage::save": {
+      "requirements": [
+        "C11",
+        "R09",
+        "R15"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::host::Storage": {
+      "requirements": [
+        "C11",
+        "R09",
+        "R15"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::host::Storage::save": {
+      "requirements": [
+        "C11",
+        "R09",
+        "R15"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::host::persist": {
+      "requirements": [
+        "C11",
+        "R09",
+        "R15"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::host::persist_async": {
+      "requirements": [
+        "C11",
+        "R09",
+        "R15"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::membership": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::membership::<Membership < MAX >>::contains": {
+      "requirements": [
+        "C03",
+        "S11",
+        "S12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::membership::<Membership < MAX >>::finalized": {
+      "requirements": [
+        "C03",
+        "S11",
+        "S12"
+      ],
+      "status": "component_evidence",
+      "note": "Existing source-linked component contracts; see proofs/README.md for assumptions and scope. No global correctness claim."
+    },
+    "crate::membership::<Membership < MAX >>::include": {
+      "requirements": [
+        "C03",
+        "S11",
+        "S12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::membership::<Membership < MAX >>::is_joint": {
+      "requirements": [
+        "C03",
+        "S11",
+        "S12"
+      ],
+      "status": "component_evidence",
+      "note": "Existing source-linked component contracts; see proofs/README.md for assumptions and scope. No global correctness claim."
+    },
+    "crate::membership::<Membership < MAX >>::is_voter": {
+      "requirements": [
+        "C03",
+        "S11",
+        "S12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::membership::<Membership < MAX >>::joint": {
+      "requirements": [
+        "C03",
+        "S11",
+        "S12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::membership::<Membership < MAX >>::learners": {
+      "requirements": [
+        "C03",
+        "S11",
+        "S12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::membership::<Membership < MAX >>::new": {
+      "requirements": [
+        "C03",
+        "S11",
+        "S12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::membership::<Membership < MAX >>::old_voters": {
+      "requirements": [
+        "C03",
+        "S11",
+        "S12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::membership::<Membership < MAX >>::peers": {
+      "requirements": [
+        "C03",
+        "S11",
+        "S12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::membership::<Membership < MAX >>::quorum": {
+      "requirements": [
+        "C03",
+        "S11",
+        "S12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::membership::<Membership < MAX >>::quorum_index": {
+      "requirements": [
+        "C03",
+        "S11",
+        "S12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::membership::<Membership < MAX >>::restore": {
+      "requirements": [
+        "C03",
+        "S11",
+        "S12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::membership::<Membership < MAX >>::voters": {
+      "requirements": [
+        "C03",
+        "S11",
+        "S12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::membership::<Membership < MAX >>::with_learners": {
+      "requirements": [
+        "C03",
+        "S11",
+        "S12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::membership::<item:0>": {
+      "requirements": [
+        "C03",
+        "S11",
+        "S12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::membership::<item:3>": {
+      "requirements": [
+        "C03",
+        "S11",
+        "S12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::membership::Member": {
+      "requirements": [
+        "C03",
+        "S11",
+        "S12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::membership::Membership": {
+      "requirements": [
+        "C03",
+        "S11",
+        "S12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::membership::tests": {
+      "requirements": [
+        "C03",
+        "S11",
+        "S12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<BatchRollback < '_ , V , S , CAP > as Drop>::drop": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<MembershipHooks < V , S , N > as Clone>::clone": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::advance_commit": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::append": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::available": {
+      "requirements": [
+        "C07",
+        "R08",
+        "R11"
+      ],
+      "status": "component_evidence",
+      "note": "Complete input-gating query contracts in proofs/input-gating; frontend/layout correspondence and callers remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::barrier": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::become_leader": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::broadcast": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::build": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::campaign": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::commit_to": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::committed": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::compact": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::compact_with": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::election_quorum": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::follow": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::grow": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::idle": {
+      "requirements": [
+        "C07",
+        "R08",
+        "R11"
+      ],
+      "status": "component_evidence",
+      "note": "Complete input-gating query contracts in proofs/input-gating; frontend/layout correspondence and callers remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::leader": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::matched": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::membership_at": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::new": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::next_message": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::progress": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::propose": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::propose_batch": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::propose_many": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::ready": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::refresh_membership": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::replicate": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::replicated": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::reply": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::reset_election": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "component_evidence",
+      "note": "Existing source-linked component contracts; see proofs/README.md for assumptions and scope. No global correctness claim."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::role": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::send": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::snapshot": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::state": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::status": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::step": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::tick": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<Node < V , S , N , CAP >>::valid": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<item:0>": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<item:2>": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<item:5>": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<item:6>": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::<item:8>": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::BatchRollback": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::MembershipHooks": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::Node": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::node::Outbound": {
+      "requirements": [
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::ready": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::ready::<Ready < '_ , V , S , N , CAP >>::persisted": {
+      "requirements": [
+        "C11",
+        "R08",
+        "R09"
+      ],
+      "status": "component_evidence",
+      "note": "Existing source-linked component contracts; see proofs/README.md for assumptions and scope. No global correctness claim."
+    },
+    "crate::ready::<Ready < '_ , V , S , N , CAP >>::state": {
+      "requirements": [
+        "C11",
+        "R08",
+        "R09"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::ready::<Ready < '_ , V , S , N , CAP >>::write": {
+      "requirements": [
+        "C11",
+        "R08",
+        "R09"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::ready::<Write < '_ , V , S >>::entries": {
+      "requirements": [
+        "C11",
+        "R08",
+        "R09"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::ready::<item:0>": {
+      "requirements": [
+        "C11",
+        "R08",
+        "R09"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::ready::<item:2>": {
+      "requirements": [
+        "C11",
+        "R08",
+        "R09"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::ready::<item:4>": {
+      "requirements": [
+        "C11",
+        "R08",
+        "R09"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::ready::Ready": {
+      "requirements": [
+        "C11",
+        "R08",
+        "R09"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::ready::Write": {
+      "requirements": [
+        "C11",
+        "R08",
+        "R09"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::state": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::state::<State < V , S , CAP > as Default>::default": {
+      "requirements": [
+        "C02",
+        "R02",
+        "R03",
+        "R05"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::state::<State < V , S , CAP >>::base": {
+      "requirements": [
+        "C02",
+        "R02",
+        "R03",
+        "R05"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::state::<State < V , S , CAP >>::entries": {
+      "requirements": [
+        "C02",
+        "R02",
+        "R03",
+        "R05"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::state::<State < V , S , CAP >>::full": {
+      "requirements": [
+        "C02",
+        "R02",
+        "R03",
+        "R05"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::state::<State < V , S , CAP >>::get": {
+      "requirements": [
+        "C02",
+        "R02",
+        "R03",
+        "R05"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::state::<State < V , S , CAP >>::grow": {
+      "requirements": [
+        "C02",
+        "R02",
+        "R03",
+        "R05"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::state::<State < V , S , CAP >>::hard": {
+      "requirements": [
+        "C02",
+        "R02",
+        "R03",
+        "R05"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::state::<State < V , S , CAP >>::id_at": {
+      "requirements": [
+        "C02",
+        "R02",
+        "R03",
+        "R05"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::state::<State < V , S , CAP >>::install": {
+      "requirements": [
+        "C02",
+        "R02",
+        "R03",
+        "R05"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::state::<State < V , S , CAP >>::last": {
+      "requirements": [
+        "C02",
+        "R02",
+        "R03",
+        "R05"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::state::<State < V , S , CAP >>::new": {
+      "requirements": [
+        "C02",
+        "R02",
+        "R03",
+        "R05"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::state::<State < V , S , CAP >>::push": {
+      "requirements": [
+        "C02",
+        "R02",
+        "R03",
+        "R05"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::state::<State < V , S , CAP >>::restore": {
+      "requirements": [
+        "C02",
+        "R02",
+        "R03",
+        "R05"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::state::<State < V , S , CAP >>::snapshot": {
+      "requirements": [
+        "C02",
+        "R02",
+        "R03",
+        "R05"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::state::<State < V , S , CAP >>::truncate": {
+      "requirements": [
+        "C02",
+        "R02",
+        "R03",
+        "R05"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::state::<State < V , S , CAP >>::write": {
+      "requirements": [
+        "C02",
+        "R02",
+        "R03",
+        "R05"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::state::<item:0>": {
+      "requirements": [
+        "C02",
+        "R02",
+        "R03",
+        "R05"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::state::<item:3>": {
+      "requirements": [
+        "C02",
+        "R02",
+        "R03",
+        "R05"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::state::<item:4>": {
+      "requirements": [
+        "C02",
+        "R02",
+        "R03",
+        "R05"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::state::HardState": {
+      "requirements": [
+        "C02",
+        "R02",
+        "R03",
+        "R05"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    },
+    "crate::state::State": {
+      "requirements": [
+        "C02",
+        "R02",
+        "R03",
+        "R05"
+      ],
+      "status": "planned",
+      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open."
+    }
+  }
+}

@@ -7,6 +7,14 @@ The runtime remains `no_std` and sans-I/O; Provium is not a runtime dependency.
 [CORRECTNESS_PLAN.md](CORRECTNESS_PLAN.md) specifies the complete source-level
 correctness goal, outstanding obligations, assumptions, milestones, and release
 gates. It is a plan, not evidence that those obligations have been proved.
+See [PROGRESS.md](PROGRESS.md) for implemented evidence and the remaining dependency frontier.
+
+`coverage.json` records a reviewed syntactic inventory of every item in the
+production module tree. Ordinary tests reject source changes until that review is
+updated. Calls remain unresolved in this inventory; it is not a closure proof.
+`jarl/scripts/verify-complete.sh` deliberately fails while source correspondence
+and composed safety/progress certificates are unavailable. The existing
+`verify.sh` checks the supported component contracts.
 
 ```rust
 #[test]
@@ -33,6 +41,7 @@ CI runs both ordinary tests and the full proof gate.
 | [persistence](persistence/Proofs.lean) | Complete `Ready::persisted` field effects: clear flags, preserve other leaves, algebraic idempotence |
 | [election](election/Proofs.lean) | Complete `Node::reset_election` successful-state projections: exact wrapping seed advance, zero elapsed time, and deadline in `[ticks, 2*ticks)` |
 | [membership](membership/Proofs.lean) | Complete `Membership::finalized` and `is_joint`: arbitrary capacity, correct retention/removal, cleared old flags, surviving identities/fields preserved, no longer joint |
+| [input-gating](input-gating/Proofs.lean) | Complete `Node::available` and `idle`: exact Result, dirty-state/reply/outbox rejection, and clean/drained admission over arbitrary outbox lengths |
 
 Each directory's `project.json` binds production Rust to explicit theorem
 obligations. Generated Lean, snapshots, hashes, and certificates are written to
@@ -51,6 +60,15 @@ do not describe partially mutated stores after a panic. The persistence contract
 does not authorize acknowledging an undurable save or reusing a consumed token.
 Membership finalization contracts do not establish that finalization was
 protocol-authorized or its log entry committed.
+
+Input-gating contracts use typed query stores for bool, Option and optional-array
+fields. They prove the complete gate and its inlined wrapper, not that every
+protocol caller invokes the gate or that storage acknowledgment was truthful.
+Source-to-store representation and frontend preservation remain trusted.
+The project also composes the generated `Ready::persisted` effect with the gate:
+acknowledgment clears dirty state but does not bypass pending output. Its explicit
+view relation does not claim to prove Rust alias/layout correspondence. The full
+gate checks this project against both the host and installed 32-bit target.
 
 Array proofs quantify over arbitrary lengths, including empty arrays. Native
 comparisons additionally cover every optional-record combination at capacities

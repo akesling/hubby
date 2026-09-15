@@ -113,4 +113,37 @@ def queryArray (predicate : Condition) (entries : ArrayStore α) : Bool :=
   entries.any (fun entry => match entry with
     | none => false
     | some state => evalCondition predicate state)
+
+-- Shared Result queries do not modify the store. The frontend checks the types
+-- of every accessed place. As above, malformed stores have a total extension;
+-- field-layout/source correspondence remains an explicit refinement obligation.
+inductive QueryCell (α : Type) where
+  | boolean (value : Bool)
+  | optional (value : Option α)
+  | slots (value : List (Option α))
+abbrev QueryStore (α : Type) := Path → QueryCell α
+inductive QueryTest where
+  | boolean (value : Bool)
+  | field (path : Path)
+  | present (path : Path)
+  | anyPresent (path : Path)
+  | not (test : QueryTest)
+  | and (left right : QueryTest)
+  | or (left right : QueryTest)
+def evalQueryTest : QueryTest → QueryStore α → Bool
+  | .boolean b, _ => b
+  | .field p, s => match s p with | .boolean b => b | _ => false
+  | .present p, s => match s p with | .optional o => o.isSome | _ => false
+  | .anyPresent p, s => match s p with | .slots xs => xs.any Option.isSome | _ => false
+  | .not t, s => !(evalQueryTest t s)
+  | .and a b, s => evalQueryTest a s && evalQueryTest b s
+  | .or a b, s => evalQueryTest a s || evalQueryTest b s
+inductive Query where
+  | success
+  | failure (error : String)
+  | branch (test : QueryTest) (yes no : Query)
+def runQuery : Query → QueryStore α → Except String Unit
+  | .success, _ => .ok ()
+  | .failure e, _ => .error e
+  | .branch t yes no, s => if evalQueryTest t s then runQuery yes s else runQuery no s
 end Provium.State

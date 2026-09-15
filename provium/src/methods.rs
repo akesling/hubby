@@ -15,6 +15,8 @@ const SEMANTICS: &str = include_str!("../lean/Provium/State.lean");
 #[serde(deny_unknown_fields)]
 pub struct Project {
     pub crate_root: PathBuf,
+    #[serde(default)]
+    pub rust_target: Option<String>,
     pub namespace: String,
     pub methods: Vec<String>,
     pub proofs: PathBuf,
@@ -71,6 +73,7 @@ pub struct Method {
     pub writes: Vec<Write>,
     pub body: Vec<Statement>,
     pub array: Option<arrays::Shape>,
+    pub query: Option<queries::Query>,
 }
 struct Definition {
     module: String,
@@ -81,6 +84,7 @@ struct Definition {
 pub struct Crate {
     files: BTreeMap<PathBuf, String>,
     structs: BTreeMap<String, syn::ItemStruct>,
+    enums: BTreeMap<String, syn::ItemEnum>,
     struct_modules: BTreeMap<String, String>,
     imports: BTreeMap<(String, String), Vec<String>>,
     methods: BTreeMap<String, Definition>,
@@ -138,6 +142,7 @@ impl Crate {
         let mut krate = Self {
             files: BTreeMap::new(),
             structs: BTreeMap::new(),
+            enums: BTreeMap::new(),
             struct_modules: BTreeMap::new(),
             imports: BTreeMap::new(),
             methods: BTreeMap::new(),
@@ -193,7 +198,7 @@ impl Crate {
                                 Err("renamed/glob imports require qualified resolution".into())
                             }
                             syn::UseTree::Name(n)
-                                if ["None", "Option", "bool", "u64"]
+                                if ["None", "Option", "bool", "u64", "Result", "Ok", "Err"]
                                     .iter()
                                     .any(|s| n.ident == *s) =>
                             {
@@ -248,13 +253,25 @@ impl Crate {
                         }
                     }
                 }
-                Item::Enum(e) if ["Option", "bool", "u64"].iter().any(|n| e.ident == *n) => {
+                Item::Enum(e) if ["Option", "bool", "u64", "Result", "Ok", "Err"].iter().any(|n| e.ident == *n) => {
                     return Err("shadowed primitive/prelude type".into())
                 }
-                Item::Const(c) if c.ident == "None" => {
+                Item::Enum(e) if !test_only(&e.attrs) => {
+                    if self.structs.contains_key(&e.ident.to_string()) {
+                        return Err("ambiguous enum/struct type name".into());
+                    }
+                    self.struct_modules.insert(e.ident.to_string(), module.to_owned());
+                    if self.enums.insert(e.ident.to_string(), e).is_some() {
+                        return Err("ambiguous enum type".into());
+                    }
+                }
+                Item::Fn(f) if ["Ok", "Err"].iter().any(|n| f.sig.ident == *n) => {
+                    return Err("shadowed Result constructor".into());
+                }
+                Item::Const(c) if ["None", "Ok", "Err"].iter().any(|n| c.ident == *n) => {
                     return Err("shadowed None constructor".into())
                 }
-                Item::Static(c) if c.ident == "None" => {
+                Item::Static(c) if ["None", "Ok", "Err"].iter().any(|n| c.ident == *n) => {
                     return Err("shadowed None constructor".into())
                 }
                 Item::Macro(_) => {
@@ -267,7 +284,10 @@ impl Crate {
                     ))
                 }
                 Item::Struct(s) if !test_only(&s.attrs) => {
-                    if ["Option", "bool", "u64"].iter().any(|n| s.ident == *n) {
+                    if self.enums.contains_key(&s.ident.to_string()) {
+                        return Err("ambiguous enum/struct type name".into());
+                    }
+                    if ["Option", "bool", "u64", "Result", "Ok", "Err"].iter().any(|n| s.ident == *n) {
                         return Err("shadowed primitive/prelude type".into());
                     }
                     for attr in &s.attrs {
@@ -305,6 +325,9 @@ impl Crate {
                     }
                 }
                 Item::Impl(i) if !test_only(&i.attrs) => {
+                    if i.generics.type_params().any(|p| ["Option", "Result", "bool", "u64", "Ok", "Err"].iter().any(|n| p.ident == *n)) {
+                        return Err("impl generic parameter shadows a primitive/prelude type".into());
+                    }
                     let receiver = base_type(&i.self_ty)?;
                     attrs(&i.attrs)?;
                     if let Some((_, trait_path, _)) = &i.trait_ {
@@ -386,6 +409,9 @@ impl Crate {
     }
     pub fn lower(&self, name: &str) -> Result<Method, String> {
         if let Some(def) = self.methods.get(name) {
+            if queries::result_error(&def.item.sig.output).is_ok() {
+                return self.lower_query(name, &[]);
+            }
             if matches!(&def.item.sig.output, syn::ReturnType::Type(_,ty) if matches!(&**ty, Type::Path(p) if p.path.is_ident("bool")))
             {
                 return self.lower_array_query(name);
@@ -476,6 +502,7 @@ impl Crate {
             writes,
             body,
             array: None,
+            query: None,
         })
     }
     fn field_type<'a>(&'a self, def: &Definition, p: &[String]) -> Result<&'a Type, String> {
@@ -755,6 +782,10 @@ pub fn generate(methods: &[Method], namespace: &str) -> String {
     let mut text=format!("-- Generated from complete Rust method bodies; no sliced statements.\nimport Provium.State\nnamespace {namespace}\nopen Provium.State\n");
     for method in methods {
         let name = &method.symbol;
+        if method.query.is_some() {
+            text.push_str(&queries::generate(method));
+            continue;
+        }
         if method.array.is_some() {
             text.push_str(&arrays::generate(method));
             continue;
@@ -830,7 +861,8 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
         return Err("inputs must be outside output directory".into());
     }
     // Type-check the actual crate, not a hand-written stand-in for its methods.
-    let checked = Command::new("rustc")
+    let mut rust_check = Command::new("rustc");
+    rust_check
         .args([
             "--crate-name",
             "provium_subject",
@@ -843,9 +875,15 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
         ])
         .arg(base.join(&project.crate_root))
         .arg("-o")
-        .arg(out.join("subject.rmeta"))
-        .output()
-        .map_err(|e| e.to_string())?;
+        .arg(out.join("subject.rmeta"));
+    if let Some(target) = &project.rust_target {
+        rust_check.args(["--target", target]);
+    }
+    let typecheck_args = rust_check
+        .get_args()
+        .map(|a| a.to_string_lossy().into_owned())
+        .collect::<Vec<_>>();
+    let checked = rust_check.output().map_err(|e| e.to_string())?;
     if !checked.status.success() {
         return Err(format!(
             "rustc rejected original crate: {}",
@@ -924,19 +962,32 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
         }
     }
     let rustc = Command::new("rustc")
-        .arg("--version")
+        .arg("-vV")
         .output()
         .map_err(|e| e.to_string())?;
     if !rustc.status.success() {
         return Err("rustc unavailable".into());
     }
-    let manifest = serde_json::json!({"format":1,"compiler_sha256":hash(fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"scope":"complete explicit method bodies in field-store semantics; frontend, field resolution, borrowing/layout refinement and host durability remain trusted; not whole-Raft correctness", "lean_toolchain":TOOLCHAIN,"rustc":String::from_utf8_lossy(&rustc.stdout).trim(),"config_sha256":hash(config_bytes),"sources":inputs,"methods":methods,"unproved_methods":krate.inventory().into_iter().filter(|n|!project.methods.contains(n)).collect::<Vec<_>>(),"artifacts":artifacts.iter().map(|(p,t)|(p,hash(t))).collect::<BTreeMap<_,_>>(),"obligations":project.obligations,"audit":report});
+    let mut cfg_command = Command::new("rustc");
+    cfg_command.args(["--print", "cfg", "-C", "overflow-checks=yes"]);
+    if let Some(target) = &project.rust_target {
+        cfg_command.args(["--target", target]);
+    }
+    let cfg = cfg_command.output().map_err(|e| e.to_string())?;
+    if !cfg.status.success() {
+        return Err(format!(
+            "rustc target configuration unavailable: {}",
+            String::from_utf8_lossy(&cfg.stderr)
+        ));
+    }
+    let manifest = serde_json::json!({"format":1,"compiler_sha256":hash(fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"scope":"complete explicit method bodies in field-store semantics; frontend, field resolution, borrowing/layout refinement and host durability remain trusted; not whole-program correctness", "lean_toolchain":TOOLCHAIN,"rustc":String::from_utf8_lossy(&rustc.stdout).trim(),"rust_target":project.rust_target,"rust_target_cfg":String::from_utf8_lossy(&cfg.stdout),"typecheck_args":typecheck_args,"config_sha256":hash(config_bytes),"sources":inputs,"methods":methods,"unproved_methods":krate.inventory().into_iter().filter(|n|!project.methods.contains(n)).collect::<Vec<_>>(),"artifacts":artifacts.iter().map(|(p,t)|(p,hash(t))).collect::<BTreeMap<_,_>>(),"obligations":project.obligations,"audit":report});
     let bytes = serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?;
     fs::write(out.join("manifest.json"), &bytes).map_err(|e| e.to_string())?;
-    fs::write(out.join("verified.json"),serde_json::to_vec_pretty(&serde_json::json!({"manifest_sha256":hash(bytes),"whole_raft_proved":false,"complete_method_bodies":methods.len(),"obligations":project.obligations.len()})).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;
-    Ok(format!("Verified {} complete method bodies and {} obligations in field-store semantics. Whole-Raft proof remains incomplete.\n{report}",methods.len(),project.obligations.len()))
+    fs::write(out.join("verified.json"),serde_json::to_vec_pretty(&serde_json::json!({"manifest_sha256":hash(bytes),"whole_program_proved":false,"complete_method_bodies":methods.len(),"obligations":project.obligations.len()})).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;
+    Ok(format!("Verified {} complete method bodies and {} obligations in field-store semantics. Whole-program proof remains incomplete.\n{report}",methods.len(),project.obligations.len()))
 }
 
 pub mod scalar;
 
 mod arrays;
+pub mod queries;

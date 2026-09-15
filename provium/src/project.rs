@@ -488,7 +488,7 @@ pub fn verify(project_path: &Path, output: &Path) -> Result<String, String> {
             return Err(format!("artifact {file} changed during verification"));
         }
     }
-    let certificate = serde_json::json!({ "whole_raft_proved": false, "manifest_sha256": hash(io(fs::read(output.join("manifest.json")))?), "source_sha256": manifest.source_sha256, "generated_sha256": manifest.generated_sha256, "semantics_sha256": manifest.semantics_sha256, "proofs_sha256": manifest.proofs_sha256, "lean": String::from_utf8_lossy(&version.stdout).trim(), "backend_certificates": manifest.functions.len(), "invariant_obligations": manifest.obligations.len(), "audit": report, "trust_boundary": manifest.trusted_boundary });
+    let certificate = serde_json::json!({ "whole_program_proved": false, "manifest_sha256": hash(io(fs::read(output.join("manifest.json")))?), "source_sha256": manifest.source_sha256, "generated_sha256": manifest.generated_sha256, "semantics_sha256": manifest.semantics_sha256, "proofs_sha256": manifest.proofs_sha256, "lean": String::from_utf8_lossy(&version.stdout).trim(), "backend_certificates": manifest.functions.len(), "invariant_obligations": manifest.obligations.len(), "audit": report, "trust_boundary": manifest.trusted_boundary });
     io(fs::write(
         output.join("verified.json"),
         serde_json::to_string_pretty(&certificate).map_err(|e| e.to_string())?,

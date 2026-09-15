@@ -41,10 +41,27 @@ fn invariants() {
     provium::assert_proofs!("proofs");
 }
 
+#[test]
+fn source_coverage_review_is_current() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let report = provium::coverage::audit(
+        root,
+        Path::new("src/lib.rs"),
+        &root.join("proofs/coverage.json"),
+    )
+    .expect("review changed Jarl source and update its coverage ledger");
+    println!(
+        "{} inventoried items; {} with declared component evidence; full proof remains open",
+        report.items, report.component_items
+    );
+}
+
 #[path = "proof_cases/lean.rs"]
 mod consensus;
 #[path = "proof_cases/scalar_methods.rs"]
 mod election;
+#[path = "proof_cases/queries.rs"]
+mod input_gating;
 #[path = "proof_cases/arrays.rs"]
 mod membership;
 #[path = "proof_cases/methods.rs"]

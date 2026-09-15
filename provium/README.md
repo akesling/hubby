@@ -138,6 +138,19 @@ length. A reserved `$present` cell records deletion and cannot name a Rust field
 It is excluded from record-field frame claims.
 
 Stores model nonoverlapping leaf locations with opaque values for untouched
+payloads. Shared queries returning `Result<(), Enum>` support complete conditional
+returns and receiver-local shared helper calls. Query conditions read builtin
+bool and Option fields or `array.iter().any(Option::is_some)`; error variants are
+resolved from original enum declarations. Query stores model optional values and
+optional-array contents explicitly and quantify over arbitrary lengths. The
+frontend rejects omitted statements, unresolved calls and unsupported effects.
+These query contracts retain the same trusted source/layout boundary.
+Method projects accept an optional `rust_target` for an already-installed target;
+their manifests record verbose rustc identity, target cfg and the actual
+type-check arguments. This describes the direct rustc check, not a Cargo build
+closure. Component certificates use `whole_program_proved: false`.
+
+Assignment stores model nonoverlapping leaf locations with opaque values for untouched
 payloads. Boolean reads have a total extension on malformed stores; Rust
 refinement requires the corresponding leaves to contain booleans. Frame theorems
 do not say an enclosing aggregate is unchanged when one of its fields changes.
@@ -180,6 +193,15 @@ the `assert_proofs!` macro never skips verification. Jarl's CI owns Jarl's proof
 assertions and mutation checks.
 
 The low-level CLI remains available:
+
+`inventory <crate-directory> --out <directory>` records a conservative syntax
+inventory of `src/lib.rs` and its modules. `audit-coverage <crate-directory>`
+checks a consumer-owned `proofs/coverage.json` against current source.
+The library API accepts other source roots. This pass does not resolve calls,
+traits, derives, macros or Cargo build configurations; its report explicitly
+retains those limitations. A successful accounting check is not a proof.
+`verify-complete <crate-directory>` currently rejects all full-proof claims;
+editing ledger labels cannot bypass missing semantic preservation/root proofs.
 
 ```sh
 cargo run --locked -- compile examples/assertions/project.json --out artifacts/assertions
