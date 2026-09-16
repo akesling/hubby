@@ -208,6 +208,11 @@ Rust ownership/unwind refinement, or source-to-IR semantic preservation.
 The underlying callback protocol also supports typed callback and enclosing return
 values. Ordered collection of numeric replies shares the same state and cleanup
 semantics; numeric rank-selection Rust lowering is not yet implemented.
+Method proof bundles include `Provium.OrderStatistics`: checked sorted-permutation,
+rank/support equivalence, maximality, input membership and scalar-bound contracts
+for arbitrary lists. Rank arithmetic has explicit nonempty and representability
+premises, including the empty-prefix wrapping index. These are reusable logical
+contracts; Rust sorting and buffer refinement remain separate obligations.
 
 Guarded by-value Copy-array merges support pure queries on both inputs, a pure
 source projection, and source-local target insertion with a constant `map_err`

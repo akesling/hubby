@@ -1090,3 +1090,30 @@ checks, provider ordinary tests, provider/Jarl Clippy, formatting and provider
 rustdoc passed. All 105 existing membership obligations replayed on host and
 installed wasm32 after the typed-protocol change. Lean remained serialized with
 a 16384 MiB ceiling. No numeric source-linked obligation is counted yet.
+
+## M1: unbounded numeric rank contracts
+
+Provium now provides `Provium.OrderStatistics` in method proof bundles, with its
+source included in artifact hashes. General Lean contracts prove sorted length,
+permutation and order; existence and input membership of the selected rank;
+exact support-count equivalence and maximality; scalar-bound preservation; and
+invariance under input permutation. The rank expression uses an explicit divisor
+greater than one. A count-based oracle determines its answer without computing
+the sort. All statements quantify over arbitrary lists and preserve ties.
+
+Nonempty-prefix arithmetic proves the quotient increment fits whenever count
+fits, and the selected offset is within count. Empty-prefix wrapping subtraction
+produces the maximum word and an out-of-bounds index for every representable
+buffer capacity. These are arithmetic contracts, not a completed Rust array or
+panic refinement.
+
+This advances the reusable P05/P06 foundation for `quorum_index`. Its source
+loops, buffer updates, sort_unstable contract, callback composition and caller
+invariants remain open. No Jarl numeric source obligation has been discharged;
+M1 and M2 remain incomplete.
+
+Validation: the order-statistic kernel test audited 21 contracts/examples and
+rejected changed rank offsets, reversed sorting and a fabricated empty result.
+Provider ordinary tests, Clippy, formatting and rustdoc passed. The existing
+105 membership obligations replayed on host and installed wasm32 with the new
+bundled module. Lean checks remained serialized with a 16384 MiB ceiling.

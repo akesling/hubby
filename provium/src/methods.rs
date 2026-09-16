@@ -11,6 +11,7 @@ use std::{
 };
 use syn::{spanned::Spanned, Expr, Item, Type};
 const SEMANTICS: &str = include_str!("../lean/Provium/State.lean");
+const ORDER_STATISTICS: &str = include_str!("../lean/Provium/OrderStatistics.lean");
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Project {
@@ -1141,6 +1142,7 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
     let mut artifacts = vec![
         ("lean-toolchain", toolchain_file.as_str()),
         ("Provium/State.lean", SEMANTICS),
+        ("Provium/OrderStatistics.lean", ORDER_STATISTICS),
         ("Provium/Audit.lean", AUDIT),
         ("Generated.lean", &generated),
         ("Proofs.lean", &proofs),
@@ -1161,6 +1163,10 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
     let mut report = String::new();
     for (file, object) in [
         ("Provium/State.lean", Some("Provium/State.olean")),
+        (
+            "Provium/OrderStatistics.lean",
+            Some("Provium/OrderStatistics.olean"),
+        ),
         ("Provium/Audit.lean", Some("Provium/Audit.olean")),
         ("Generated.lean", Some("Generated.olean")),
     ] {
