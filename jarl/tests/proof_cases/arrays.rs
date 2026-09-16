@@ -162,6 +162,12 @@ fn original_membership_mutations_break_the_array_contracts() {
         ("any(|m| m.id == id)", "any(|m| m.id == id && m.voter)"),
         ("0 => member.voter = true", "0 => member.voter = false"),
         ("old: false,", "old: true,"),
+        ("next.include(id, 0)?;", "next.include(id, 2)?;"),
+        ("next.include(*id, 1)?;", "next.include(*id, 2)?;"),
+        (
+            "self.is_voter(*id) || learners[..i].contains(id)",
+            "self.contains(*id) || learners[..i].contains(id)",
+        ),
         ("if voters.is_empty()", "if old_voters.is_empty()"),
         (
             "kind == 1 && voters.contains(id)",
@@ -181,4 +187,67 @@ fn original_membership_mutations_break_the_array_contracts() {
         );
         assert!(!out.join("verified.json").exists());
     }
+}
+
+#[test]
+fn original_learner_replacement_matches_sets_and_capacity() {
+    let w = Work::new();
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let krate = Crate::load(&root.join("src/lib.rs")).unwrap();
+    let mut methods = String::new();
+    for name in ["with_learners", "include", "voters", "is_voter"] {
+        methods.push_str(
+            &krate
+                .lower(&format!("membership::Membership::{name}"))
+                .unwrap()
+                .rust,
+        );
+    }
+    let native = format!(
+        r#"
+type Id = usize;
+#[derive(Clone, Copy, Debug, PartialEq)] struct Member {{id: Id, old: bool, voter: bool, learner: bool}}
+#[derive(Clone, Copy, Debug, PartialEq)] struct Membership<const MAX: usize> {{members: [Option<Member>; MAX]}}
+#[derive(Clone, Copy, Debug, PartialEq)] enum Error {{Config}}
+impl<const MAX: usize> Membership<MAX> {{{methods}}}
+fn check<const N: usize>() {{
+ for code in 0..9usize.pow(N as u32) {{
+  let mut digits=code;
+  let original=Membership::<N> {{members:core::array::from_fn(|i|{{let d=digits%9;digits/=9;
+   (d!=0).then_some(Member{{id:i%2,voter:d&1!=0,old:d&2!=0,learner:d&4!=0}})
+  }})}};
+  for learners in [vec![],vec![0],vec![1],vec![2],vec![2,2],vec![2,3]] {{
+   let mut expected=Vec::<Member>::new();
+   for member in original.members.iter().flatten().filter(|m|m.voter) {{
+    if !expected.iter().any(|m|m.id==member.id) {{expected.push(Member{{id:member.id,voter:true,old:false,learner:false}});}}
+   }}
+   let invalid=learners.iter().enumerate().any(|(i,id)|learners[..i].contains(id) || original.members.iter().flatten().any(|m|m.id==*id && (m.voter || m.old)));
+   for id in &learners {{expected.push(Member{{id:*id,voter:false,old:false,learner:true}});}}
+   let before=original;
+   match original.with_learners(&learners) {{
+    Err(Error::Config)=>assert!(invalid || expected.len()>N),
+    Ok(result)=>{{assert!(!invalid && expected.len()<=N);assert_eq!(result.members.into_iter().flatten().collect::<Vec<_>>(),expected);}}
+   }}
+   assert_eq!(original,before);
+  }}
+ }}
+}}
+fn main(){{check::<0>();check::<1>();check::<3>();}}
+"#
+    );
+    let source = w.source(&native);
+    let binary = w.0.join("native");
+    let built = Command::new("rustc")
+        .args(["--edition=2021", "-C", "overflow-checks=yes"])
+        .arg(source)
+        .arg("-o")
+        .arg(&binary)
+        .output()
+        .unwrap();
+    assert!(
+        built.status.success(),
+        "{}",
+        String::from_utf8_lossy(&built.stderr)
+    );
+    assert!(Command::new(binary).status().unwrap().success());
 }

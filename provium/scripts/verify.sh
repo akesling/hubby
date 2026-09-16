@@ -14,6 +14,7 @@ cargo test --locked --test lookups -- --ignored
 cargo test --locked --test records -- --ignored
 cargo test --locked --test iterations -- --ignored
 cargo test --locked --test projections -- --ignored
+cargo test --locked --test rebuilds -- --ignored
 cargo test --locked --test upserts -- --ignored
 cargo test --locked --test slot_batches -- --ignored
 cargo test --locked --test truncations -- --ignored

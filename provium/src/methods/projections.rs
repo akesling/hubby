@@ -278,6 +278,7 @@ impl Crate {
                 key: None,
                 upsert: None,
                 batch: None,
+                rebuild: None,
                 scope: if preserve_slots {
                     "complete Copy array/Option field mapping; slot positions preserved; source/type/layout/ownership refinement remains open"
                 } else {

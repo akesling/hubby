@@ -933,3 +933,38 @@ passed. The full ordinary provider suite, provider Clippy/rustdoc, Jarl Clippy,
 format checks and coverage/review check passed. Jarl's expanded native comparison
 and all 13 original-source membership mutations passed. Lean checks remained
 serialized with a 16384 MiB ceiling.
+
+## M1: complete learner replacement
+
+Provium now translates two-pass optional-record rebuilds. It retains the original
+source projection, exclusion query and insertion helper bodies, both loops,
+initialization, prefix validation, insertion tags, error propagation and return.
+The first loop merges duplicate projected identities without adding validation;
+the second tests the original receiver and rejects duplicate input identities.
+Reusable Lean inductions establish preservation, exact observations, necessary
+and sufficient acceptance, and possible error codes. This is reusable provider
+support; Jarl production Rust is unchanged.
+
+Jarl's `with_learners` adds 14 obligations, bringing the membership project to
+12 complete methods and 84 obligations. Successful replacement preserves the
+source voter set, replaces learners exactly, establishes unique identities,
+preserves capacity, and produces no old voters or joint state. Acceptance holds
+exactly when learners are distinct, none votes in either source voter set, and
+the distinct union of retained voters and requested learners fits capacity.
+Otherwise the result is Config. The identity union and validation conditions are
+derived from complete source-generated execution, not assumed as helper results.
+
+The private method has no nonempty/stable-source guard. Those properties and
+configuration authorization remain caller obligations, including composition
+with `Cluster::change_available`/`set_learners` and the configuration log history.
+`joint`, quorum helpers, reachable callers and Rust source/ownership/index/equality
+refinement remain open under C03/P02/P03/P05/R01. M1 and M2 remain incomplete.
+
+Validation: host and installed wasm32 checks passed for all 84 obligations with
+axiom auditing. The three independent provider rebuild tests passed, including
+kernel source mutations and native source-preservation/ordered-result cases at
+capacities 0, 1 and 3. Original-Jarl learner-replacement native comparisons passed
+at the same capacities. All 16 original-source membership mutations failed their
+Lean contracts and invalidated stale certificates. Provider ordinary tests,
+provider and Jarl Clippy, provider rustdoc, formatting, and coverage/review checks
+passed. Lean runs were serialized with a 16384 MiB ceiling.

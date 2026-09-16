@@ -921,6 +921,305 @@ theorem runSlotBatch_error_codes [DecidableEq α] (program : SlotBatch) (capacit
   · cases failure; exact Or.inl rfl
   · exact runSlotBatchPasses_error_codes program inputs program.passes _ error failure
 
+-- A source projection is inserted without duplicate validation. The following
+-- input loop checks a pure query on the original source before its prior prefix.
+structure Rebuild where
+  projection : RecordProjection
+  exclusion : RecordProjection
+  insert : Upsert
+  firstTag : Nat
+  inputTag : Nat
+  error : String
+
+def runInsertPass [DecidableEq α] (program : Upsert) (tag : Nat)
+    (keys : List (Cell α)) (entries : ArrayStore α) : Except String (ArrayStore α) :=
+  match keys with
+  | [] => .ok entries
+  | key :: rest =>
+    let (next, error) := runUpsert program entries key tag
+    match error with
+    | some error => .error error
+    | none => runInsertPass program tag rest next
+
+def runRebuildInput [DecidableEq α] (program : Rebuild) (original : ArrayStore α)
+    (keys seen : List (Cell α)) (entries : ArrayStore α) : Except String (ArrayStore α) :=
+  match keys with
+  | [] => .ok entries
+  | key :: rest =>
+    if queryKey program.exclusion original key || decide (key ∈ seen) then .error program.error
+    else
+      let (next, error) := runUpsert program.insert entries key program.inputTag
+      match error with
+      | some error => .error error
+      | none => runRebuildInput program original rest (seen ++ [key]) next
+
+def runRebuild [DecidableEq α] (program : Rebuild) (capacity : Nat)
+    (original : ArrayStore α) (keys : List (Cell α)) : Except String (ArrayStore α) :=
+  match runInsertPass program.insert program.firstTag (projectArray program.projection original)
+      (List.replicate capacity none) with
+  | .error error => .error error
+  | .ok entries => runRebuildInput program original keys [] entries
+
+theorem runInsertPass_preserves [DecidableEq α] (program : Upsert) (tag : Nat)
+    (invariant : ArrayStore α → Prop)
+    (step : ∀ entries key, invariant entries → (runUpsert program entries key tag).2 = none →
+      invariant (runUpsert program entries key tag).1)
+    (keys : List (Cell α)) (entries result : ArrayStore α) (initial : invariant entries)
+    (success : runInsertPass program tag keys entries = .ok result) : invariant result := by
+  induction keys generalizing entries with
+  | nil => cases success; exact initial
+  | cons key rest ih =>
+    simp only [runInsertPass] at success
+    cases code : (runUpsert program entries key tag).2 with
+    | some error => simp [code] at success
+    | none =>
+      simp only [code] at success
+      exact ih _ (step entries key initial code) success
+
+theorem runRebuildInput_preserves [DecidableEq α] (program : Rebuild) (original : ArrayStore α)
+    (invariant : ArrayStore α → Prop)
+    (step : ∀ entries key, invariant entries → (runUpsert program.insert entries key program.inputTag).2 = none →
+      invariant (runUpsert program.insert entries key program.inputTag).1)
+    (keys seen : List (Cell α)) (entries result : ArrayStore α) (initial : invariant entries)
+    (success : runRebuildInput program original keys seen entries = .ok result) : invariant result := by
+  induction keys generalizing seen entries with
+  | nil => cases success; exact initial
+  | cons key rest ih =>
+    simp only [runRebuildInput] at success
+    split at success
+    · cases success
+    · cases code : (runUpsert program.insert entries key program.inputTag).2 with
+      | some error => simp [code] at success
+      | none =>
+        simp only [code] at success
+        exact ih _ _ (step entries key initial code) success
+
+theorem runRebuild_preserves [DecidableEq α] (program : Rebuild)
+    (invariant : ArrayStore α → Prop)
+    (step : ∀ entries key tag, invariant entries → (runUpsert program.insert entries key tag).2 = none →
+      invariant (runUpsert program.insert entries key tag).1)
+    (capacity : Nat) (original : ArrayStore α) (keys : List (Cell α)) (result : ArrayStore α)
+    (initial : invariant (List.replicate capacity none))
+    (success : runRebuild program capacity original keys = .ok result) : invariant result := by
+  simp only [runRebuild] at success
+  cases first : runInsertPass program.insert program.firstTag (projectArray program.projection original)
+      (List.replicate capacity none) with
+  | error error => simp [first] at success
+  | ok entries =>
+    simp only [first] at success
+    have after := runInsertPass_preserves program.insert program.firstTag invariant (fun entries key => step entries key _) _ _ entries initial first
+    exact runRebuildInput_preserves program original invariant (fun entries key => step entries key _) keys [] entries result after success
+
+theorem runInsertPass_observes [DecidableEq α] (program : Upsert) (tag : Nat)
+    (observe : ArrayStore α → Prop) (added : Cell α → Prop)
+    (step : ∀ entries key, (runUpsert program entries key tag).2 = none →
+      (observe (runUpsert program entries key tag).1 ↔ observe entries ∨ added key))
+    (keys : List (Cell α)) (entries result : ArrayStore α)
+    (success : runInsertPass program tag keys entries = .ok result) :
+    observe result ↔ observe entries ∨ ∃ key ∈ keys, added key := by
+  induction keys generalizing entries with
+  | nil => cases success; simp
+  | cons key rest ih =>
+    simp only [runInsertPass] at success
+    cases code : (runUpsert program entries key tag).2 with
+    | some error => simp [code] at success
+    | none =>
+      simp only [code] at success
+      rw [ih _ success, step entries key code]
+      simp only [List.mem_cons, or_and_right, exists_or, exists_eq_left, or_assoc]
+
+theorem runRebuildInput_observes [DecidableEq α] (program : Rebuild) (original : ArrayStore α)
+    (observe : ArrayStore α → Prop) (added : Cell α → Prop)
+    (step : ∀ entries key, (runUpsert program.insert entries key program.inputTag).2 = none →
+      (observe (runUpsert program.insert entries key program.inputTag).1 ↔ observe entries ∨ added key))
+    (keys seen : List (Cell α)) (entries result : ArrayStore α)
+    (success : runRebuildInput program original keys seen entries = .ok result) :
+    observe result ↔ observe entries ∨ ∃ key ∈ keys, added key := by
+  induction keys generalizing seen entries with
+  | nil => cases success; simp
+  | cons key rest ih =>
+    simp only [runRebuildInput] at success
+    split at success
+    · cases success
+    · cases code : (runUpsert program.insert entries key program.inputTag).2 with
+      | some error => simp [code] at success
+      | none =>
+        simp only [code] at success
+        rw [ih _ _ success, step entries key code]
+        simp only [List.mem_cons, or_and_right, exists_or, exists_eq_left, or_assoc]
+
+theorem runRebuild_observes [DecidableEq α] (program : Rebuild)
+    (observe : ArrayStore α → Prop) (added : Cell α → Nat → Prop)
+    (step : ∀ entries key tag, (runUpsert program.insert entries key tag).2 = none →
+      (observe (runUpsert program.insert entries key tag).1 ↔ observe entries ∨ added key tag))
+    (capacity : Nat) (original : ArrayStore α) (keys : List (Cell α)) (result : ArrayStore α)
+    (success : runRebuild program capacity original keys = .ok result) :
+    observe result ↔ observe (List.replicate capacity none) ∨
+      (∃ key ∈ projectArray program.projection original, added key program.firstTag) ∨
+      (∃ key ∈ keys, added key program.inputTag) := by
+  simp only [runRebuild] at success
+  cases first : runInsertPass program.insert program.firstTag (projectArray program.projection original)
+      (List.replicate capacity none) with
+  | error error => simp [first] at success
+  | ok entries =>
+    simp only [first] at success
+    rw [runRebuildInput_observes program original observe (fun key => added key program.inputTag)
+      (fun entries key => step entries key _) keys [] entries result success,
+      runInsertPass_observes program.insert program.firstTag observe (fun key => added key program.firstTag)
+        (fun entries key => step entries key _) _ _ entries first, or_assoc]
+
+theorem runRebuildInput_valid [DecidableEq α] (program : Rebuild) (original : ArrayStore α)
+    (keys seen : List (Cell α)) (entries result : ArrayStore α)
+    (success : runRebuildInput program original keys seen entries = .ok result) :
+    keys.Nodup ∧ (∀ key ∈ keys, key ∉ seen) ∧ (∀ key ∈ keys, queryKey program.exclusion original key = false) := by
+  induction keys generalizing seen entries with
+  | nil => simp
+  | cons key rest ih =>
+    simp only [runRebuildInput] at success
+    split at success
+    · cases success
+    · rename_i guard
+      have clean : queryKey program.exclusion original key = false ∧ key ∉ seen := by
+        simpa using guard
+      cases code : (runUpsert program.insert entries key program.inputTag).2 with
+      | some error => simp [code] at success
+      | none =>
+        simp only [code] at success
+        obtain ⟨distinct, fresh, excluded⟩ := ih (seen ++ [key]) _ success
+        have absent : key ∉ rest := by
+          intro member
+          exact fresh key member (by simp)
+        refine ⟨List.nodup_cons.mpr ⟨absent, distinct⟩, ?_, ?_⟩
+        · intro next member
+          rcases List.mem_cons.mp member with rfl | member
+          · exact clean.2
+          · exact fun present => fresh next member (List.mem_append_left _ present)
+        · intro next member
+          rcases List.mem_cons.mp member with rfl | member
+          · exact clean.1
+          · exact excluded next member
+
+theorem runRebuild_valid [DecidableEq α] (program : Rebuild) (capacity : Nat)
+    (original : ArrayStore α) (keys : List (Cell α)) (result : ArrayStore α)
+    (success : runRebuild program capacity original keys = .ok result) :
+    keys.Nodup ∧ (∀ key ∈ keys, queryKey program.exclusion original key = false) := by
+  simp only [runRebuild] at success
+  cases first : runInsertPass program.insert program.firstTag (projectArray program.projection original)
+      (List.replicate capacity none) with
+  | error error => simp [first] at success
+  | ok entries =>
+    simp only [first] at success
+    have valid := runRebuildInput_valid program original keys [] entries result success
+    exact ⟨valid.1, valid.2.2⟩
+
+theorem runInsertPass_accepts [DecidableEq α] (program : Upsert) (tag : Nat)
+    (invariant : ArrayStore α → Prop) (allowed : Cell α → Prop)
+    (step : ∀ entries key, invariant entries → allowed key →
+      ∃ next, runUpsert program entries key tag = (next, none) ∧ invariant next)
+    (keys : List (Cell α)) (entries : ArrayStore α) (initial : invariant entries)
+    (admitted : ∀ key ∈ keys, allowed key) :
+    ∃ result, runInsertPass program tag keys entries = .ok result ∧ invariant result := by
+  induction keys generalizing entries with
+  | nil => exact ⟨entries, rfl, initial⟩
+  | cons key rest ih =>
+    obtain ⟨next, inserted, preserved⟩ := step entries key initial (admitted key (by simp))
+    obtain ⟨result, finished, final⟩ := ih next preserved (fun key member => admitted key (List.mem_cons_of_mem _ member))
+    exact ⟨result, by simpa only [runInsertPass, inserted] using finished, final⟩
+
+theorem runRebuildInput_accepts [DecidableEq α] (program : Rebuild) (original : ArrayStore α)
+    (invariant : ArrayStore α → Prop) (allowed : Cell α → Prop)
+    (step : ∀ entries key, invariant entries → allowed key →
+      ∃ next, runUpsert program.insert entries key program.inputTag = (next, none) ∧ invariant next)
+    (keys seen : List (Cell α)) (entries : ArrayStore α) (initial : invariant entries)
+    (distinct : keys.Nodup) (fresh : ∀ key ∈ keys, key ∉ seen)
+    (excluded : ∀ key ∈ keys, queryKey program.exclusion original key = false)
+    (admitted : ∀ key ∈ keys, allowed key) :
+    ∃ result, runRebuildInput program original keys seen entries = .ok result ∧ invariant result := by
+  induction keys generalizing seen entries with
+  | nil => exact ⟨entries, rfl, initial⟩
+  | cons key rest ih =>
+    have clean : (queryKey program.exclusion original key || decide (key ∈ seen)) = false := by
+      simp [excluded key (by simp), fresh key (by simp)]
+    obtain ⟨next, inserted, preserved⟩ := step entries key initial (admitted key (by simp))
+    have remaining : ∀ value ∈ rest, value ∉ seen ++ [key] := by
+      intro value member
+      have old := fresh value (List.mem_cons_of_mem _ member)
+      have different : value ≠ key := by
+        intro same
+        subst value
+        exact (List.nodup_cons.mp distinct).1 member
+      simpa only [List.mem_append, List.mem_singleton, not_or] using And.intro old different
+    obtain ⟨result, finished, final⟩ := ih (seen ++ [key]) next preserved (List.nodup_cons.mp distinct).2 remaining
+      (fun key member => excluded key (List.mem_cons_of_mem _ member))
+      (fun key member => admitted key (List.mem_cons_of_mem _ member))
+    exact ⟨result, by simpa only [runRebuildInput, clean, Bool.false_eq_true, if_false, inserted] using finished, final⟩
+
+theorem runRebuild_accepts [DecidableEq α] (program : Rebuild)
+    (invariant : ArrayStore α → Prop) (allowed : Cell α → Prop)
+    (step : ∀ entries key tag, invariant entries → allowed key →
+      ∃ next, runUpsert program.insert entries key tag = (next, none) ∧ invariant next)
+    (capacity : Nat) (original : ArrayStore α) (keys : List (Cell α))
+    (initial : invariant (List.replicate capacity none))
+    (projected : ∀ key ∈ projectArray program.projection original, allowed key)
+    (distinct : keys.Nodup) (excluded : ∀ key ∈ keys, queryKey program.exclusion original key = false)
+    (admitted : ∀ key ∈ keys, allowed key) :
+    ∃ result, runRebuild program capacity original keys = .ok result ∧ invariant result := by
+  obtain ⟨entries, first, preserved⟩ := runInsertPass_accepts program.insert program.firstTag invariant allowed
+    (fun entries key => step entries key _) _ _ initial projected
+  obtain ⟨result, finished, final⟩ := runRebuildInput_accepts program original invariant allowed
+    (fun entries key => step entries key _) keys [] entries preserved distinct (by simp) excluded admitted
+  exact ⟨result, by simpa only [runRebuild, first] using finished, final⟩
+
+theorem runInsertPass_error_code [DecidableEq α] (program : Upsert) (tag : Nat)
+    (keys : List (Cell α)) (entries : ArrayStore α) (error : String)
+    (failure : runInsertPass program tag keys entries = .error error) : error = program.error := by
+  induction keys generalizing entries with
+  | nil => cases failure
+  | cons key rest ih =>
+    simp only [runInsertPass] at failure
+    cases code : (runUpsert program entries key tag).2 with
+    | none =>
+      simp only [code] at failure
+      exact ih _ failure
+    | some reason =>
+      simp only [code, Except.error.injEq] at failure
+      subst error
+      exact runUpsert_failure_code program entries key tag reason code
+
+theorem runRebuildInput_error_codes [DecidableEq α] (program : Rebuild) (original : ArrayStore α)
+    (keys seen : List (Cell α)) (entries : ArrayStore α) (error : String)
+    (failure : runRebuildInput program original keys seen entries = .error error) :
+    error = program.error ∨ error = program.insert.error := by
+  induction keys generalizing seen entries with
+  | nil => cases failure
+  | cons key rest ih =>
+    simp only [runRebuildInput] at failure
+    split at failure
+    · cases failure; exact Or.inl rfl
+    · cases code : (runUpsert program.insert entries key program.inputTag).2 with
+      | none =>
+        simp only [code] at failure
+        exact ih _ _ failure
+      | some reason =>
+        simp only [code, Except.error.injEq] at failure
+        subst error
+        exact Or.inr (runUpsert_failure_code program.insert entries key program.inputTag reason code)
+
+theorem runRebuild_error_codes [DecidableEq α] (program : Rebuild) (capacity : Nat)
+    (original : ArrayStore α) (keys : List (Cell α)) (error : String)
+    (failure : runRebuild program capacity original keys = .error error) :
+    error = program.error ∨ error = program.insert.error := by
+  simp only [runRebuild] at failure
+  cases first : runInsertPass program.insert program.firstTag (projectArray program.projection original)
+      (List.replicate capacity none) with
+  | ok entries =>
+    simp only [first] at failure
+    exact runRebuildInput_error_codes program original keys [] entries error failure
+  | error reason =>
+    simp only [first, Except.error.injEq] at failure
+    subst error
+    exact Or.inr (runInsertPass_error_code program.insert program.firstTag _ _ reason first)
+
 -- Shared Result queries do not modify the store. The frontend checks the types
 -- of every accessed place. As above, malformed stores have a total extension;
 -- field-layout/source correspondence remains an explicit refinement obligation.

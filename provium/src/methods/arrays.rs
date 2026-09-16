@@ -15,6 +15,7 @@ pub struct Shape {
     pub key: Option<KeyQuery>,
     pub upsert: Option<super::upserts::Upsert>,
     pub batch: Option<super::slot_batches::Batch>,
+    pub rebuild: Option<Box<super::rebuilds::Rebuild>>,
 }
 pub(super) fn copy_derived(item: &syn::ItemStruct) -> bool {
     item.attrs.iter().any(|a| {
@@ -178,7 +179,7 @@ impl Crate {
             )
         };
         Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],
-            iteration:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,view:None,record_at:None,lookup:None,selection:None,relocation:None,buffer:None,constructor:None,query:None,array:Some(Shape{field:p[0].clone(),capacity:tokens(&array.len),record,predicate:Some(predicate),projection:None,preserve_slots:false,key,upsert:None,batch:None,scope:"complete shared optional-record array iterator query; Rust layout/borrowing and frontend refinement remain trusted"})})
+            iteration:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,view:None,record_at:None,lookup:None,selection:None,relocation:None,buffer:None,constructor:None,query:None,array:Some(Shape{field:p[0].clone(),capacity:tokens(&array.len),record,predicate:Some(predicate),projection:None,preserve_slots:false,key,upsert:None,batch:None,rebuild:None,scope:"complete shared optional-record array iterator query; Rust layout/borrowing and frontend refinement remain trusted"})})
     }
     pub(super) fn lower_array(&self, name: &str) -> Result<Method, String> {
         let def = self.methods.get(name).ok_or("unknown array method")?;
@@ -305,7 +306,7 @@ impl Crate {
             &mut writes,
         )?;
         Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes,body,
-            iteration:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,view:None,record_at:None,lookup:None,selection:None,relocation:None,buffer:None,constructor:None,query:None,array:Some(Shape{field:array_path[0].clone(),capacity:tokens(&array.len),record,predicate:None,projection:None,preserve_slots:false,key:None,upsert:None,batch:None,scope:"complete optional Copy-record array traversal; preserves length and visits each original slot exactly once; Rust layout/borrowing and frontend refinement remain trusted"})})
+            iteration:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,view:None,record_at:None,lookup:None,selection:None,relocation:None,buffer:None,constructor:None,query:None,array:Some(Shape{field:array_path[0].clone(),capacity:tokens(&array.len),record,predicate:None,projection:None,preserve_slots:false,key:None,upsert:None,batch:None,rebuild:None,scope:"complete optional Copy-record array traversal; preserves length and visits each original slot exactly once; Rust layout/borrowing and frontend refinement remain trusted"})})
     }
     fn array_statements(
         &self,
@@ -386,6 +387,9 @@ impl Crate {
 }
 pub(super) fn generate(method: &Method) -> String {
     let name = &method.symbol;
+    if let Some(rebuild) = method.array.as_ref().and_then(|s| s.rebuild.as_ref()) {
+        return super::rebuilds::generate(name, rebuild);
+    }
     if let Some(batch) = method.array.as_ref().and_then(|s| s.batch.as_ref()) {
         return super::slot_batches::generate(name, batch);
     }

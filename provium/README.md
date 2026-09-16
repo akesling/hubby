@@ -197,6 +197,14 @@ contracts. The logical query is connected to membership in the corresponding
 projection sequence. Relating logical equality to actual Rust values remains
 part of source refinement.
 
+Two-pass optional-record rebuilds support a pure source projection followed by
+a checked input slice. The first loop merges repeated projected keys; the second
+checks a pure identity query on the original receiver and rejects prior-prefix
+duplicates. Complete source-local projection, query and insertion bodies are
+retained, including insertion tags and error propagation. Shared Lean lemmas
+cover preservation, observations, accepted inputs and error codes. Source memory,
+ownership and lowering preservation remain separate obligations.
+
 Optional Copy-record upserts retain existing-key search before empty-slot fallback,
 the full-array error, the selected indexed `get_or_insert`, every initializer and
 literal-tag flag assignment. Shared Lean contracts establish search bounds, exact

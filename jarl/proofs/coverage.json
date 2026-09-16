@@ -4507,10 +4507,95 @@
         "S11",
         "S12"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open.",
+      "status": "component_evidence",
+      "note": "Complete original two-loop rebuild retains source voter projection, original-receiver is_voter exclusion, learner-prefix duplicate checks, insertion bodies and early errors. Checked capacity and unique identities, exact retained voter and replacement learner sets/identity union, no old voters/not-joint, and acceptance iff learners are distinct, in neither source voter set, and the distinct output union fits capacity; otherwise Config. Stable/nonempty source membership, authorization and log lifecycle remain reachable caller obligations. Rust source/ownership/index/equality refinement remains open.",
       "root_apis": [],
-      "contracts": [],
+      "contracts": [
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "LearnerReplacement.capacity_preserved",
+          "function": "membership_Membership_with_learners",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "LearnerReplacement.unique_identities",
+          "function": "membership_Membership_with_learners",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "LearnerReplacement.flags",
+          "function": "membership_Membership_with_learners",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "LearnerReplacement.voters_exact",
+          "function": "membership_Membership_with_learners",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "LearnerReplacement.learners_exact",
+          "function": "membership_Membership_with_learners",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "LearnerReplacement.old_empty",
+          "function": "membership_Membership_with_learners",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "LearnerReplacement.valid_inputs",
+          "function": "membership_Membership_with_learners",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "LearnerReplacement.identities",
+          "function": "membership_Membership_with_learners",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "LearnerReplacement.accepts",
+          "function": "membership_Membership_with_learners",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "LearnerReplacement.accepts_iff",
+          "function": "membership_Membership_with_learners",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "LearnerReplacement.accepts_by_count",
+          "function": "membership_Membership_with_learners",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "LearnerReplacement.error_code",
+          "function": "membership_Membership_with_learners",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "LearnerReplacement.rejects_iff",
+          "function": "membership_Membership_with_learners",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "LearnerReplacement.not_joint",
+          "function": "membership_Membership_with_learners",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        }
+      ],
       "context": "production"
     },
     "crate::membership::<item:0>": {

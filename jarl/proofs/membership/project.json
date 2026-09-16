@@ -12,7 +12,8 @@
     "membership::Membership::include",
     "membership::Membership::restore",
     "membership::Membership::new",
-    "membership::Membership::peers"
+    "membership::Membership::peers",
+    "membership::Membership::with_learners"
   ],
   "proofs": "Proofs.lean",
   "obligations": [
@@ -295,6 +296,62 @@
     {
       "theorem": "Peers.stable_members",
       "function": "membership_Membership_peers"
+    },
+    {
+      "theorem": "LearnerReplacement.capacity_preserved",
+      "function": "membership_Membership_with_learners"
+    },
+    {
+      "theorem": "LearnerReplacement.unique_identities",
+      "function": "membership_Membership_with_learners"
+    },
+    {
+      "theorem": "LearnerReplacement.flags",
+      "function": "membership_Membership_with_learners"
+    },
+    {
+      "theorem": "LearnerReplacement.voters_exact",
+      "function": "membership_Membership_with_learners"
+    },
+    {
+      "theorem": "LearnerReplacement.learners_exact",
+      "function": "membership_Membership_with_learners"
+    },
+    {
+      "theorem": "LearnerReplacement.old_empty",
+      "function": "membership_Membership_with_learners"
+    },
+    {
+      "theorem": "LearnerReplacement.valid_inputs",
+      "function": "membership_Membership_with_learners"
+    },
+    {
+      "theorem": "LearnerReplacement.identities",
+      "function": "membership_Membership_with_learners"
+    },
+    {
+      "theorem": "LearnerReplacement.accepts",
+      "function": "membership_Membership_with_learners"
+    },
+    {
+      "theorem": "LearnerReplacement.accepts_iff",
+      "function": "membership_Membership_with_learners"
+    },
+    {
+      "theorem": "LearnerReplacement.accepts_by_count",
+      "function": "membership_Membership_with_learners"
+    },
+    {
+      "theorem": "LearnerReplacement.error_code",
+      "function": "membership_Membership_with_learners"
+    },
+    {
+      "theorem": "LearnerReplacement.rejects_iff",
+      "function": "membership_Membership_with_learners"
+    },
+    {
+      "theorem": "LearnerReplacement.not_joint",
+      "function": "membership_Membership_with_learners"
     }
   ]
 }

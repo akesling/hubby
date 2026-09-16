@@ -25,7 +25,7 @@ pub(super) fn candidate(item: &syn::ImplItemFn) -> bool {
         |s| matches!(s,syn::Stmt::Expr(Expr::ForLoop(f),_) if matches!(&*f.expr,Expr::Array(_))),
     )
 }
-fn output_error(output: &syn::ReturnType) -> Result<String, String> {
+pub(super) fn output_error(output: &syn::ReturnType) -> Result<String, String> {
     let syn::ReturnType::Type(_, ty) = output else {
         return Err("batch constructor needs a Result".into());
     };
@@ -59,7 +59,7 @@ fn output_error(output: &syn::ReturnType) -> Result<String, String> {
     }
     Ok(e.path.segments[0].ident.to_string())
 }
-fn tuple_binding(p: &syn::Pat) -> Result<(String, String), String> {
+pub(super) fn tuple_binding(p: &syn::Pat) -> Result<(String, String), String> {
     let syn::Pat::Tuple(p) = p else {
         return Err("batch loop needs two plain bindings".into());
     };
@@ -74,7 +74,7 @@ fn tuple_binding(p: &syn::Pat) -> Result<(String, String), String> {
     }
     Ok((a, b))
 }
-fn tag(expr: &Expr) -> Result<u8, String> {
+pub(super) fn tag(expr: &Expr) -> Result<u8, String> {
     let Expr::Lit(l) = expr else {
         return Err("batch tag must be a u8 literal".into());
     };
@@ -87,7 +87,7 @@ fn tag(expr: &Expr) -> Result<u8, String> {
     }
     n.base10_parse().map_err(|e| e.to_string())
 }
-fn binary<'a>(expr: &'a Expr, operation: &str) -> Result<(&'a Expr, &'a Expr), String> {
+pub(super) fn binary<'a>(expr: &'a Expr, operation: &str) -> Result<(&'a Expr, &'a Expr), String> {
     let Expr::Binary(b) = expr else {
         return Err("batch validation requires the original binary expression".into());
     };
@@ -105,7 +105,7 @@ fn unparen(expr: &Expr) -> Result<&Expr, String> {
         Ok(expr)
     }
 }
-fn error_return(branch: &syn::ExprIf) -> Result<&Expr, String> {
+pub(super) fn error_return(branch: &syn::ExprIf) -> Result<&Expr, String> {
     attrs(&branch.attrs)?;
     if branch.else_branch.is_some() {
         return Err("batch validation cannot hide an else effect".into());
@@ -468,7 +468,7 @@ impl Crate {
             insert_rust: helper.rust,
             insert: shape.upsert.ok_or("missing insertion IR")?,
         };
-        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],iteration:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,view:None,record_at:None,lookup:None,selection:None,relocation:None,buffer:None,constructor:None,query:None,array:Some(arrays::Shape{field:field_name,capacity:tokens(&array.len),record:shape.record,predicate:None,projection:None,preserve_slots:false,key:None,upsert:None,batch:Some(batch),scope:"complete checked slice batches and insertion callee; prefix enumeration, early errors and pass order retained; Rust source/ownership/layout refinement remains open"})})
+        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],iteration:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,view:None,record_at:None,lookup:None,selection:None,relocation:None,buffer:None,constructor:None,query:None,array:Some(arrays::Shape{field:field_name,capacity:tokens(&array.len),record:shape.record,predicate:None,projection:None,preserve_slots:false,key:None,upsert:None,batch:Some(batch),rebuild:None,scope:"complete checked slice batches and insertion callee; prefix enumeration, early errors and pass order retained; Rust source/ownership/layout refinement remains open"})})
     }
 }
 impl Crate {
