@@ -178,6 +178,14 @@
     {
       "theorem": "Storage.installation_mismatching_resets_log",
       "function": "state_State_install"
+    },
+    {
+      "theorem": "Storage.truncation_retains_predecessor",
+      "function": "state_State_truncate"
+    },
+    {
+      "theorem": "Storage.truncation_retains_base",
+      "function": "state_State_truncate"
     }
   ]
 }

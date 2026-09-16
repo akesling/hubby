@@ -207,10 +207,17 @@ outstanding; these are contracts of the generated structural semantics.
 
 `replication-contract` imports the original storage and validation proofs through
 Provium's `proof_modules` support. Both projects use the generated namespace
-`Jarl` so their unchanged contracts compose in one generated program. The bridge
-proves that accepted append validation supplies storage's `LogSuccessor`
-condition, then derives log preservation and an unchanged existing prefix from
-the actual generated `State::push`. Field correspondence, the actual last record,
-available capacity and an already advanced hard term remain explicit premises.
-This is a composed component contract, not a proof of `Node::append` or
-`Node::step`; their complete bodies must establish the caller premises.
+`Jarl`. Accepted append validation supplies the storage successor/term condition.
+The replacement contract then composes actual generated `State::id_at`,
+`truncate` and `push`: it derives the retained predecessor and available space,
+preserves the ordered log and committed slots, and proves the resulting length.
+The capacity condition is both necessary and sufficient after truncation, even
+when the old log is full. These results are parameterized by capacity and word
+size. The normal destructor continuations remain explicit in `resumeTruncation`.
+
+The caller still must establish field correspondence, the advanced hard term,
+matching log identity, and the scalar admission/commit conditions. This is a
+composed storage contract, not a proof of the complete `Node::append` or
+`Node::step` bodies, their Clone/Drop behavior, membership effects, or global
+Raft safety and liveness. The project has 16 audited obligations; its 32-bit
+check rejects source mutations to the lookup offset and truncation boundary.

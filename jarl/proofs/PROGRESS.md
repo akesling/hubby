@@ -467,3 +467,37 @@ freshness and transitive-axiom regressions. All 20 Jarl proof tests pass, includ
 the new composed contract on 32-bit; the final host composition also passes with
 the fresh-build checker. Coverage, formatting and Clippy pass. Jarl production
 Rust and runtime dependencies remain unchanged.
+
+
+## Replacement storage and predecessor discharge (partial P09/R02/R03/R05)
+
+- The storage project now has 44 obligations. New full-operation theorems prove
+  that truncation retains either the actual predecessor entry record or the
+  compacted base record. The proof uses the generated traversal and mutation,
+  exact retained length, and preservation of earlier slots; it does not assume
+  the desired post-truncation lookup.
+- The replication project now selects eight original methods and audits 16
+  obligations. It includes the complete generated `State::id_at` and proves that
+  a successful lookup identifies a predecessor in the old occupied prefix or
+  at the snapshot boundary. Composing this with truncation preserves the entire
+  returned record, including its term.
+- The exact post-truncation capacity theorem proves that space is equivalent to
+  passing the scalar full-log admission condition, for cuts above the base.
+  The replacement contract derives space instead of assuming it, including
+  replacement in a full log and arbitrary capacity/word-size parameters.
+- `matched_replacement_preserves_log` composes lookup, truncation and push using
+  only pre-replacement conditions. Normal destruction continuations are explicit;
+  the result preserves the ordered log, committed prefix and commit bound and
+  gives the exact resulting length. Validation's earlier theorem supplies its
+  successor/term condition once the input field relation is established.
+- Node::append and Node::step still need complete translation and caller
+  discharge: generated record equality, advanced term, guard selection, Clone
+  and exceptional Drop, membership refresh, dirty markers and commit updates.
+  These scalar guard premises are not yet proofs that the complete Node body
+  checks them. Global safety/liveness and Rust refinement remain open.
+
+Validation: the complete host proof suite passes. The expanded composed contract
+passes on 32-bit and rejects changed lookup offsets and truncation inclusivity;
+the storage 32-bit proof/mutation suite also passes with all 44 obligations.
+Formatting, Clippy and diff checks pass. Jarl production Rust, runtime dependency
+graph, toolchains and Provium implementation are unchanged in this checkpoint.

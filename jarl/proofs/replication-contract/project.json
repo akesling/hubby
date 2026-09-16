@@ -8,7 +8,8 @@
     "state::State::truncate",
     "state::State::install",
     "state::State::restore",
-    "node::Node::valid"
+    "node::Node::valid",
+    "state::State::id_at"
   ],
   "proof_modules": [
     {
@@ -32,6 +33,58 @@
     },
     {
       "theorem": "Replication.validated_append_preserves_log",
+      "function": "state_State_push"
+    },
+    {
+      "theorem": "Replication.replacement_prepares_append",
+      "function": "state_State_truncate"
+    },
+    {
+      "theorem": "Replication.replacement_storage_succeeds",
+      "function": "state_State_truncate"
+    },
+    {
+      "theorem": "Replication.replacement_storage_succeeds",
+      "function": "state_State_push"
+    },
+    {
+      "theorem": "Replication.truncation_space_iff",
+      "function": "state_State_truncate"
+    },
+    {
+      "theorem": "Replication.replacement_append_preserves_log",
+      "function": "state_State_truncate"
+    },
+    {
+      "theorem": "Replication.replacement_append_preserves_log",
+      "function": "state_State_push"
+    },
+    {
+      "theorem": "Replication.predecessor_after_truncation",
+      "function": "state_State_truncate"
+    },
+    {
+      "theorem": "Replication.lookup_identifies_predecessor",
+      "function": "state_State_id_at"
+    },
+    {
+      "theorem": "Replication.lookup_retained_after_truncation",
+      "function": "state_State_id_at"
+    },
+    {
+      "theorem": "Replication.lookup_retained_after_truncation",
+      "function": "state_State_truncate"
+    },
+    {
+      "theorem": "Replication.matched_replacement_preserves_log",
+      "function": "state_State_id_at"
+    },
+    {
+      "theorem": "Replication.matched_replacement_preserves_log",
+      "function": "state_State_truncate"
+    },
+    {
+      "theorem": "Replication.matched_replacement_preserves_log",
       "function": "state_State_push"
     }
   ]

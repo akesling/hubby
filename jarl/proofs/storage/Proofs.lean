@@ -1706,4 +1706,69 @@ theorem installation_mismatching_resets_log (bits capacity index commit : Nat)
   · simp [next,List.replicate_append_replicate,size]
   · dsimp [next];omega
 
+private theorem split_present_slot (slots : List (Option α)) (position : Nat) (entry : α)
+    (hit : slots[position]? = some (some entry)) :
+    ∃ front suffix, slots = (front ++ [some entry]) ++ suffix ∧ front.length = position := by
+  induction slots generalizing position with
+  | nil => simp at hit
+  | cons head tail ih =>
+    cases position with
+    | zero =>
+      simp only [List.getElem?_cons_zero,Option.some.injEq] at hit
+      subst head
+      exact ⟨[],tail,rfl,rfl⟩
+    | succ position =>
+      simp only [List.getElem?_cons_succ] at hit
+      obtain ⟨front,suffix,split,length⟩ := ih position hit
+      exact ⟨head :: front,suffix,by simp [split],by simp [length]⟩
+
+private theorem last_at_final_slot (view : α → Path → InitStore) (records : SelectionStore)
+    (state : BufferState α) (position : Nat) (entry : α)
+    (length : state.len = position + 1) (hit : state.slots[position]? = some (some entry)) :
+    lastRecord Jarl.state_State_truncate_ir.last (truncationView view records state) = .ok (view entry ["id"]) := by
+  obtain ⟨front,suffix,split,count⟩ := split_present_slot state.slots position entry hit
+  have shape : state = ⟨(front ++ [some entry]) ++ suffix,front.length+1⟩ := by
+    cases state
+    simp_all
+  rw [shape]
+  exact last_before_truncation view records front suffix entry
+
+-- Truncation preserves the actual predecessor record, not merely its index.
+-- The caller must still connect its successful id_at check to the old slot.
+theorem truncation_retains_predecessor (view : α → Path → InitStore) (records : SelectionStore)
+    (hard base : InitStore) (boundary capacity baseIndex position : Nat)
+    (state shortened : BufferState α) (entry : α)
+    (selected : selectRecord Jarl.state_State_truncate_ir.last.base records = base)
+    (baseRead : recordWord base ["index"] = some baseIndex)
+    (valid : LogRep view hard base state capacity) (boundaryWord : boundary < 2^64)
+    (cut : boundary = baseIndex + position + 2) (inside : position < state.len)
+    (hit : state.slots[position]? = some (some entry))
+    (execution : resumeTruncation (Jarl.state_State_truncate view records state boundary) = .returned shortened) :
+    lastRecord Jarl.state_State_truncate_ir.last (truncationView view records shortened) = .ok (view entry ["id"]) := by
+  obtain ⟨expected,returned,_,length,unchanged⟩ :=
+    truncation_complete_result view records hard base boundary capacity baseIndex state
+      selected baseRead valid boundaryWord
+  have same : expected = shortened := TruncationRun.returned.inj (returned.symm.trans execution)
+  subst expected
+  have nextLength : shortened.len = position + 1 := by omega
+  exact last_at_final_slot view records shortened position entry nextLength
+    ((unchanged position (by omega)).trans hit)
+
+theorem truncation_retains_base (view : α → Path → InitStore) (records : SelectionStore)
+    (hard base : InitStore) (boundary capacity baseIndex : Nat) (state shortened : BufferState α)
+    (selected : selectRecord Jarl.state_State_truncate_ir.last.base records = base)
+    (baseRead : recordWord base ["index"] = some baseIndex)
+    (valid : LogRep view hard base state capacity) (boundaryWord : boundary < 2^64)
+    (cut : boundary = baseIndex + 1)
+    (execution : resumeTruncation (Jarl.state_State_truncate view records state boundary) = .returned shortened) :
+    lastRecord Jarl.state_State_truncate_ir.last (truncationView view records shortened) = .ok base := by
+  obtain ⟨expected,returned,_,length,_⟩ :=
+    truncation_complete_result view records hard base boundary capacity baseIndex state
+      selected baseRead valid boundaryWord
+  have same : expected = shortened := TruncationRun.returned.inj (returned.symm.trans execution)
+  subst expected
+  have empty : shortened.len = 0 := by omega
+  simpa [lastRecord,iterateRecords,truncationView,Jarl.state_State_truncate_ir,empty,presentPlaces]
+    using congrArg (Except.ok (ε := TraversalFault)) selected
+
 end Storage
