@@ -594,3 +594,20 @@ the authorized 16 GiB Lean limit. M0 closes claim/inventory accounting and
 specification/host witness existence. Effective compiler invocation and expanded
 call closure are P01 work in M1, not established by requested-build accounting.
 Later milestones and full protocol correctness remain open.
+
+## M1 actual compiler capture (partial P01)
+
+The active goal is M1 followed by M2; neither is complete. `M1_M2.md` records the
+original exit criteria and current gaps. Provium now captures real Cargo/rustc
+invocations, including argument boundaries, compiler working directories and
+observed executable/version identity, together with original root source
+snapshots. Actual root compilation must be present; version/capability probes
+alone cannot count. Failed builds, changed source, and unsupported configuration
+cannot leave a successful capture report. A provider build-script mutation checks
+source-change rejection, independently of Jarl.
+
+Jarl's actual host and installed wasm32 release builds were captured without new
+toolchains, dependencies or runtime changes. The ordinary Jarl proof test checks
+that host build capture binds to its current source inventory. These are build
+identity facts only; source preservation, resolved closure, primitive ownership
+and exceptional semantics, and the M2 global election induction remain open.

@@ -245,3 +245,25 @@ fn m0_review_binding_matches_the_specification_and_scope() {
         .collect();
     assert_eq!(coverage_ids, (1..=12).map(|i| format!("C{i:02}")).collect());
 }
+
+#[test]
+fn m1_actual_cargo_compilation_is_bound_to_original_sources() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let mut request: provium::cargo_subject::Request =
+        serde_json::from_slice(&fs::read(root.join("proofs/builds.json")).unwrap()).unwrap();
+    request.manifest = root.join("proofs").join(request.manifest);
+    let report =
+        provium::cargo_capture::capture(request, &root.join("artifacts/provium/m1-capture-host"))
+            .unwrap();
+    assert_eq!(
+        report.source_inventory,
+        provium::coverage::inventory(root, Path::new("src/lib.rs")).unwrap()
+    );
+    assert_eq!(report.subject.packages.len(), 1);
+    assert_eq!(report.subject.packages[0].name, "jarl");
+    assert!(!report.semantic_preservation_proved);
+    assert!(report.invocations.iter().any(|i| i
+        .arguments
+        .windows(2)
+        .any(|pair| pair[0] == "--crate-name" && pair[1] == "jarl")));
+}

@@ -417,3 +417,14 @@ roots, absent project obligations and stale source. Status labels remain review
 metadata and cannot authorize a complete-proof claim. To migrate schema 1,
 regenerate the inventory and review the new contexts, roots and evidence fields;
 changing only the version number is rejected.
+
+`provium capture-cargo <build.json> --out <evidence-directory>` supplements
+`inspect-cargo` with actual compiler invocation records. A forwarding wrapper
+records argument boundaries and working directories while Cargo builds the
+selected library in a fresh Cargo-owned target tree. The report includes observed
+compiler executable hashes/version, root-source snapshots, and manifest/lock
+identity. Build failure or changed source removes prior capture success.
+Unsupported Cargo configuration and existing wrapper overrides fail explicitly.
+This is build provenance, not a proof certificate: expanded/resolved source,
+generated/dependency inputs, environment and compiler sysroot attestation remain
+separate obligations. The library entry point is `cargo_capture::capture`.
