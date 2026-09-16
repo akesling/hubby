@@ -1,5 +1,6 @@
 //! Whole-body translation of typed field assignments and boolean control flow.
 //! No statement is sliced away or accepted as an opaque call.
+mod build;
 mod configured;
 
 use crate::project::{hash, Obligation, AUDIT, TOOLCHAIN};
@@ -23,6 +24,8 @@ pub struct Project {
     pub crate_root: PathBuf,
     #[serde(default)]
     pub rust_target: Option<String>,
+    #[serde(default)]
+    pub cargo_build: Option<PathBuf>,
     pub namespace: String,
     pub methods: Vec<String>,
     pub proofs: PathBuf,
@@ -1067,30 +1070,35 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
         return Err("valid namespace, selected methods, and obligations required".into());
     }
     let base = config.parent().unwrap_or(Path::new("."));
-    // Query the same target and scalar profile used by the actual source check.
-    // Cargo capture is separate evidence; this remains the explicit rustc build.
-    let mut cfg_command = Command::new("rustc");
-    cfg_command.args([
-        "--print",
-        "cfg",
-        "--edition=2021",
-        "-C",
-        "overflow-checks=yes",
-    ]);
-    if let Some(target) = &project.rust_target {
-        cfg_command.args(["--target", target]);
-    }
-    let cfg = cfg_command.output().map_err(|e| e.to_string())?;
-    if !cfg.status.success() {
-        return Err(format!(
-            "rustc target configuration unavailable: {}",
-            String::from_utf8_lossy(&cfg.stderr)
-        ));
-    }
-    let configuration = crate::cfg::Configuration::parse(
-        std::str::from_utf8(&cfg.stdout).map_err(|e| e.to_string())?,
-    )?;
+    let cargo_build = build::Build::capture(&project, config, out)?;
+    let cfg_text = if let Some(build) = &cargo_build {
+        build.cfg()?.to_owned()
+    } else {
+        let mut cfg_command = Command::new("rustc");
+        cfg_command.args([
+            "--print",
+            "cfg",
+            "--edition=2021",
+            "-C",
+            "overflow-checks=yes",
+        ]);
+        if let Some(target) = &project.rust_target {
+            cfg_command.args(["--target", target]);
+        }
+        let cfg = cfg_command.output().map_err(|e| e.to_string())?;
+        if !cfg.status.success() {
+            return Err(format!(
+                "rustc target configuration unavailable: {}",
+                String::from_utf8_lossy(&cfg.stderr)
+            ));
+        }
+        String::from_utf8(cfg.stdout).map_err(|e| e.to_string())?
+    };
+    let configuration = crate::cfg::Configuration::parse(&cfg_text)?;
     let krate = Crate::load_configured(&base.join(&project.crate_root), configuration)?;
+    if let Some(build) = &cargo_build {
+        build.bind_sources(&krate)?;
+    }
     let methods = project
         .methods
         .iter()
@@ -1139,36 +1147,43 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
     {
         return Err("inputs must be outside output directory".into());
     }
-    // Type-check the actual crate, not a hand-written stand-in for its methods.
-    let mut rust_check = Command::new("rustc");
-    rust_check
-        .args([
-            "--crate-name",
-            "provium_subject",
-            "--crate-type",
-            "lib",
-            "--emit=metadata",
-            "--edition=2021",
-            "-C",
-            "overflow-checks=yes",
-        ])
-        .arg(base.join(&project.crate_root))
-        .arg("-o")
-        .arg(out.join("subject.rmeta"));
-    if let Some(target) = &project.rust_target {
-        rust_check.args(["--target", target]);
-    }
-    let typecheck_args = rust_check
-        .get_args()
-        .map(|a| a.to_string_lossy().into_owned())
-        .collect::<Vec<_>>();
-    let checked = rust_check.output().map_err(|e| e.to_string())?;
-    if !checked.status.success() {
-        return Err(format!(
-            "rustc rejected original crate: {}",
-            String::from_utf8_lossy(&checked.stderr)
-        ));
-    }
+    let typecheck_args = if let Some(build) = &cargo_build {
+        build.capture.invocations[build.capture.configured_root_invocation]
+            .arguments
+            .clone()
+    } else {
+        // Type-check the actual crate, not a hand-written stand-in for its methods.
+        let mut rust_check = Command::new("rustc");
+        rust_check
+            .args([
+                "--crate-name",
+                "provium_subject",
+                "--crate-type",
+                "lib",
+                "--emit=metadata",
+                "--edition=2021",
+                "-C",
+                "overflow-checks=yes",
+            ])
+            .arg(base.join(&project.crate_root))
+            .arg("-o")
+            .arg(out.join("subject.rmeta"));
+        if let Some(target) = &project.rust_target {
+            rust_check.args(["--target", target]);
+        }
+        let typecheck_args = rust_check
+            .get_args()
+            .map(|a| a.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        let checked = rust_check.output().map_err(|e| e.to_string())?;
+        if !checked.status.success() {
+            return Err(format!(
+                "rustc rejected original crate: {}",
+                String::from_utf8_lossy(&checked.stderr)
+            ));
+        }
+        typecheck_args
+    };
     fs::create_dir_all(out.join("Provium")).map_err(|e| e.to_string())?;
     fs::create_dir_all(out.join("Inputs")).map_err(|e| e.to_string())?;
     let mut inputs = vec![];
@@ -1294,6 +1309,9 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
     if !rustc.status.success() {
         return Err("rustc unavailable".into());
     }
+    if let Some(build) = &cargo_build {
+        build.revalidate()?;
+    }
     for object in [
         "Provium/State.olean",
         "Provium/Audit.olean",
@@ -1305,7 +1323,7 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
     for library in &libraries {
         workspace.publish(&library.artifact.replace(".lean", ".olean"), &out)?;
     }
-    let manifest = serde_json::json!({"format":1,"compiler_sha256":hash(fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"scope":"complete explicit method bodies in supported Lean semantics; frontend, field resolution, borrowing/layout refinement and host durability remain trusted; not whole-program correctness", "lean_toolchain":TOOLCHAIN,"rustc":String::from_utf8_lossy(&rustc.stdout).trim(),"rust_target":project.rust_target,"rust_target_cfg":String::from_utf8_lossy(&cfg.stdout),"typecheck_args":typecheck_args,"config_sha256":hash(config_bytes),"sources":inputs,"proof_modules":libraries.iter().map(|library| serde_json::json!({"name":library.module,"path":library.path,"artifact":library.artifact,"sha256":hash(&library.source)})).collect::<Vec<_>>(),"methods":methods,"unproved_methods":krate.inventory().into_iter().filter(|n|!project.methods.contains(n)).collect::<Vec<_>>(),"artifacts":artifacts.iter().map(|(p,t)|(p,hash(t))).collect::<BTreeMap<_,_>>(),"obligations":project.obligations,"audit":report});
+    let manifest = serde_json::json!({"format":1,"compiler_sha256":hash(fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"scope":"complete explicit method bodies in supported Lean semantics; frontend, field resolution, borrowing/layout refinement and host durability remain trusted; not whole-program correctness", "lean_toolchain":TOOLCHAIN,"rustc":String::from_utf8_lossy(&rustc.stdout).trim(),"rust_target":cargo_build.as_ref().map(|b| b.capture.subject.request.target.clone()).or(project.rust_target),"rust_target_cfg":cfg_text,"cargo_build":cargo_build.as_ref().map(build::Build::evidence),"typecheck_args":typecheck_args,"config_sha256":hash(config_bytes),"sources":inputs,"proof_modules":libraries.iter().map(|library| serde_json::json!({"name":library.module,"path":library.path,"artifact":library.artifact,"sha256":hash(&library.source)})).collect::<Vec<_>>(),"methods":methods,"unproved_methods":krate.inventory().into_iter().filter(|n|!project.methods.contains(n)).collect::<Vec<_>>(),"artifacts":artifacts.iter().map(|(p,t)|(p,hash(t))).collect::<BTreeMap<_,_>>(),"obligations":project.obligations,"audit":report});
     let bytes = serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?;
     fs::write(out.join("manifest.json"), &bytes).map_err(|e| e.to_string())?;
     fs::write(out.join("verified.json"),serde_json::to_vec_pretty(&serde_json::json!({"manifest_sha256":hash(bytes),"whole_program_proved":false,"complete_method_bodies":methods.len(),"initialized_slot_refinements":initialized_refinements,"obligations":project.obligations.len()})).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;

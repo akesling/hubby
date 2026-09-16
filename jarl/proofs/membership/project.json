@@ -464,5 +464,6 @@
       "theorem": "QuorumIndex.observation_complete",
       "function": "membership_Membership_quorum_index"
     }
-  ]
+  ],
+  "cargo_build": "../builds.json"
 }

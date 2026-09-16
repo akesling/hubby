@@ -29,9 +29,38 @@ impl Work {
     fn out(&self) -> PathBuf {
         self.0.join("out")
     }
+    fn cargo_build(&self) {
+        self.write(
+            "Cargo.toml",
+            "[package]\nname=\"proof_subject\"\nversion=\"0.1.0\"\nedition=\"2021\"\n[workspace]\n",
+        );
+        self.write("build.json", r#"{"manifest":"Cargo.toml","target":"host"}"#);
+        let locked = std::process::Command::new("cargo")
+            .args(["generate-lockfile", "--offline", "--manifest-path"])
+            .arg(self.0.join("Cargo.toml"))
+            .output()
+            .unwrap();
+        assert!(
+            locked.status.success(),
+            "{}",
+            String::from_utf8_lossy(&locked.stderr)
+        );
+    }
 }
 impl Drop for Work {
     fn drop(&mut self) {
+        if self.0.join("target").exists() {
+            // Only Cargo creates, writes or cleans its target artifacts.
+            let cleaned = std::process::Command::new("cargo")
+                .args(["clean", "--manifest-path"])
+                .arg(self.0.join("Cargo.toml"))
+                .arg("--target-dir")
+                .arg(self.0.join("target"))
+                .output();
+            if !cleaned.is_ok_and(|result| result.status.success()) {
+                return;
+            }
+        }
         let _ = fs::remove_dir_all(&self.0);
     }
 }

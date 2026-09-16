@@ -288,3 +288,112 @@ fn response_files_fail_closed_and_invalidate_prior_capture() {
     );
     assert!(!subject.certificate().exists());
 }
+
+#[test]
+#[ignore = "requires pinned Lean; scripts/verify.sh runs this"]
+fn cargo_method_proof_uses_features_profile_and_original_source() {
+    let subject = Subject::new();
+    let manifest = subject.0.join("Cargo.toml");
+    let contents = fs::read_to_string(&manifest).unwrap() + "\n[features]\nchosen=[]\n";
+    fs::write(manifest, contents).unwrap();
+    let source = "#![no_std]\npub struct State { flag: bool } impl State { #[cfg(all(feature=\"chosen\", not(debug_assertions)))] pub fn clear(&mut self) { self.flag = false; } }";
+    fs::write(subject.0.join("src/lib.rs"), source).unwrap();
+    let request = r#"{"manifest":"Cargo.toml","target":"host","profile":"release","panic":"abort","features":["chosen"]}"#;
+    fs::write(subject.0.join("build.json"), request).unwrap();
+    fs::write(subject.0.join("Proofs.lean"), "import Generated\nopen Provium.State\ntheorem cleared (s : Store α) : Subject.State_clear s [\"flag\"] = .boolean false := by simp [Subject.State_clear, put]\n").unwrap();
+    let mut project = serde_json::json!({"crate_root":"src/lib.rs","cargo_build":"build.json","namespace":"Subject","methods":["State::clear"],"proofs":"Proofs.lean","obligations":[{"theorem":"cleared","function":"State_clear"}]});
+    let project_path = subject.0.join("project.json");
+    fs::write(&project_path, project.to_string()).unwrap();
+    let verify = || {
+        Command::new(env!("CARGO_BIN_EXE_provium"))
+            .args(["verify-methods", "project.json", "--out", "proofs-out"])
+            .current_dir(&subject.0)
+            .output()
+            .unwrap()
+    };
+    let result = verify();
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let evidence = subject.0.join("proofs-out/manifest.json");
+    let report: serde_json::Value = serde_json::from_slice(&fs::read(evidence).unwrap()).unwrap();
+    assert_eq!(
+        report["sources"][0]["sha256"],
+        provium::project::hash(source)
+    );
+    assert!(report["rust_target_cfg"]
+        .as_str()
+        .unwrap()
+        .contains("feature=\"chosen\""));
+    assert!(!report["rust_target_cfg"]
+        .as_str()
+        .unwrap()
+        .lines()
+        .any(|line| line == "debug_assertions"));
+    assert_eq!(
+        report["typecheck_args"],
+        report["cargo_build"]["root_invocation"]["arguments"]
+    );
+    assert_eq!(
+        report["cargo_build"]["capture_sha256"],
+        provium::project::hash(
+            fs::read(subject.0.join("proofs-out/Cargo/captured-build.json")).unwrap()
+        )
+    );
+    assert!(!subject.0.join("proofs-out/subject.rmeta").exists());
+    let proof_path = subject.0.join("Proofs.lean");
+    let proof = fs::read_to_string(&proof_path).unwrap();
+    let request_literal =
+        serde_json::to_string(subject.0.join("build.json").to_str().unwrap()).unwrap();
+    fs::write(
+        &proof_path,
+        format!("{proof}\nrun_cmd do IO.FS.writeFile {request_literal} \"{{}}\"\n"),
+    )
+    .unwrap();
+    let result = verify();
+    assert!(!result.status.success());
+    assert!(
+        String::from_utf8_lossy(&result.stderr).contains("Cargo build request or evidence changed"),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert!(!subject.0.join("proofs-out/verified.json").exists());
+    fs::write(&proof_path, proof).unwrap();
+    fs::write(subject.0.join("build.json"), request).unwrap();
+    fs::write(
+        subject.0.join("src/lib.rs"),
+        source.replace("flag = false", "flag = true"),
+    )
+    .unwrap();
+    let result = verify();
+    assert!(!result.status.success());
+    assert!(String::from_utf8_lossy(&result.stderr).contains("Lean rejected Proofs.lean"));
+    assert!(!subject.0.join("proofs-out/verified.json").exists());
+    fs::write(subject.0.join("src/lib.rs"), source).unwrap();
+    fs::write(
+        subject.0.join("build.json"),
+        request.replace("[\"chosen\"]", "[]"),
+    )
+    .unwrap();
+    let result = verify();
+    assert!(!result.status.success());
+    assert!(
+        String::from_utf8_lossy(&result.stderr).contains("unknown method"),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    fs::write(subject.0.join("build.json"), request).unwrap();
+    fs::write(subject.0.join("wrong.rs"), "pub struct Other;").unwrap();
+    project["crate_root"] = "wrong.rs".into();
+    fs::write(&project_path, project.to_string()).unwrap();
+    let result = verify();
+    assert!(!result.status.success());
+    assert!(String::from_utf8_lossy(&result.stderr).contains("not the captured Cargo library root"));
+    project["rust_target"] = "wasm32-unknown-unknown".into();
+    fs::write(&project_path, project.to_string()).unwrap();
+    let result = verify();
+    assert!(!result.status.success());
+    assert!(String::from_utf8_lossy(&result.stderr).contains("cannot both select"));
+}

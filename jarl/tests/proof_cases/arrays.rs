@@ -142,6 +142,8 @@ fn original_membership_mutations_break_the_array_contracts() {
         serde_json::from_slice(&fs::read(root.join("proofs/membership/project.json")).unwrap())
             .unwrap();
     config["crate_root"] = "src/lib.rs".into();
+    w.cargo_build();
+    config["cargo_build"] = "build.json".into();
     let path = w.0.join("project.json");
     fs::write(&path, config.to_string()).unwrap();
     let out = w.0.join("out");

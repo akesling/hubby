@@ -1345,3 +1345,34 @@ Drop effects and unsupported nested cfg. Jarl's complete existing consumer proof
 suite passed (166.71 seconds), and all 111 membership obligations replayed on
 installed wasm32. Provider ordinary tests, Clippy, formatting, rustdoc and Jarl
 coverage review passed. Lean checks were serialized with a 16384 MiB cap.
+
+### M1 P01: Cargo-bound method verification
+
+Method projects can now name a `cargo_build` request. Verification captures a
+fresh Cargo library build, uses that root invocation's effective cfg for source
+selection, and binds every lowered Rust file to the captured source hashes.
+The method manifest records the actual compiler arguments, target, build request
+hash and capture hash. Publication rechecks the request, capture, original source,
+source snapshots, manifests/lockfiles and compiler executables. Conflicting target
+selectors and mismatched library roots reject verification.
+
+Jarl's membership project now uses this route. Its mutation fixtures also have
+isolated Cargo manifests and locked offline builds, so negative controls continue
+to test contract failures on the modified source. Cargo exclusively creates and
+cleans fixture target artifacts. The other method projects have not yet migrated.
+
+The route currently requires a dependency-free Rust 2021 subject without build
+scripts or proc macros. Exact compiler/sysroot/environment closure, general
+resolution, source preservation and Rust interpretations of model arithmetic,
+panic and ownership parameters remain open. Binding a build to a component proof
+does not discharge those semantic obligations. M1/M2 remain incomplete.
+
+Validation: the Cargo method kernel test proves a feature/release-selected body
+and rejects a changed body, disabled method, wrong library root, conflicting
+target selectors and a build-request mutation during Lean checking. Jarl's full
+existing consumer proof suite passed (173.73 seconds); host and wasm32 membership
+runs each checked 111 obligations with Cargo evidence. All 23 original membership
+mutations failed their Lean contracts using fresh Cargo fixture builds (330.55
+seconds), with stale proof success removed. Provider ordinary tests, provider/Jarl
+proof-test Clippy, formatting, rustdoc and coverage review passed. Lean ran one
+process at a time with a 16384 MiB cap.

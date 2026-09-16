@@ -115,8 +115,20 @@ variants using cfg/cfg_attr; disabled modules are not loaded. Original source
 snapshots and hashes remain unchanged by selection. Remaining nested conditional
 attributes reject verification, including expression and generic-parameter cfg.
 The standalone API is `methods::Crate::load_configured`; its caller supplies the
-configuration. Cargo capture remains separate from this explicit rustc build,
-and declaration selection remains trusted frontend work, not source preservation.
+configuration. Declaration selection remains trusted frontend work, not source
+preservation.
+
+A method project can instead set `"cargo_build": "../builds.json"`, naming a
+Cargo request file relative to that project. Verification captures a fresh build,
+selects its root compilation's cfg, and checks that lowered source bytes match
+the capture. Evidence includes the actual compiler arguments and a hashed capture
+under `Cargo/`; publication rechecks the request, captured inputs, snapshots,
+manifest/lockfiles and compiler executables. `rust_target` cannot also be set;
+the Cargo request selects the target, features, profile and optional panic policy.
+This route currently requires a dependency-free Rust 2021 library without build
+scripts or proc macros. It binds build provenance to component proofs; sysroot,
+complete resolution, source preservation and interpreting model parameters in
+that Rust build remain separate obligations.
 
 Method projects can reuse consumer-owned Lean files without copying their proofs:
 
