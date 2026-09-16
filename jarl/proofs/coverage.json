@@ -4400,10 +4400,41 @@
         "S11",
         "S12"
       ],
-      "status": "planned",
-      "note": "Complete source translation remains open. Native original-Rust regressions now record stateful/repeated-key callback order, first-majority short circuit, stable configurations, callback unwinding and callback-drop panic. Provium has a generic callback/drop protocol with kernel-checked traces and response bounds, but no lowering of this method to that model or caller/ownership/arithmetic refinement yet.",
+      "status": "component_evidence",
+      "note": "Complete original quorum body lowered to the generic owned-callback protocol. Checked contracts retain current/old voter projections, strict majority thresholds, stateful callback sequencing, stable short circuit, empty-current cleanup and a response budget. This is generated-IR component evidence; Rust source/ownership/unwind/usize refinement, caller validity and cross-configuration safety remain open.",
       "root_apis": [],
-      "contracts": [],
+      "contracts": [
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "Quorum.execution",
+          "function": "membership_Membership_quorum",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "Quorum.stable_execution",
+          "function": "membership_Membership_quorum",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "Quorum.empty_current",
+          "function": "membership_Membership_quorum",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "Quorum.response_budget",
+          "function": "membership_Membership_quorum",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "Quorum.observation_complete",
+          "function": "membership_Membership_quorum",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        }
+      ],
       "context": "production"
     },
     "crate::membership::<Membership < MAX >>::quorum_index": {

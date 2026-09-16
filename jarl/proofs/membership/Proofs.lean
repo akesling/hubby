@@ -1349,3 +1349,51 @@ theorem joint_iff_source_voters [DecidableEq α] (source target result : ArraySt
       cases present
 
 end JointConstruction
+
+namespace Quorum
+open JarlMembership
+
+-- The callback is stateful: the old configuration receives the handle left by
+-- the current pass, and overlapping identities are visited again.
+theorem execution (entries : ArrayStore α) (callback : σ) :
+    membership_Membership_quorum entries callback =
+      countPredicates (membership_Membership_voters entries) callback 0 (fun count advanced =>
+        if decide (count > (membership_Membership_voters entries).length / 2) then
+          if membership_Membership_is_joint entries then
+            countPredicates (membership_Membership_old_voters entries) advanced 0 (fun count advanced =>
+              finishPredicate advanced (.value (decide (count > (membership_Membership_old_voters entries).length / 2))))
+          else finishPredicate advanced (.value true)
+        else finishPredicate advanced (.value false)) := rfl
+
+theorem stable_execution (entries : ArrayStore α) (callback : σ)
+    (stable : membership_Membership_is_joint entries = false) :
+    membership_Membership_quorum entries callback =
+      countPredicates (membership_Membership_voters entries) callback 0 (fun count advanced =>
+        finishPredicate advanced (.value (decide (count > (membership_Membership_voters entries).length / 2)))) := by
+  rw [execution]
+  simp only [stable, Bool.false_eq_true, ↓reduceIte]
+  congr 1
+  funext count advanced
+  cases decide (count > (membership_Membership_voters entries).length / 2) <;> rfl
+
+theorem empty_current (entries : ArrayStore α) (callback : σ)
+    (empty : membership_Membership_voters entries = []) :
+    membership_Membership_quorum entries callback = finishPredicate callback (.value false) := by
+  rw [execution, empty]
+  rfl
+
+-- The budget counts completed responses, not wall time or callback termination.
+theorem response_budget (entries : ArrayStore α) (callback : σ) :
+    predicateBudget ((membership_Membership_voters entries).length +
+      (membership_Membership_old_voters entries).length + 2)
+      (membership_Membership_quorum entries callback) :=
+  predicate_fold_budget membership_Membership_quorum_ir entries callback
+
+theorem observation_complete (entries : ArrayStore α) (callback : σ)
+    (call : Cell α → σ → PredicateReply σ) (drop : σ → PredicateDropReply) :
+    ∃ outcome, observePredicate ((membership_Membership_voters entries).length +
+      (membership_Membership_old_voters entries).length + 2) call drop
+      (membership_Membership_quorum entries callback) = some outcome :=
+  predicate_observation_complete _ _ (response_budget entries callback) call drop
+
+end Quorum

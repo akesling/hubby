@@ -1038,3 +1038,28 @@ proofs replayed on host and installed wasm32 with 100 obligations; their count
 has not increased because quorum lowering is still absent. Provider/Jarl Clippy,
 provider rustdoc, formatting and coverage/review checks passed. Lean checks ran
 one process at a time with a 16384 MiB ceiling.
+
+## M1: source-derived quorum interaction contracts
+
+Provium now lowers the original `Membership::quorum` body, retaining the local
+closure, cloned iterator count, stateful FnMut calls, strict majority comparison,
+and source-local joint-state query. Five Jarl-owned obligations connect the
+complete generated interaction to existing current/old voter projections, prove
+stable-member short circuit and empty-current cleanup, and bound completed
+response steps for arbitrary membership lengths and callback handles. The
+membership project now contains 14 complete method translations and 105 checked
+obligations. Jarl production Rust is unchanged.
+
+The response budget requires completed external responses; it is not a proof
+that arbitrary Rust callbacks terminate. Source-to-IR preservation, ownership,
+unwind and usize representation remain open, as do caller validity and historical
+configuration safety. `quorum_index` still needs numeric callbacks, sorting,
+rank selection and empty-input outcomes. M1 and M2 remain incomplete.
+
+The provider's independent fixture checks source-derived callback traces and
+rejects threshold/selection mutations. Jarl's original-source mutation suite now
+rejects 21 mutants through Lean contract failure, including three quorum changes,
+and invalidates stale certificates. Original-Rust callback tests, Jarl Clippy,
+formatting and coverage/review checks pass.
+Host and installed wasm32 verification each checked all 105 obligations with
+axiom auditing. Lean checks ran one process at a time with a 16384 MiB ceiling.

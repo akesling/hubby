@@ -14,7 +14,8 @@
     "membership::Membership::new",
     "membership::Membership::peers",
     "membership::Membership::with_learners",
-    "membership::Membership::joint"
+    "membership::Membership::joint",
+    "membership::Membership::quorum"
   ],
   "proofs": "Proofs.lean",
   "obligations": [
@@ -417,6 +418,26 @@
     {
       "theorem": "JointConstruction.joint_iff_source_voters",
       "function": "membership_Membership_joint"
+    },
+    {
+      "theorem": "Quorum.execution",
+      "function": "membership_Membership_quorum"
+    },
+    {
+      "theorem": "Quorum.stable_execution",
+      "function": "membership_Membership_quorum"
+    },
+    {
+      "theorem": "Quorum.empty_current",
+      "function": "membership_Membership_quorum"
+    },
+    {
+      "theorem": "Quorum.response_budget",
+      "function": "membership_Membership_quorum"
+    },
+    {
+      "theorem": "Quorum.observation_complete",
+      "function": "membership_Membership_quorum"
     }
   ]
 }
