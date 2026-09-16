@@ -98,6 +98,10 @@ fn complete_pure_body_and_helper_are_retained_and_unsupported_rust_rejected() {
             "impl Position {fn default()->Self{Self{offset:1,epoch:1}}} struct Checker;",
         ),
         "enum Packet { Data { value: i32 } } struct Checker; impl Checker { fn check(packet: &Packet) -> bool { match packet { Packet::Data{value} => *value > 0 } } }".to_owned(),
+        // A declaration's type parameter must not resolve to a same-named
+        // module record, even when the instantiated argument is concrete.
+        "struct Value { offset:u64 } struct Other { offset:u32 } enum Packet<Value> { Data { value:Value } } struct Checker; impl Checker { fn check(packet:&Packet<Other>)->bool { match packet { Packet::Data {value} => value.offset>0 } } }".to_owned(),
+        "struct Value { offset:u64 } struct Other { offset:u32 } struct Holder<Value> { value:Value } enum Packet { Data { holder:Holder<Other> } } struct Checker; impl Checker { fn check(packet:&Packet)->bool { match packet { Packet::Data {holder} => holder.value.offset>0 } } }".to_owned(),
         format!("struct i32;{SOURCE}"),
         format!("struct Other<i32>{{value:i32}}{SOURCE}"),
         SOURCE.replace("let good=", "let Some=|value:u64|value;let good="),
@@ -292,4 +296,81 @@ theorem symbolic_literal (env : PureEnv) :
             .count(),
         7
     );
+}
+
+#[test]
+#[ignore = "requires pinned Lean; scripts/verify.sh runs this"]
+fn closures_preserve_lexical_closure_captures() {
+    let source = r#"
+#[derive(Clone,Copy)]
+struct Position { offset:u64, epoch:u64 }
+enum Packet { Data { position:Position } }
+struct Checker;
+impl Checker { fn check(packet:&Packet)->bool {
+    let check=|position:Position|position.offset>0;
+    let wrapper=|position:Position|check(position);
+    let check=|position:Position|position.epoch>0;
+    match packet { Packet::Data {position} => wrapper(*position) && !check(*position) }
+} }
+"#;
+    let w = Work::new(source);
+    fs::write(
+        w.0.join("Proofs.lean"),
+        r#"import Generated
+open Provium.State
+set_option maxRecDepth 10000
+theorem captured : Subject.Checker_check 256
+  (.variant "Packet" "Data" [("position", .record "Position"
+    [("offset", .number "u64" 1), ("epoch", .number "u64" 0)])]) = .ok true := by rfl
+"#,
+    )
+    .unwrap();
+    let config = w.0.join("project.json");
+    fs::write(
+        &config,
+        serde_json::to_vec(&serde_json::json!({
+            "crate_root":"lib.rs","namespace":"Subject","methods":["Checker::check"],
+            "proofs":"Proofs.lean","obligations":[{"theorem":"captured","function":"Checker_check"}]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    provium::methods::verify(&config, &w.0.join("out")).unwrap();
+    fs::write(w.0.join("main.rs"),format!("{source}\nfn main() {{ assert!(Checker::check(&Packet::Data {{ position:Position {{offset:1,epoch:0}} }})); }}")).unwrap();
+    let binary = w.0.join("native");
+    let compiled = std::process::Command::new("rustc")
+        .arg(w.0.join("main.rs"))
+        .arg("-o")
+        .arg(&binary)
+        .output()
+        .unwrap();
+    assert!(
+        compiled.status.success(),
+        "{}",
+        String::from_utf8_lossy(&compiled.stderr)
+    );
+    assert!(std::process::Command::new(binary)
+        .status()
+        .unwrap()
+        .success());
+}
+
+#[test]
+fn record_fields_resolve_in_their_declaration_module() {
+    let source = r#"
+mod records;
+use records::Item;
+enum Packet { Data { item:Item } }
+struct Checker;
+impl Checker { fn check(packet:&Packet)->bool {
+    match packet { Packet::Data {item} => item.position.offset>0 }
+} }
+"#;
+    let w = Work::new(source);
+    fs::write(
+        w.0.join("records.rs"),
+        "#[derive(Clone,Copy)] pub struct Position { pub offset:u64, pub epoch:u64 } pub struct Item { pub position:Position }",
+    )
+    .unwrap();
+    assert!(w.lower().unwrap().validator.is_some());
 }

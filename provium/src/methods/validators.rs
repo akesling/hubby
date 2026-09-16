@@ -30,6 +30,7 @@ struct Binding {
 struct Closure {
     syntax: syn::ExprClosure,
     captures: BTreeMap<String, Binding>,
+    closures: BTreeMap<String, Closure>,
 }
 #[derive(Debug, Serialize)]
 pub struct Validator {
@@ -90,9 +91,14 @@ pub(super) fn candidate(f: &syn::ImplItemFn) -> bool {
 }
 impl Compiler<'_> {
     fn ty(&self, t: &Type) -> Result<Ty, String> {
+        self.ty_in(t, &self.def.impl_generics, &self.def.module)
+    }
+    fn ty_in(&self, t: &Type, generics: &syn::Generics, module: &str) -> Result<Ty, String> {
         Ok(match t {
-            Type::Reference(r) if r.mutability.is_none() => Ty::Ref(Box::new(self.ty(&r.elem)?)),
-            Type::Array(a) => Ty::Array(Box::new(self.ty(&a.elem)?)),
+            Type::Reference(r) if r.mutability.is_none() => {
+                Ty::Ref(Box::new(self.ty_in(&r.elem, generics, module)?))
+            }
+            Type::Array(a) => Ty::Array(Box::new(self.ty_in(&a.elem, generics, module)?)),
             Type::Path(p)
                 if p.qself.is_none()
                     && p.path.leading_colon.is_none()
@@ -100,6 +106,12 @@ impl Compiler<'_> {
             {
                 let s = &p.path.segments[0];
                 let name = s.ident.to_string();
+                if generics
+                    .type_params()
+                    .any(|parameter| parameter.ident == name)
+                {
+                    return Err(format!("opaque generic validator type {name}"));
+                }
                 match name.as_str() {
                     "bool" => Ty::Bool,
                     "u64" => Ty::Number("u64"),
@@ -114,9 +126,9 @@ impl Compiler<'_> {
                         let syn::GenericArgument::Type(t) = &a.args[0] else {
                             return Err("invalid Option arguments".into());
                         };
-                        Ty::Option(Box::new(self.ty(t)?))
+                        Ty::Option(Box::new(self.ty_in(t, generics, module)?))
                     }
-                    _ => Ty::Named(self.krate.resolve(&self.def.module, &name, 0)?),
+                    _ => Ty::Named(self.krate.resolve(module, &name, 0)?),
                 }
             }
             _ => return Err(format!("unsupported validator type {}", tokens(t))),
@@ -148,7 +160,7 @@ impl Compiler<'_> {
                     .ok_or("copy requires a source record")?;
                 self.derived(s, "Copy")?;
                 for f in &s.fields {
-                    let t = self.ty(&f.ty)?;
+                    let t = self.ty_in(&f.ty, &s.generics, &self.krate.struct_modules[name])?;
                     if !matches!(t, Ty::Bool | Ty::Number(_)) {
                         return Err("copied records require primitive fields".into());
                     }
@@ -212,7 +224,7 @@ impl Compiler<'_> {
             .find(|f| f.ident.as_ref() == Some(member))
             .ok_or("unknown record field")?;
         attrs(&f.attrs)?;
-        let ty = self.ty(&f.ty)?;
+        let ty = self.ty_in(&f.ty, &s.generics, &self.krate.struct_modules[name])?;
         self.copyable(&ty)?;
         Ok(ty)
     }
@@ -239,6 +251,7 @@ impl Compiler<'_> {
                             Closure {
                                 syntax: c.clone(),
                                 captures: self.env.clone(),
+                                closures: self.closures.clone(),
                             },
                         );
                     } else {
@@ -312,10 +325,13 @@ impl Compiler<'_> {
             return Err("mutable closure arguments are not modeled".into());
         }
         let saved = self.env.clone();
+        let saved_closures = self.closures.clone();
         self.env = c.captures.clone();
+        self.closures = c.closures.clone();
         let slot = self.bind(name, ty, false);
         let (body, result) = self.expr(&f.body, None)?;
         self.env = saved;
+        self.closures = saved_closures;
         self.call_depth -= 1;
         Ok((seq(format!(".write {slot} ({})", arg.0), body), result))
     }
@@ -390,7 +406,11 @@ impl Compiler<'_> {
                         .find(|f| f.ident.as_ref() == Some(member))
                         .ok_or("unknown variant field")?;
                     attrs(&source.attrs)?;
-                    let mut ty_field = self.ty(&source.ty)?;
+                    let mut ty_field = self.ty_in(
+                        &source.ty,
+                        &enumeration.generics,
+                        &self.krate.struct_modules[&owner],
+                    )?;
                     if matches!(ty, Ty::Ref(_)) {
                         ty_field = Ty::Ref(Box::new(ty_field))
                     }
@@ -753,7 +773,11 @@ impl Compiler<'_> {
                     let mut fields = Vec::new();
                     for f in &s.fields {
                         attrs(&f.attrs)?;
-                        let value = match self.ty(&f.ty)? {
+                        let value = match self.ty_in(
+                            &f.ty,
+                            &s.generics,
+                            &self.krate.struct_modules[&name],
+                        )? {
                             Ty::Number(k) => format!(".number {} 0", q(k)),
                             Ty::Bool => ".boolean false".into(),
                             _ => return Err("unsupported default field".into()),
@@ -797,6 +821,7 @@ impl Compiler<'_> {
                         let closure = Closure {
                             syntax: c.clone(),
                             captures: self.env.clone(),
+                            closures: self.closures.clone(),
                         };
                         let (body, result) =
                             self.closure(&closure, (format!(".read {slot}"), *t))?;
