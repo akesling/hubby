@@ -173,3 +173,40 @@ theorem finalization_has_no_old_voters (entries : ArrayStore α) :
     have cleared := Finalization.all_old_flags_cleared entries state member
     simp [projectSlot, JarlMembership.membership_Membership_old_voters_ir, evalCondition, cleared]
 end MembershipProjection
+
+namespace IdentityQuery
+open Provium.State JarlMembership
+
+theorem contains_exact [DecidableEq α] (entries : ArrayStore α) (key : Cell α) :
+    membership_Membership_contains entries key = true ↔
+      ∃ state, some state ∈ entries ∧ state ["id"] = key := by
+  rw [membership_Membership_contains, queryKey_member, projectArray_member]
+  simp [membership_Membership_contains_ir, evalCondition]
+
+theorem is_voter_exact [DecidableEq α] (entries : ArrayStore α) (key : Cell α) :
+    membership_Membership_is_voter entries key = true ↔
+      key ∈ membership_Membership_voters entries ∨
+      key ∈ membership_Membership_old_voters entries := by
+  rw [membership_Membership_is_voter, queryKey_member, projectArray_member,
+    MembershipProjection.voters_member, MembershipProjection.old_voters_member]
+  simp only [membership_Membership_is_voter_ir, evalCondition, Bool.or_eq_true]
+  constructor
+  · rintro ⟨state, member, flag, value⟩
+    rcases flag with voter | old
+    · exact Or.inl ⟨state, member, (evalCondition_field_true state ["voter"]).mp voter, value⟩
+    · exact Or.inr ⟨state, member, (evalCondition_field_true state ["old"]).mp old, value⟩
+  · rintro (⟨state, member, flag, value⟩ | ⟨state, member, flag, value⟩)
+    · exact ⟨state, member, Or.inl ((evalCondition_field_true state ["voter"]).mpr flag), value⟩
+    · exact ⟨state, member, Or.inr ((evalCondition_field_true state ["old"]).mpr flag), value⟩
+
+theorem voter_participates [DecidableEq α] (entries : ArrayStore α) (key : Cell α)
+    (voter : membership_Membership_is_voter entries key = true) :
+    membership_Membership_contains entries key = true := by
+  rw [contains_exact]
+  rw [is_voter_exact] at voter
+  rcases voter with current | old
+  · obtain ⟨state, member, _, value⟩ := (MembershipProjection.voters_member entries key).mp current
+    exact ⟨state, member, value⟩
+  · obtain ⟨state, member, _, value⟩ := (MembershipProjection.old_voters_member entries key).mp old
+    exact ⟨state, member, value⟩
+end IdentityQuery

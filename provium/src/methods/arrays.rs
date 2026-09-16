@@ -1,5 +1,6 @@
 //! Whole traversal of a Copy record array with optional entries.
 //! The reserved `$present` leaf cannot collide with a Rust field identifier.
+use super::key_queries::KeyQuery;
 use super::*;
 use syn::{visit_mut::VisitMut, Pat, Stmt};
 #[derive(Debug, Serialize)]
@@ -10,6 +11,7 @@ pub struct Shape {
     pub scope: &'static str,
     pub predicate: Option<Condition>,
     pub projection: Option<Vec<String>>,
+    pub key: Option<KeyQuery>,
 }
 pub(super) fn copy_derived(item: &syn::ItemStruct) -> bool {
     item.attrs.iter().any(|a| {
@@ -30,7 +32,7 @@ pub(super) fn binding(p: &Pat) -> Result<String, String> {
     }
     Ok(p.ident.to_string())
 }
-fn named(expr: &Expr, name: &str) -> bool {
+pub(super) fn named(expr: &Expr, name: &str) -> bool {
     matches!(expr,Expr::Path(p) if p.qself.is_none() && p.path.is_ident(name) && p.attrs.is_empty())
 }
 pub(super) fn relative(expr: &Expr, name: &str) -> Expr {
@@ -53,6 +55,7 @@ impl Crate {
         if self.array_iterator_shadow {
             return Err("custom iterator methods require trait resolution".into());
         }
+        self.iterator_traits()?;
         let def = self.methods.get(name).ok_or("unknown array query")?;
         let f = &def.item;
         attrs(&f.attrs)?;
@@ -63,10 +66,10 @@ impl Crate {
             || sig.abi.is_some()
             || !sig.generics.params.is_empty()
             || sig.generics.where_clause.is_some()
-            || sig.inputs.len() != 1
+            || !(1..=2).contains(&sig.inputs.len())
             || !matches!(&sig.output,syn::ReturnType::Type(_,ty) if matches!(&**ty,Type::Path(p) if p.path.is_ident("bool")))
         {
-            return Err("array query requires a receiver-only boolean method".into());
+            return Err("array query requires a boolean method with &self and at most one identity argument".into());
         }
         let Some(syn::FnArg::Receiver(receiver)) = sig.inputs.first() else {
             return Err("missing receiver".into());
@@ -127,7 +130,11 @@ impl Crate {
             return Err("expected one record type".into());
         };
         let record = self.resolve(&def.module, &base_type(ty)?, 0)?;
-        if !self.structs[&record].generics.params.is_empty() {
+        let record_type = self
+            .structs
+            .get(&record)
+            .ok_or("array query needs a source record struct")?;
+        if !record_type.generics.params.is_empty() {
             return Err("generic record queries unsupported".into());
         }
         let Expr::Closure(closure) = &any.args[0] else {
@@ -153,9 +160,17 @@ impl Crate {
             impl_generics: syn::Generics::default(),
             self_type: None,
         };
-        let predicate = self.condition(&record_def, &relative(&closure.body, &member))?;
+        let (key, predicate) = if sig.inputs.len() == 2 {
+            let (key, predicate) = self.key_query(def, &record_def, &closure.body, &member)?;
+            (Some(key), predicate)
+        } else {
+            (
+                None,
+                self.condition(&record_def, &relative(&closure.body, &member))?,
+            )
+        };
         Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],
-            iteration:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,view:None,record_at:None,lookup:None,selection:None,relocation:None,buffer:None,constructor:None,query:None,array:Some(Shape{field:p[0].clone(),capacity:tokens(&array.len),record,predicate:Some(predicate),projection:None,scope:"complete shared optional-record array iterator query; Rust layout/borrowing and frontend refinement remain trusted"})})
+            iteration:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,view:None,record_at:None,lookup:None,selection:None,relocation:None,buffer:None,constructor:None,query:None,array:Some(Shape{field:p[0].clone(),capacity:tokens(&array.len),record,predicate:Some(predicate),projection:None,key,scope:"complete shared optional-record array iterator query; Rust layout/borrowing and frontend refinement remain trusted"})})
     }
     pub(super) fn lower_array(&self, name: &str) -> Result<Method, String> {
         let def = self.methods.get(name).ok_or("unknown array method")?;
@@ -282,7 +297,7 @@ impl Crate {
             &mut writes,
         )?;
         Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes,body,
-            iteration:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,view:None,record_at:None,lookup:None,selection:None,relocation:None,buffer:None,constructor:None,query:None,array:Some(Shape{field:array_path[0].clone(),capacity:tokens(&array.len),record,predicate:None,projection:None,scope:"complete optional Copy-record array traversal; preserves length and visits each original slot exactly once; Rust layout/borrowing and frontend refinement remain trusted"})})
+            iteration:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,view:None,record_at:None,lookup:None,selection:None,relocation:None,buffer:None,constructor:None,query:None,array:Some(Shape{field:array_path[0].clone(),capacity:tokens(&array.len),record,predicate:None,projection:None,key:None,scope:"complete optional Copy-record array traversal; preserves length and visits each original slot exactly once; Rust layout/borrowing and frontend refinement remain trusted"})})
     }
     fn array_statements(
         &self,
@@ -363,6 +378,12 @@ impl Crate {
 }
 pub(super) fn generate(method: &Method) -> String {
     let name = &method.symbol;
+    if let Some(shape) = method.array.as_ref().filter(|s| s.key.is_some()) {
+        let key = shape.key.as_ref().unwrap();
+        let predicate = condition(shape.predicate.as_ref().unwrap());
+        let field = lean_path(&key.path);
+        return format!("def {name}_ir : RecordProjection := ⟨{predicate}, {field}⟩\ndef {name} [DecidableEq α] (entries : ArrayStore α) (key : Cell α) : Bool :=\n  queryKey {name}_ir entries key\ntheorem {name}_correspondence [DecidableEq α] (entries : ArrayStore α) (key : Cell α) : queryKey {name}_ir entries key = {name} entries key := by rfl\n");
+    }
     if let Some(shape) = method.array.as_ref().filter(|s| s.projection.is_some()) {
         let predicate = condition(shape.predicate.as_ref().unwrap());
         let field = lean_path(shape.projection.as_ref().unwrap());

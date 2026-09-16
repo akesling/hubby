@@ -6,7 +6,9 @@
     "membership::Membership::is_joint",
     "membership::Membership::voters",
     "membership::Membership::old_voters",
-    "membership::Membership::learners"
+    "membership::Membership::learners",
+    "membership::Membership::contains",
+    "membership::Membership::is_voter"
   ],
   "proofs": "Proofs.lean",
   "obligations": [
@@ -69,6 +71,18 @@
     {
       "theorem": "MembershipProjection.finalization_has_no_old_voters",
       "function": "membership_Membership_old_voters"
+    },
+    {
+      "theorem": "IdentityQuery.contains_exact",
+      "function": "membership_Membership_contains"
+    },
+    {
+      "theorem": "IdentityQuery.is_voter_exact",
+      "function": "membership_Membership_is_voter"
+    },
+    {
+      "theorem": "IdentityQuery.voter_participates",
+      "function": "membership_Membership_contains"
     }
   ]
 }

@@ -3892,12 +3892,25 @@
         "S11",
         "S12"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open.",
+      "status": "component_evidence",
+      "note": "Complete original identity query with typed structural equality and flag predicate. Source-derived contracts connect is_voter to current/old voter sequences and show voters participate. Constructor/identity uniqueness, reachable callers and Rust equality/store/source refinement remain open.",
       "root_apis": [
         "crate::membership::<Membership < MAX >>::contains"
       ],
-      "contracts": [],
+      "contracts": [
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "IdentityQuery.contains_exact",
+          "function": "membership_Membership_contains",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "IdentityQuery.voter_participates",
+          "function": "membership_Membership_contains",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        }
+      ],
       "context": "production"
     },
     "crate::membership::<Membership < MAX >>::finalized": {
@@ -3982,12 +3995,19 @@
         "S11",
         "S12"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open.",
+      "status": "component_evidence",
+      "note": "Complete original identity query with typed structural equality and flag predicate. Source-derived contracts connect is_voter to current/old voter sequences and show voters participate. Constructor/identity uniqueness, reachable callers and Rust equality/store/source refinement remain open.",
       "root_apis": [
         "crate::membership::<Membership < MAX >>::is_voter"
       ],
-      "contracts": [],
+      "contracts": [
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "IdentityQuery.is_voter_exact",
+          "function": "membership_Membership_is_voter",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        }
+      ],
       "context": "production"
     },
     "crate::membership::<Membership < MAX >>::joint": {

@@ -180,6 +180,14 @@ record has Drop. Generic Copy bounds, arbitrary callbacks, and source ownership,
 layout and lifetime refinement remain open. Kernel contracts check output origin
 and length bounds; native comparisons check order and payload destruction, and
 source mutations must invalidate the proof.
+
+Optional-record `any` queries also support a field equality against a concrete
+value argument, optionally followed by a boolean flag predicate. Equality is
+restricted to builtin scalars and Copy records deriving PartialEq over builtin
+scalar fields; custom equality and generic equality bounds require further
+contracts. The logical query is connected to membership in the corresponding
+projection sequence. Relating logical equality to actual Rust values remains
+part of source refinement.
 Borrowed-slice locations can be rebased to the source array and loaded without
 silently discarding invalid locations; these logical relations do not discharge
 physical reference/lifetime refinement.

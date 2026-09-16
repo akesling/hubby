@@ -27,7 +27,7 @@ fn closure(expression: &Expr) -> Result<&syn::ExprClosure, String> {
 }
 
 impl Crate {
-    fn projection_value_type(&self, module: &str, ty: &Type) -> Result<String, String> {
+    pub(super) fn projection_value_type(&self, module: &str, ty: &Type) -> Result<String, String> {
         let name = base_type(ty)?;
         if tokens(ty) != name {
             return Err("projection requires a concrete Copy scalar or record value".into());
@@ -201,7 +201,7 @@ impl Crate {
             validator: None, view: None, record_at: None, lookup: None, selection: None, relocation: None,
             buffer: None, constructor: None, query: None,
             array: Some(arrays::Shape { field: field[0].clone(), capacity: tokens(&array.len), record,
-                predicate: Some(predicate), projection: Some(projected),
+                predicate: Some(predicate), projection: Some(projected), key: None,
                 scope: "complete pure optional-record filter and copied-field iterator projection; ordered lazy value denotation; source/type/layout/lifetime refinement remains open" }),
         })
     }

@@ -366,6 +366,30 @@ theorem projectArray_member (program : RecordProjection) (entries : ArrayStore �
     refine ⟨some state, member, ?_⟩
     simp [projectSlot, selected, valueEq]
 
+-- Equality is structural for the accepted scalar/derived-record key types.
+-- The relation between Rust key values and Cell equality remains a refinement
+-- obligation; DecidableEq supplies executable equality on the logical domain.
+def queryKey [DecidableEq α] (program : RecordProjection) (entries : ArrayStore α)
+    (key : Cell α) : Bool :=
+  entries.any (fun entry => match entry with
+    | none => false
+    | some state => decide (state program.field = key) && evalCondition program.predicate state)
+
+theorem queryKey_member [DecidableEq α] (program : RecordProjection)
+    (entries : ArrayStore α) (key : Cell α) :
+    queryKey program entries key = true ↔ key ∈ projectArray program entries := by
+  rw [projectArray_member]
+  simp only [queryKey, List.any_eq_true]
+  constructor
+  · rintro ⟨entry, member, selected⟩
+    cases entry with
+    | none => contradiction
+    | some state =>
+      simp only [Bool.and_eq_true, decide_eq_true_eq] at selected
+      exact ⟨state, member, selected.2, selected.1⟩
+  · rintro ⟨state, member, predicate, value⟩
+    exact ⟨some state, member, by simp [value, predicate]⟩
+
 theorem projectArray_length (program : RecordProjection) (entries : ArrayStore α) :
     (projectArray program entries).length ≤ entries.length :=
   List.length_filterMap_le _ _

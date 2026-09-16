@@ -775,3 +775,31 @@ This advances P02/P03 and C03 in CORRECTNESS_PLAN.md. The coverage ledger record
 component evidence only. Membership construction, identity validation, lifecycle,
 quorum helpers and reachable callers remain open, as do P04/P10 ownership and
 Rust semantic preservation. M1 and M2 remain incomplete.
+
+## M1: membership identity queries
+
+Provium translates complete optional-record `any` bodies with a typed equality
+against a value argument and optional boolean flag predicate. The reusable
+contract accepts builtin scalars and Copy records deriving structural PartialEq
+on builtin scalar fields. Custom equality, mismatched types, generic equality
+bounds, shadowed iterator methods and additional predicate effects are rejected.
+The Lean query retains equality before flag evaluation and is connected to
+membership in its corresponding projection sequence.
+
+Jarl's original `contains` and `is_voter` are now translated. Three new obligations
+establish exact identity presence, equivalence between `is_voter` and the union
+of current/old voter sequences, and participation of every voter. These results
+allow repeated identities and arbitrary capacities; they do not assume or prove
+constructor identity uniqueness. Jarl production Rust remains unchanged.
+
+The project checked seven complete methods and 18 obligations on host and wasm32.
+Provider tests cover rejected equality variants, kernel rejection of changed
+fields/flags and 12,288 native query comparisons over repeated keys and holes.
+All ordinary provider tests, iterator/projection kernel regressions, Clippy,
+rustdoc and coverage/review checks passed. Rust value equality, source lowering
+preservation and ownership/layout refinement remain explicit open obligations.
+This advances C03 and P02/P03/P05 component coverage; M1/M2 remain open.
+
+The Jarl native comparison and all eight source mutation checks also passed,
+including overly restrictive voter flags and identity presence limited to voters.
+Each rejected mutation invalidates the stale proof certificate.
