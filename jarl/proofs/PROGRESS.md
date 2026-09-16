@@ -1201,3 +1201,31 @@ and its three semantic mutations passed their expected checks. All 108 Jarl
 membership obligations replayed on host and installed wasm32. Provider ordinary
 tests, Clippy, formatting, rustdoc and coverage review passed. Lean checks stayed
 serialized with a 16384 MiB ceiling.
+
+## M1: finite-width numeric arithmetic refinement
+
+Provium now composes its existing typed scalar interpreter for the actual
+quotient, increment and subtraction sequence. Both checked and wrapping profiles
+refine the natural rank offset for every nonempty representable count and proper
+representable divisor. Loop increments also agree when their capacity bound
+holds. Each binary operation retains word validation and its own fault behavior.
+
+Empty input differs internally: checked subtraction overflows; wrapping subtraction
+produces the maximum word and then fails indexed selection for every representable
+buffer capacity. A checked theorem maps typed scalar selection to the numeric
+buffer model's success/failure observations. The scalar layer retains the distinct
+faults even though that observation intentionally does not expose panic detail.
+The new library and scalar semantics are included in method bundles and hashes.
+
+This closes a conditional arithmetic step, not build-to-width/profile binding or
+Rust memory/source preservation. Those premises must still be established by the
+source/build refinement. Rust sorting, ownership, panic detail and caller
+invariants remain open. M1 and M2 remain incomplete; the 108-obligation Jarl
+membership count is unchanged.
+
+Validation: 26 buffer/arithmetic contracts and examples passed axiom auditing,
+including 32/64-bit boundaries and invalid width/divisor/count rejection. Ten
+corrupted buffer/arithmetic definitions failed kernel checking. All 108 Jarl
+membership obligations replayed on host and installed wasm32. Provider ordinary
+tests, Clippy, formatting, rustdoc and coverage review passed. Lean checks stayed
+serialized with a 16384 MiB ceiling.

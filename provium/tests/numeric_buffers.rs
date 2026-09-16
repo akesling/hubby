@@ -39,11 +39,17 @@ fn kernel_indexed_buffer_refines_collection_and_rejects_wrong_writes() {
     );
     fs::create_dir_all(w.0.join("Provium")).unwrap();
     let source = include_str!("../lean/Provium/NumericFolds.lean");
+    let arithmetic = include_str!("../lean/Provium/RankArithmetic.lean");
     for (file, contents) in [
         ("State", include_str!("../lean/Provium/State.lean")),
         (
             "OrderStatistics",
             include_str!("../lean/Provium/OrderStatistics.lean"),
+        ),
+        ("Semantics", include_str!("../lean/Provium/Semantics.lean")),
+        (
+            "RankArithmetic",
+            include_str!("../lean/Provium/RankArithmetic.lean"),
         ),
         ("NumericFolds", source),
         ("Audit", include_str!("../lean/Provium/Audit.lean")),
@@ -72,6 +78,18 @@ open Provium.State
        some (.abort,[.called (.other 7) 0 (.value 9 1)]) := rfl
  theorem writes : writeNumeric [99,98,97,96] 1 [4,5] = [99,4,5,96] := rfl
  theorem reset_overwrites : writeNumeric (writeNumeric [0,0,0] 0 [9,8,7]) 0 [1,2] = [1,2,7] := rfl
+ theorem rank32 : Provium.RankArithmetic.offset 32 4294967295 2 true = .ok (.uint 32 2147483647) := rfl
+ theorem empty32 : Provium.RankArithmetic.offset 32 0 2 false = .ok (.uint 32 4294967295) := rfl
+ theorem empty64 : Provium.RankArithmetic.offset 64 0 2 true = .error .overflow := rfl
+ theorem invalid_width : Provium.RankArithmetic.offset 7 2 2 true = .error .typeMismatch := rfl
+ theorem zero_divisor : Provium.RankArithmetic.offset 32 2 0 true = .error .divisionByZero := rfl
+ theorem invalid_count : Provium.RankArithmetic.offset 32 4294967296 2 true = .error .overflow := rfl
+#provium_check rank32 references Provium.RankArithmetic.offset
+#provium_check empty32 references Provium.RankArithmetic.offset
+#provium_check empty64 references Provium.RankArithmetic.offset
+#provium_check invalid_width references Provium.RankArithmetic.offset
+#provium_check zero_divisor references Provium.RankArithmetic.offset
+#provium_check invalid_count references Provium.RankArithmetic.offset
 #provium_check Provium.State.writeNumeric_length references Provium.State.writeNumeric
 #provium_check Provium.State.writeNumeric_contents references Provium.State.writeNumeric
 #provium_check Provium.State.writeNumeric_prefix references Provium.State.writeNumeric
@@ -83,6 +101,11 @@ open Provium.State
 #provium_check Provium.State.sortNumericBuffer_suffix references Provium.State.sortNumericBuffer
 #provium_check Provium.State.selectNumericBuffer_refines references Provium.State.selectNumericBuffer
 #provium_check Provium.State.fillNumericRank_refines references Provium.State.fillNumericCallbacks
+#provium_check Provium.State.selectNumericBuffer_word_refines references Provium.State.selectNumericBuffer
+#provium_check Provium.RankArithmetic.nonempty_offset references Provium.RankArithmetic.offset
+#provium_check Provium.RankArithmetic.empty_offset references Provium.RankArithmetic.offset
+#provium_check Provium.RankArithmetic.increment_within_capacity references Provium.RankArithmetic.increment
+#provium_check Provium.RankArithmetic.empty_wrapping_not_index references Provium.RankArithmetic.offset
 #provium_check callback_before_bounds references Provium.State.fillNumericCallbacks
 #provium_check bounds_abort references Provium.State.fillNumericCallbacks
 #provium_check writes references Provium.State.writeNumeric
@@ -126,6 +149,32 @@ open Provium.State
         )
         .unwrap();
         let result = lean(&w, "Provium/NumericFolds.lean", None);
+        assert!(!result.status.success(), "accepted {from} -> {to}");
+        let diagnostic = String::from_utf8_lossy(&result.stdout);
+        assert!(diagnostic.contains("error:"), "{diagnostic}");
+        assert!(!diagnostic.contains("unexpected token"), "{diagnostic}");
+    }
+    for (from, to) in [
+        (
+            "if checked then .sub else .wrappingSub",
+            "if checked then .saturatingSub else .wrappingSub",
+        ),
+        (
+            "if checked then .sub else .wrappingSub",
+            "if checked then .sub else .sub",
+        ),
+        (
+            "binary (if checked then .add else .wrappingAdd) (.uint bits count) (.uint bits 1)",
+            "binary (if checked then .add else .wrappingAdd) (.uint bits count) (.uint bits 2)",
+        ),
+    ] {
+        assert!(arithmetic.contains(from));
+        fs::write(
+            w.0.join("Provium/RankArithmetic.lean"),
+            arithmetic.replace(from, to),
+        )
+        .unwrap();
+        let result = lean(&w, "Provium/RankArithmetic.lean", None);
         assert!(!result.status.success(), "accepted {from} -> {to}");
         let diagnostic = String::from_utf8_lossy(&result.stdout);
         assert!(diagnostic.contains("error:"), "{diagnostic}");

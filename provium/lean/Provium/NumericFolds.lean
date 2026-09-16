@@ -1,5 +1,6 @@
 import Provium.State
 import Provium.OrderStatistics
+import Provium.RankArithmetic
 
 namespace Provium.State
 
@@ -168,6 +169,20 @@ def sortNumericBuffer (buffer : List UInt64) (count : Nat) : List UInt64 :=
 
 def selectNumericBuffer (buffer : List UInt64) (count divisor : Nat) : Option UInt64 :=
   if count = 0 then none else buffer[Provium.OrderStatistics.rankOffset count divisor]?
+
+-- This equates success/failure observations while the scalar model retains
+-- the distinct overflow versus bounds faults for empty inputs.
+theorem selectNumericBuffer_word_refines (buffer : List UInt64) (bits count divisor : Nat) (checked : Bool)
+    (width : Provium.validWidth bits = true) (within : count ≤ buffer.length)
+    (capacity_fits : buffer.length < 2^bits) (proper : 1 < divisor) (divisor_fits : divisor < 2^bits) :
+    (Provium.RankArithmetic.select buffer bits count divisor checked).toOption = selectNumericBuffer buffer count divisor := by
+  by_cases zero : count = 0
+  · subst count
+    rw [Provium.RankArithmetic.select_empty buffer bits divisor checked width proper divisor_fits capacity_fits]
+    cases checked <;> rfl
+  · rw [Provium.RankArithmetic.select_nonempty buffer bits count divisor checked width
+      (Nat.pos_of_ne_zero zero) proper (Nat.lt_of_le_of_lt within capacity_fits) divisor_fits]
+    simp only [selectNumericBuffer, zero, ↓reduceIte]
 
 theorem sortNumericBuffer_length (buffer : List UInt64) (count : Nat) :
     (sortNumericBuffer buffer count).length = buffer.length := by

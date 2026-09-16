@@ -11,6 +11,8 @@ use std::{
 };
 use syn::{spanned::Spanned, Expr, Item, Type};
 const SEMANTICS: &str = include_str!("../lean/Provium/State.lean");
+const SCALAR_SEMANTICS: &str = include_str!("../lean/Provium/Semantics.lean");
+const RANK_ARITHMETIC: &str = include_str!("../lean/Provium/RankArithmetic.lean");
 const NUMERIC_FOLDS: &str = include_str!("../lean/Provium/NumericFolds.lean");
 const ORDER_STATISTICS: &str = include_str!("../lean/Provium/OrderStatistics.lean");
 #[derive(Deserialize)]
@@ -1147,6 +1149,8 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
         ("lean-toolchain", toolchain_file.as_str()),
         ("Provium/State.lean", SEMANTICS),
         ("Provium/OrderStatistics.lean", ORDER_STATISTICS),
+        ("Provium/Semantics.lean", SCALAR_SEMANTICS),
+        ("Provium/RankArithmetic.lean", RANK_ARITHMETIC),
         ("Provium/NumericFolds.lean", NUMERIC_FOLDS),
         ("Provium/Audit.lean", AUDIT),
         ("Generated.lean", &generated),
@@ -1171,6 +1175,11 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
         (
             "Provium/OrderStatistics.lean",
             Some("Provium/OrderStatistics.olean"),
+        ),
+        ("Provium/Semantics.lean", Some("Provium/Semantics.olean")),
+        (
+            "Provium/RankArithmetic.lean",
+            Some("Provium/RankArithmetic.olean"),
         ),
         (
             "Provium/NumericFolds.lean",
