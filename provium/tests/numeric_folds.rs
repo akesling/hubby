@@ -119,6 +119,7 @@ open Provium.State
       some (.value 9,[.called (.other 7) 0 (.value 9 1),.dropped 1 .returned]) := by
    have ranked : numericRank [(9:UInt64)] 2 = some 9 := by
      apply numericRank_eq_of_counts _ _ _ (by decide) <;> decide
+   rw [execution]
    change (observeCallback 2 (fun (_:Cell Nat) (state:Nat)=>.value (9:UInt64) (state+1)) (fun _=>.returned)
      (match numericRank [(9:UInt64)] 2 with
       | none => finishNumericPanic 1 false

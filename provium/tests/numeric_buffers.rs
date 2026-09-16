@@ -78,6 +78,11 @@ open Provium.State
 #provium_check Provium.State.fillNumericCallbacks_refines references Provium.State.fillNumericCallbacks
 #provium_check Provium.State.fillNumericCallbacks_prefix references Provium.State.fillNumericCallbacks
 #provium_check Provium.State.runNumericFold_refines references Provium.State.runNumericFold
+#provium_check Provium.State.sortNumericBuffer_length references Provium.State.sortNumericBuffer
+#provium_check Provium.State.sortNumericBuffer_permutation references Provium.State.sortNumericBuffer
+#provium_check Provium.State.sortNumericBuffer_suffix references Provium.State.sortNumericBuffer
+#provium_check Provium.State.selectNumericBuffer_refines references Provium.State.selectNumericBuffer
+#provium_check Provium.State.fillNumericRank_refines references Provium.State.fillNumericCallbacks
 #provium_check callback_before_bounds references Provium.State.fillNumericCallbacks
 #provium_check bounds_abort references Provium.State.fillNumericCallbacks
 #provium_check writes references Provium.State.writeNumeric
@@ -91,6 +96,12 @@ open Provium.State
         String::from_utf8_lossy(&result.stderr)
     );
     for (from, to) in [
+        ("++ buffer.drop count", "++ buffer.drop (count + 1)"),
+        (
+            "else buffer[Provium.OrderStatistics.rankOffset count divisor]?",
+            "else buffer[Provium.OrderStatistics.rankOffset count divisor + 1]?",
+        ),
+        ("if count = 0 then none", "if count = 1 then none"),
         (
             "fillNumericCallbacks rest advanced (buffer.set count answer) (count + 1)",
             "fillNumericCallbacks rest advanced (buffer.set (count + 1) answer) (count + 1)",

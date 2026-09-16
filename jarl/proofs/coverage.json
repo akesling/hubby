@@ -4444,7 +4444,7 @@
         "S12"
       ],
       "status": "component_evidence",
-      "note": "Complete original callback loops, prefix sorts, rank expressions, early return and minimum lower to the numeric interaction model. Contracts connect both source projections, stable execution and empty-current panic. Numeric scalar rank contracts and an unbounded indexed-buffer-to-collection refinement are reusable Provium evidence; the execution contract now uses the buffer refinement. Rust memory/usize/sort_unstable/ownership/source refinement, build-to-panic-policy binding, panic detail and reachable caller invariants remain open.",
+      "note": "Complete original callback loops, prefix sorts, rank expressions, early return and minimum lower to the numeric interaction model. Contracts connect both source projections, stable execution and empty-current panic. Numeric scalar rank contracts and an unbounded indexed-buffer/prefix-sort-to-collection refinement are reusable Provium evidence; the execution contract now uses the buffer refinement. Rust memory/usize/sort_unstable/ownership/source refinement, build-to-panic-policy binding, panic detail and reachable caller invariants remain open.",
       "root_apis": [],
       "contracts": [
         {

@@ -214,8 +214,9 @@ loop/index structure and mismatched capacities fail closed. The panic-policy
 parameter remains an explicit model input; binding it to build profiles and
 refining Rust memory, sort_unstable, ownership and panic detail remain open.
 The numeric execution model carries a fixed-length buffer and write index through
-both passes. A checked refinement proves equivalence to ordered callback
-collection, including initialized-prefix contents and preserved unused slots.
+both passes, including canonical prefix sorting and indexed rank reads. A
+checked refinement proves equivalence to ordered callback collection and rank
+selection, including initialized-prefix contents and preserved unused slots.
 Bounds are derived from source projection lengths; callback replies precede
 index checking, including when an invalid buffer model triggers a panic.
 Method proof bundles include `Provium.OrderStatistics`: checked sorted-permutation,

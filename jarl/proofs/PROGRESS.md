@@ -1177,3 +1177,27 @@ source fixtures and their divisor/projection/gate mutants passed their expected
 checks. All 108 membership obligations replayed on host and installed wasm32.
 Provider ordinary tests, Clippy, formatting, rustdoc and Jarl coverage review
 passed. Lean checks remained serialized with a 16384 MiB ceiling.
+
+## M1: prefix sorting and indexed rank refinement
+
+The numeric execution model now sorts each initialized buffer prefix, reads the
+computed rank index from that buffer, and carries the first sorted buffer into
+the second callback pass. General contracts prove constant buffer length,
+permutation of the original contents, and unchanged unused suffix. Indexed
+selection after canonical sorting refines the existing numeric rank function.
+The complete two-pass refinement consequently includes both prefix sorts and
+index reads, preserving the existing Jarl execution theorem and all callbacks.
+
+The provider sort is a canonical logical operation over bounded numeric values.
+This does not verify Rust's sort_unstable implementation, Rust memory/ownership,
+integer-width/profile binding, panic detail or original-source preservation.
+Those and caller invariants remain M1 work. M1 and M2 are incomplete; the
+membership obligation count remains 108.
+
+Validation: 15 buffer contracts/examples passed axiom auditing. Seven corrupted
+runtime definitions failed kernel checking, including suffix truncation, an
+incorrect rank index and a changed empty-prefix guard. The numeric source fixture
+and its three semantic mutations passed their expected checks. All 108 Jarl
+membership obligations replayed on host and installed wasm32. Provider ordinary
+tests, Clippy, formatting, rustdoc and coverage review passed. Lean checks stayed
+serialized with a 16384 MiB ceiling.

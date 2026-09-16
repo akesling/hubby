@@ -161,6 +161,68 @@ theorem fillNumericCallbacks_prefix (keys : List (Cell α)) (callback : σ) (buf
   simp only [Nat.zero_add]
   rw [writeNumeric_prefix buffer values (by omega)]
 
+-- Canonical numeric sorting updates only the initialized prefix. Connecting
+-- this operation to Rust's unstable sorting algorithm remains a library proof.
+def sortNumericBuffer (buffer : List UInt64) (count : Nat) : List UInt64 :=
+  (Provium.OrderStatistics.sort ((buffer.take count).map UInt64.toNat)).map UInt64.ofNat ++ buffer.drop count
+
+def selectNumericBuffer (buffer : List UInt64) (count divisor : Nat) : Option UInt64 :=
+  if count = 0 then none else buffer[Provium.OrderStatistics.rankOffset count divisor]?
+
+theorem sortNumericBuffer_length (buffer : List UInt64) (count : Nat) :
+    (sortNumericBuffer buffer count).length = buffer.length := by
+  simp only [sortNumericBuffer, List.length_append, List.length_map,
+    Provium.OrderStatistics.sort_length, List.length_take, List.length_drop]
+  omega
+
+theorem sortNumericBuffer_permutation (buffer : List UInt64) (count : Nat) :
+    (sortNumericBuffer buffer count).Perm buffer := by
+  have sorted : ((Provium.OrderStatistics.sort ((buffer.take count).map UInt64.toNat)).map UInt64.ofNat).Perm
+      (buffer.take count) := by
+    simpa [Function.comp_def] using (Provium.OrderStatistics.sort_permutation ((buffer.take count).map UInt64.toNat)).map UInt64.ofNat
+  simpa only [sortNumericBuffer, List.take_append_drop] using sorted.append (List.Perm.refl (buffer.drop count))
+
+theorem sortNumericBuffer_suffix (buffer : List UInt64) (count : Nat)
+    (within : count ≤ buffer.length) :
+    (sortNumericBuffer buffer count).drop count = buffer.drop count := by
+  unfold sortNumericBuffer
+  have length : ((Provium.OrderStatistics.sort ((buffer.take count).map UInt64.toNat)).map UInt64.ofNat).length = count := by
+    simp [Provium.OrderStatistics.sort_length, Nat.min_eq_left within]
+  simpa only [length] using (List.drop_left (l₁ := (Provium.OrderStatistics.sort ((buffer.take count).map UInt64.toNat)).map UInt64.ofNat) (l₂ := buffer.drop count))
+
+theorem selectNumericBuffer_refines (buffer : List UInt64) (count divisor : Nat)
+    (within : count ≤ buffer.length) :
+    selectNumericBuffer (sortNumericBuffer buffer count) count divisor = numericRank (buffer.take count) divisor := by
+  have prefix_length : (buffer.take count).length = count := by simp [Nat.min_eq_left within]
+  by_cases zero : count = 0
+  · subst count
+    rfl
+  · have nonempty : (buffer.take count).isEmpty = false := List.isEmpty_eq_false_iff.mpr (by
+      intro empty
+      rw [empty] at prefix_length
+      simp only [List.length_nil] at prefix_length
+      exact zero prefix_length.symm)
+    have index : Provium.OrderStatistics.rankOffset count divisor < count :=
+      Nat.sub_lt (Nat.pos_of_ne_zero zero) (Nat.succ_pos _)
+    simp only [selectNumericBuffer, zero, ↓reduceIte, sortNumericBuffer,
+      numericRank, Provium.OrderStatistics.rank, List.isEmpty_map, nonempty,
+      Bool.false_eq_true, List.length_map, prefix_length]
+    rw [List.getElem?_append_left (by simpa only [List.length_map, Provium.OrderStatistics.sort_length, prefix_length] using index)]
+    exact List.getElem?_map
+
+theorem fillNumericRank_refines (keys : List (Cell α)) (callback : σ) (buffer : List UInt64)
+    (divisor : Nat) (abortOnPanic : Bool) (next : Option UInt64 → σ → CallbackRun α σ UInt64 UInt64)
+    (room : keys.length ≤ buffer.length) :
+    fillNumericCallbacks keys callback buffer 0 abortOnPanic
+      (fun buffer count advanced => next (selectNumericBuffer (sortNumericBuffer buffer count) count divisor) advanced) =
+      collectCallbacks keys callback (fun values advanced => next (numericRank values divisor) advanced) := by
+  rw [fillNumericCallbacks_refines _ _ _ _ _ _ (by simpa using room)]
+  apply collectCallbacks_congr
+  intro values advanced length
+  simp only [Nat.zero_add]
+  rw [selectNumericBuffer_refines _ _ _ (by simpa only [writeNumeric_length, length] using room)]
+  rw [writeNumeric_prefix buffer values (by omega)]
+
 def runNumericFoldList (program : NumericFold) (entries : ArrayStore α) (callback : σ)
     (abortOnPanic : Bool) : CallbackRun α σ UInt64 UInt64 :=
   collectCallbacks (projectArray program.first entries) callback fun values advanced =>
@@ -174,19 +236,21 @@ def runNumericFoldList (program : NumericFold) (entries : ArrayStore α) (callba
           | some second => finishCallback advanced (.value (min first second))
       else finishCallback advanced (.value first)
 
--- The executable model now carries the original fixed-capacity buffer and
--- count through both passes. Sorting/rank remains the separate numeric model.
+-- The executable model carries the fixed-capacity buffer, prefix sorts, index
+-- reads and count through both passes. Rust memory/library refinement is open.
 def runNumericFold (program : NumericFold) (entries : ArrayStore α) (callback : σ)
     (abortOnPanic : Bool) : CallbackRun α σ UInt64 UInt64 :=
   fillNumericCallbacks (projectArray program.first entries) callback (List.replicate entries.length 0) 0 abortOnPanic
     fun buffer count advanced =>
-      match numericRank (buffer.take count) program.divisor with
+      let sorted := sortNumericBuffer buffer count
+      match selectNumericBuffer sorted count program.divisor with
       | none => finishNumericPanic advanced abortOnPanic
       | some first =>
         if queryArray program.secondRequired entries then
-          fillNumericCallbacks (projectArray program.second entries) advanced buffer 0 abortOnPanic
+          fillNumericCallbacks (projectArray program.second entries) advanced sorted 0 abortOnPanic
             fun buffer count advanced =>
-              match numericRank (buffer.take count) program.divisor with
+              let sorted := sortNumericBuffer buffer count
+              match selectNumericBuffer sorted count program.divisor with
               | none => finishNumericPanic advanced abortOnPanic
               | some second => finishCallback advanced (.value (min first second))
         else finishCallback advanced (.value first)
@@ -199,17 +263,18 @@ theorem runNumericFold_refines (program : NumericFold) (entries : ArrayStore α)
   apply collectCallbacks_congr
   intro values advanced length
   simp only [Nat.zero_add]
+  rw [selectNumericBuffer_refines _ _ _ (by simpa only [writeNumeric_length, List.length_replicate, length] using projectArray_length program.first entries)]
   rw [writeNumeric_prefix _ values (by simpa [length] using projectArray_length program.first entries)]
   cases ranked : numericRank values program.divisor with
   | none => rfl
   | some first =>
     simp only []
     split
-    · exact fillNumericCallbacks_prefix (projectArray program.second entries) advanced _ abortOnPanic
-        (fun values advanced => match numericRank values program.divisor with
+    · exact fillNumericRank_refines (projectArray program.second entries) advanced _ program.divisor abortOnPanic
+        (fun result advanced => match result with
           | none => finishNumericPanic advanced abortOnPanic
           | some second => finishCallback advanced (.value (min first second)))
-        (by simpa only [writeNumeric_length, List.length_replicate] using projectArray_length program.second entries)
+        (by simpa only [sortNumericBuffer_length, writeNumeric_length, List.length_replicate] using projectArray_length program.second entries)
     · rfl
 
 end Provium.State
