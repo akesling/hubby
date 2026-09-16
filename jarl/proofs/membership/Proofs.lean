@@ -1153,3 +1153,199 @@ theorem not_joint [DecidableEq α] (capacity : Nat) (original result : ArrayStor
   | true => exact False.elim ((joint_iff_old_nonempty result).mp joint (old_empty capacity original result learners success))
 
 end LearnerReplacement
+
+namespace JointConstruction
+open JarlMembership Inclusion SetInterpretation CapacityAcceptance
+
+theorem success_shape [DecidableEq α] (source target result : ArrayStore α) :
+    membership_Membership_joint source target = .ok result ↔
+      membership_Membership_is_joint source = false ∧ membership_Membership_is_joint target = false ∧
+      runInsertPass membership_Membership_include_ir 2 (membership_Membership_voters source) target = .ok result :=
+  runArrayMerge_success membership_Membership_joint_ir source target result
+
+theorem capacity_preserved [DecidableEq α] (source target result : ArrayStore α)
+    (success : membership_Membership_joint source target = .ok result) : result.length = target.length := by
+  have pass := (success_shape source target result).mp success
+  apply runInsertPass_preserves membership_Membership_include_ir 2 (fun entries => entries.length = target.length)
+    _ (membership_Membership_voters source) target result rfl pass.2.2
+  intro entries key initial _
+  simpa only [runUpsert_length] using initial
+
+theorem unique_identities [DecidableEq α] (source target result : ArrayStore α)
+    (unique : UniqueIdentities target) (success : membership_Membership_joint source target = .ok result) :
+    UniqueIdentities result := by
+  have pass := (success_shape source target result).mp success
+  apply runInsertPass_preserves membership_Membership_include_ir 2 UniqueIdentities
+    _ (membership_Membership_voters source) target result unique pass.2.2
+  intro entries key initial _
+  exact Inclusion.preserves_unique entries key 2 initial
+
+theorem flags [DecidableEq α] (flag : Path) (valid : ValidFlag flag) (source target result : ArrayStore α)
+    (success : membership_Membership_joint source target = .ok result) (query : Cell α) :
+    FlagMember flag result query ↔ FlagMember flag target query ∨
+      (query ∈ membership_Membership_voters source ∧ flag = ["old"]) := by
+  have pass := (success_shape source target result).mp success
+  have step : ∀ entries key, (runUpsert membership_Membership_include_ir entries key 2).2 = none →
+      (FlagMember flag (runUpsert membership_Membership_include_ir entries key 2).1 query ↔
+        FlagMember flag entries query ∨ (key = query ∧ flag = ["old"])) := by
+    intro entries key succeeded
+    exact include_flag flag valid entries query key 2 succeeded
+  have relation := runInsertPass_observes membership_Membership_include_ir 2 (fun entries => FlagMember flag entries query)
+    (fun key => key = query ∧ flag = ["old"]) step (membership_Membership_voters source) target result pass.2.2
+  simpa [and_left_comm, and_assoc] using relation
+
+theorem voters_exact [DecidableEq α] (source target result : ArrayStore α)
+    (success : membership_Membership_joint source target = .ok result) (query : Cell α) :
+    query ∈ membership_Membership_voters result ↔ query ∈ membership_Membership_voters target := by
+  rw [MembershipProjection.voters_member, MembershipProjection.voters_member, ← flag_member_iff, ← flag_member_iff]
+  simpa using flags ["voter"] (Or.inl rfl) source target result success query
+
+theorem learners_exact [DecidableEq α] (source target result : ArrayStore α)
+    (success : membership_Membership_joint source target = .ok result) (query : Cell α) :
+    query ∈ membership_Membership_learners result ↔ query ∈ membership_Membership_learners target := by
+  rw [MembershipProjection.learners_member, MembershipProjection.learners_member, ← flag_member_iff, ← flag_member_iff]
+  simpa using flags ["learner"] (Or.inr (Or.inl rfl)) source target result success query
+
+theorem old_voters_exact [DecidableEq α] (source target result : ArrayStore α)
+    (success : membership_Membership_joint source target = .ok result) (query : Cell α) :
+    query ∈ membership_Membership_old_voters result ↔ query ∈ membership_Membership_voters source := by
+  have stable := ((success_shape source target result).mp success).2.1
+  have absent : ¬FlagMember ["old"] target query := by
+    intro marked
+    have present := (MembershipProjection.old_voters_member target query).mpr ((flag_member_iff ["old"] target query).mp marked)
+    have nonempty : membership_Membership_old_voters target ≠ [] := by
+      intro empty
+      rw [empty] at present
+      cases present
+    have active := (joint_iff_old_nonempty target).mpr nonempty
+    rw [stable] at active
+    cases active
+  rw [MembershipProjection.old_voters_member, ← flag_member_iff]
+  simpa [absent] using flags ["old"] (Or.inr (Or.inr rfl)) source target result success query
+
+theorem identities [DecidableEq α] (source target result : ArrayStore α)
+    (success : membership_Membership_joint source target = .ok result) (query : Cell α) :
+    HasIdentity result query ↔ HasIdentity target query ∨ query ∈ membership_Membership_voters source := by
+  have pass := (success_shape source target result).mp success
+  have step : ∀ entries key, (runUpsert membership_Membership_include_ir entries key 2).2 = none →
+      (HasIdentity (runUpsert membership_Membership_include_ir entries key 2).1 query ↔ HasIdentity entries query ∨ key = query) := by
+    intro entries key succeeded
+    exact include_identity entries query key 2 succeeded
+  have relation := runInsertPass_observes membership_Membership_include_ir 2 (fun entries => HasIdentity entries query)
+    (fun key => key = query) step (membership_Membership_voters source) target result pass.2.2
+  simpa using relation
+
+def FitsMerge (source target : ArrayStore α) : Prop :=
+  ∃ domainKeys : List (Cell α), domainKeys.length ≤ target.length ∧
+    ∀ key, HasIdentity target key ∨ key ∈ membership_Membership_voters source → key ∈ domainKeys
+
+theorem accepts [DecidableEq α] (source target : ArrayStore α) (unique : UniqueIdentities target)
+    (source_stable : membership_Membership_is_joint source = false)
+    (target_stable : membership_Membership_is_joint target = false) (fits : FitsMerge source target) :
+    ∃ result, membership_Membership_joint source target = .ok result := by
+  obtain ⟨domainKeys, bound, covers⟩ := fits
+  have initial : Covered target.length domainKeys target := ⟨unique, rfl, fun key member => covers key (Or.inl member)⟩
+  have step : ∀ entries key, Covered target.length domainKeys entries → key ∈ domainKeys →
+      ∃ next, runUpsert membership_Membership_include_ir entries key 2 = (next, none) ∧ Covered target.length domainKeys next := by
+    intro entries key covered admitted
+    obtain ⟨next, execution⟩ := include_available target.length domainKeys bound entries covered key admitted 2
+    refine ⟨next, execution, ?_⟩
+    have preserved := include_covered target.length domainKeys entries covered key admitted 2 (by simp [execution])
+    simpa only [execution] using preserved
+  obtain ⟨result, pass, _⟩ := runInsertPass_accepts membership_Membership_include_ir 2 (Covered target.length domainKeys)
+    (fun key => key ∈ domainKeys) step (membership_Membership_voters source) target initial (fun key member => covers key (Or.inr member))
+  exact ⟨result, (success_shape source target result).mpr ⟨source_stable, target_stable, pass⟩⟩
+
+theorem accepts_iff [DecidableEq α] (source target : ArrayStore α) (unique : UniqueIdentities target) :
+    (∃ result, membership_Membership_joint source target = .ok result) ↔
+      membership_Membership_is_joint source = false ∧ membership_Membership_is_joint target = false ∧ FitsMerge source target := by
+  constructor
+  · rintro ⟨result, success⟩
+    have shape := (success_shape source target result).mp success
+    refine ⟨shape.1, shape.2.1, Keys result, ?_, ?_⟩
+    · exact Nat.le_trans (projectArray_length ⟨.boolean true, ["id"]⟩ result) (Nat.le_of_eq (capacity_preserved source target result success))
+    · intro key member
+      exact (keys_member result key).mpr ((identities source target result success key).mpr member)
+  · rintro ⟨source_stable, target_stable, fits⟩
+    exact accepts source target unique source_stable target_stable fits
+
+theorem fits_by_count [DecidableEq α] (source target : ArrayStore α) :
+    FitsMerge source target ↔ (uniqueKeys (Keys target ++ membership_Membership_voters source)).length ≤ target.length := by
+  have equivalent : FitsMerge source target ↔ Fits target.length (Keys target) [] (membership_Membership_voters source) := by
+    unfold FitsMerge Fits
+    simp only [keys_member, List.not_mem_nil, or_false]
+  rw [equivalent, fits_iff_count]
+  simp only [List.append_nil]
+
+theorem accepts_by_count [DecidableEq α] (source target : ArrayStore α) (unique : UniqueIdentities target) :
+    (∃ result, membership_Membership_joint source target = .ok result) ↔
+      membership_Membership_is_joint source = false ∧ membership_Membership_is_joint target = false ∧
+        (uniqueKeys (Keys target ++ membership_Membership_voters source)).length ≤ target.length := by
+  rw [accepts_iff source target unique, fits_by_count]
+
+theorem guard_error_iff [DecidableEq α] (source target : ArrayStore α) :
+    membership_Membership_joint source target = .error "Reconfiguring" ↔
+      membership_Membership_is_joint source = true ∨ membership_Membership_is_joint target = true :=
+  runArrayMerge_guard_error membership_Membership_joint_ir (by decide) source target
+
+theorem error_codes [DecidableEq α] (source target : ArrayStore α) (error : String)
+    (failure : membership_Membership_joint source target = .error error) :
+    error = "Reconfiguring" ∨ error = "Full" :=
+  runArrayMerge_error_codes membership_Membership_joint_ir source target error failure
+
+theorem full_iff [DecidableEq α] (source target : ArrayStore α) (unique : UniqueIdentities target) :
+    membership_Membership_joint source target = .error "Full" ↔
+      membership_Membership_is_joint source = false ∧ membership_Membership_is_joint target = false ∧ ¬FitsMerge source target := by
+  constructor
+  · intro failure
+    have inactive : ¬(membership_Membership_is_joint source = true ∨ membership_Membership_is_joint target = true) := by
+      intro active
+      have denied := (guard_error_iff source target).mpr active
+      rw [failure] at denied
+      simp at denied
+    have stable : membership_Membership_is_joint source = false ∧ membership_Membership_is_joint target = false := by
+      simpa using inactive
+    refine ⟨stable.1, stable.2, ?_⟩
+    intro fits
+    obtain ⟨result, success⟩ := accepts source target unique stable.1 stable.2 fits
+    rw [failure] at success
+    cases success
+  · rintro ⟨source_stable, target_stable, notFits⟩
+    cases outcome : membership_Membership_joint source target with
+    | ok result =>
+      exact False.elim (notFits (((accepts_iff source target unique).mp ⟨result, outcome⟩).2.2))
+    | error error =>
+      rcases error_codes source target error outcome with guarded | full
+      · subst error
+        have active := (guard_error_iff source target).mp outcome
+        simp [source_stable, target_stable] at active
+      · simp [full]
+
+theorem full_by_count [DecidableEq α] (source target : ArrayStore α) (unique : UniqueIdentities target) :
+    membership_Membership_joint source target = .error "Full" ↔
+      membership_Membership_is_joint source = false ∧ membership_Membership_is_joint target = false ∧
+        target.length < (uniqueKeys (Keys target ++ membership_Membership_voters source)).length := by
+  rw [full_iff source target unique, fits_by_count]
+  simp only [Nat.not_le]
+
+theorem joint_iff_source_voters [DecidableEq α] (source target result : ArrayStore α)
+    (success : membership_Membership_joint source target = .ok result) :
+    membership_Membership_is_joint result = true ↔ membership_Membership_voters source ≠ [] := by
+  rw [joint_iff_old_nonempty]
+  constructor
+  · intro nonempty empty
+    cases old : membership_Membership_old_voters result with
+    | nil => exact nonempty old
+    | cons key rest =>
+      have present := (old_voters_exact source target result success key).mp (by simp [old])
+      rw [empty] at present
+      cases present
+  · intro nonempty empty
+    cases voters : membership_Membership_voters source with
+    | nil => exact nonempty voters
+    | cons key rest =>
+      have present := (old_voters_exact source target result success key).mpr (by simp [voters])
+      rw [empty] at present
+      cases present
+
+end JointConstruction

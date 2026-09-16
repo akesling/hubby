@@ -488,6 +488,9 @@ impl Crate {
             if views::candidate(&def.item) {
                 return self.lower_shared_view(name);
             }
+            if merges::candidate(&def.item) {
+                return self.lower_merge(name);
+            }
             if rebuilds::candidate(&def.item) {
                 return self.lower_rebuild(name);
             }
@@ -1267,6 +1270,7 @@ pub mod validators;
 
 pub mod views;
 
+mod merges;
 mod projections;
 mod rebuilds;
 

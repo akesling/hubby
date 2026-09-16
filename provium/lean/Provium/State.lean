@@ -1220,6 +1220,94 @@ theorem runRebuild_error_codes [DecidableEq α] (program : Rebuild) (capacity : 
     subst error
     exact Or.inr (runInsertPass_error_code program.insert program.firstTag _ _ reason first)
 
+-- A constant map_err closure is evaluated at each failed insertion. The
+-- correspondence below permits reuse of the unmapped pass contracts.
+def replaceInsertError (error : String) (result : Except String β) : Except String β :=
+  match result with
+  | .ok value => .ok value
+  | .error _ => .error error
+
+def runMappedInsertPass [DecidableEq α] (program : Upsert) (tag : Nat) (error : String)
+    (keys : List (Cell α)) (entries : ArrayStore α) : Except String (ArrayStore α) :=
+  match keys with
+  | [] => .ok entries
+  | key :: rest =>
+    let (next, code) := runUpsert program entries key tag
+    match code with
+    | some _ => .error error
+    | none => runMappedInsertPass program tag error rest next
+
+theorem runMappedInsertPass_eq [DecidableEq α] (program : Upsert) (tag : Nat) (error : String)
+    (keys : List (Cell α)) (entries : ArrayStore α) :
+    runMappedInsertPass program tag error keys entries =
+      replaceInsertError error (runInsertPass program tag keys entries) := by
+  induction keys generalizing entries with
+  | nil => rfl
+  | cons key rest ih =>
+    simp only [runMappedInsertPass, runInsertPass]
+    cases code : (runUpsert program entries key tag).2 with
+    | some reason => rfl
+    | none => exact ih _
+
+theorem replaceInsertError_success (error : String) (outcome : Except String β) (result : β) :
+    replaceInsertError error outcome = .ok result ↔ outcome = .ok result := by
+  cases outcome <;> simp [replaceInsertError]
+
+structure ArrayMerge where
+  sourceGuard : Condition
+  targetGuard : Condition
+  projection : RecordProjection
+  insert : Upsert
+  tag : Nat
+  guardError : String
+  insertError : String
+
+def runArrayMerge [DecidableEq α] (program : ArrayMerge) (source target : ArrayStore α) : Except String (ArrayStore α) :=
+  if queryArray program.sourceGuard source || queryArray program.targetGuard target then .error program.guardError
+  else runMappedInsertPass program.insert program.tag program.insertError (projectArray program.projection source) target
+
+theorem runArrayMerge_success [DecidableEq α] (program : ArrayMerge) (source target result : ArrayStore α) :
+    runArrayMerge program source target = .ok result ↔
+      queryArray program.sourceGuard source = false ∧ queryArray program.targetGuard target = false ∧
+      runInsertPass program.insert program.tag (projectArray program.projection source) target = .ok result := by
+  simp only [runArrayMerge]
+  split
+  · rename_i guard
+    have active : queryArray program.sourceGuard source = true ∨ queryArray program.targetGuard target = true := by simpa using guard
+    rcases active with active | active <;> simp [active]
+  · rename_i guard
+    have inactive : queryArray program.sourceGuard source = false ∧ queryArray program.targetGuard target = false := by simpa using guard
+    rw [runMappedInsertPass_eq, replaceInsertError_success]
+    simp only [inactive.1, inactive.2, true_and]
+
+theorem runArrayMerge_error_codes [DecidableEq α] (program : ArrayMerge) (source target : ArrayStore α)
+    (error : String) (failure : runArrayMerge program source target = .error error) :
+    error = program.guardError ∨ error = program.insertError := by
+  simp only [runArrayMerge] at failure
+  split at failure
+  · cases failure; exact Or.inl rfl
+  · rw [runMappedInsertPass_eq] at failure
+    cases result : runInsertPass program.insert program.tag (projectArray program.projection source) target with
+    | ok entries => simp [result, replaceInsertError] at failure
+    | error reason =>
+      simp only [result, replaceInsertError, Except.error.injEq] at failure
+      exact Or.inr failure.symm
+
+theorem runArrayMerge_guard_error [DecidableEq α] (program : ArrayMerge)
+    (different : program.guardError ≠ program.insertError) (source target : ArrayStore α) :
+    runArrayMerge program source target = .error program.guardError ↔
+      queryArray program.sourceGuard source = true ∨ queryArray program.targetGuard target = true := by
+  simp only [runArrayMerge]
+  split
+  · rename_i guard
+    have active : queryArray program.sourceGuard source = true ∨ queryArray program.targetGuard target = true := by simpa using guard
+    simp only [active]
+  · rename_i guard
+    have inactive : queryArray program.sourceGuard source = false ∧ queryArray program.targetGuard target = false := by simpa using guard
+    rw [runMappedInsertPass_eq]
+    cases outcome : runInsertPass program.insert program.tag (projectArray program.projection source) target <;>
+      simp [replaceInsertError, inactive.1, inactive.2, Ne.symm different]
+
 -- Shared Result queries do not modify the store. The frontend checks the types
 -- of every accessed place. As above, malformed stores have a total extension;
 -- field-layout/source correspondence remains an explicit refinement obligation.

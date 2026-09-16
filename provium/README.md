@@ -197,6 +197,14 @@ contracts. The logical query is connected to membership in the corresponding
 projection sequence. Relating logical equality to actual Rust values remains
 part of source refinement.
 
+Guarded by-value Copy-array merges support pure queries on both inputs, a pure
+source projection, and source-local target insertion with a constant `map_err`
+closure. The generated model maps errors at each insertion; a checked equivalence
+allows reuse of pass invariants and observation contracts. Guards run before
+insertion, including when the target is full. Arbitrary closures, dropping errors
+and unmodeled effects are rejected. Source ownership/lowering refinement remains
+open.
+
 Two-pass optional-record rebuilds support a pure source projection followed by
 a checked input slice. The first loop merges repeated projected keys; the second
 checks a pure identity query on the original receiver and rejects prior-prefix

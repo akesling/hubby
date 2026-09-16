@@ -968,3 +968,37 @@ at the same capacities. All 16 original-source membership mutations failed their
 Lean contracts and invalidated stale certificates. Provider ordinary tests,
 provider and Jarl Clippy, provider rustdoc, formatting, and coverage/review checks
 passed. Lean runs were serialized with a 16384 MiB ceiling.
+
+## M1: complete joint-configuration construction
+
+Provium now translates guarded by-value Copy-array merges, retaining both input
+queries, the source projection, insertion body, loop and constant error mapper.
+The implementation semantics maps errors at each insertion; a checked generic
+correspondence relates this to the existing pass semantics for composition.
+Both guards precede insertion, including when capacity is exhausted.
+
+Jarl's original `Membership::joint` adds 16 obligations. The membership project
+now covers 13 complete methods and 100 obligations. Successful construction
+preserves target voters and learners, makes source voters exactly the old voter
+set, preserves target capacity, and preserves target identity uniqueness when
+it holds initially. The output identity union is exact. For unique targets,
+acceptance requires both inputs to be non-joint and the distinct union of stored
+target identities and source voters to fit target capacity. Either joint input
+returns Reconfiguring; otherwise exceeding that capacity returns Full. The result
+is joint exactly when the source voter set is nonempty. No nonempty-input guard
+is invented for this private method.
+
+This advances C03/P02/P03/P05/R01 structural component coverage. Valid/nonempty
+input membership, authorization, committed configuration lineage and reachable
+caller discharge remain open, as do the quorum helpers and Rust source,
+ownership, equality and layout refinement. These contracts do not establish
+cross-configuration safety. M1 and M2 remain incomplete.
+
+Validation: host and installed wasm32 checked all 100 obligations with axiom
+auditing. The three independent provider merge tests passed, including kernel
+guard/tag/error-map mutations and native union/error-priority cases. Original
+Jarl joint construction matched independent native results at capacities 0, 1
+and 2. All 18 original-source membership mutations failed Lean contracts and
+invalidated stale certificates. Provider ordinary tests, provider/Jarl Clippy,
+provider rustdoc, formatting and coverage/review checks passed. Lean checks
+remained serialized with a 16384 MiB ceiling.

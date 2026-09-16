@@ -4101,10 +4101,107 @@
         "S11",
         "S12"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open.",
+      "status": "component_evidence",
+      "note": "Complete original guarded by-value merge retains both original is_joint queries, voter projection, insertion loop and per-insertion error mapping. Success preserves target capacity, target uniqueness (from its input), target voter/learner sets, and makes source voters exactly the old voter set. Identity-union acceptance and Full rejection are checked for unique targets; either joint input yields Reconfiguring with guard priority. Nonempty/valid deployment membership, authorization, committed configuration lineage, reachable callers and Rust source/ownership/equality/layout refinement remain open.",
       "root_apis": [],
-      "contracts": [],
+      "contracts": [
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "JointConstruction.success_shape",
+          "function": "membership_Membership_joint",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "JointConstruction.capacity_preserved",
+          "function": "membership_Membership_joint",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "JointConstruction.unique_identities",
+          "function": "membership_Membership_joint",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "JointConstruction.flags",
+          "function": "membership_Membership_joint",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "JointConstruction.voters_exact",
+          "function": "membership_Membership_joint",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "JointConstruction.learners_exact",
+          "function": "membership_Membership_joint",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "JointConstruction.old_voters_exact",
+          "function": "membership_Membership_joint",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "JointConstruction.identities",
+          "function": "membership_Membership_joint",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "JointConstruction.accepts",
+          "function": "membership_Membership_joint",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "JointConstruction.accepts_iff",
+          "function": "membership_Membership_joint",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "JointConstruction.accepts_by_count",
+          "function": "membership_Membership_joint",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "JointConstruction.guard_error_iff",
+          "function": "membership_Membership_joint",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "JointConstruction.error_codes",
+          "function": "membership_Membership_joint",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "JointConstruction.full_iff",
+          "function": "membership_Membership_joint",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "JointConstruction.full_by_count",
+          "function": "membership_Membership_joint",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "JointConstruction.joint_iff_source_voters",
+          "function": "membership_Membership_joint",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        }
+      ],
       "context": "production"
     },
     "crate::membership::<Membership < MAX >>::learners": {

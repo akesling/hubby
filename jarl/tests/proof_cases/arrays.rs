@@ -162,6 +162,8 @@ fn original_membership_mutations_break_the_array_contracts() {
         ("any(|m| m.id == id)", "any(|m| m.id == id && m.voter)"),
         ("0 => member.voter = true", "0 => member.voter = false"),
         ("old: false,", "old: true,"),
+        ("target.include(id, 2)", "target.include(id, 1)"),
+        ("map_err(|_| Error::Full)", "map_err(|_| Error::Config)"),
         ("next.include(id, 0)?;", "next.include(id, 2)?;"),
         ("next.include(*id, 1)?;", "next.include(*id, 2)?;"),
         (
@@ -233,6 +235,62 @@ fn check<const N: usize>() {{
  }}
 }}
 fn main(){{check::<0>();check::<1>();check::<3>();}}
+"#
+    );
+    let source = w.source(&native);
+    let binary = w.0.join("native");
+    let built = Command::new("rustc")
+        .args(["--edition=2021", "-C", "overflow-checks=yes"])
+        .arg(source)
+        .arg("-o")
+        .arg(&binary)
+        .output()
+        .unwrap();
+    assert!(
+        built.status.success(),
+        "{}",
+        String::from_utf8_lossy(&built.stderr)
+    );
+    assert!(Command::new(binary).status().unwrap().success());
+}
+
+#[test]
+fn original_joint_construction_matches_union_and_guard_priority() {
+    let w = Work::new();
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let krate = Crate::load(&root.join("src/lib.rs")).unwrap();
+    let mut methods = String::new();
+    for name in ["joint", "include", "voters", "is_joint"] {
+        methods.push_str(
+            &krate
+                .lower(&format!("membership::Membership::{name}"))
+                .unwrap()
+                .rust,
+        );
+    }
+    let native = format!(
+        r#"
+type Id=usize;
+#[derive(Clone,Copy,Debug,PartialEq)]struct Member{{id:Id,old:bool,voter:bool,learner:bool}}
+#[derive(Clone,Copy,Debug,PartialEq)]struct Membership<const MAX:usize>{{members:[Option<Member>;MAX]}}
+#[derive(Clone,Copy,Debug,PartialEq)]enum Error{{Config,Reconfiguring,Full}}
+impl<const MAX:usize>Membership<MAX>{{{methods}}}
+fn check<const N:usize>(){{
+ for a in 0..9usize.pow(N as u32){{for b in 0..9usize.pow(N as u32){{
+  let build=|mut code:usize,offset:usize|Membership::<N>{{members:core::array::from_fn(|i|{{let d=code%9;code/=9;
+   (d!=0).then_some(Member{{id:i+offset,voter:d&1!=0,old:d&2!=0,learner:d&4!=0}})
+  }})}};
+  let source=build(a,0);let target=build(b,1);let mut expected=target;let mut error=None;
+  if source.members.iter().chain(target.members.iter()).flatten().any(|m|m.old){{error=Some(Error::Reconfiguring);}}
+  else{{for id in source.members.iter().flatten().filter(|m|m.voter).map(|m|m.id){{
+   let slot=expected.members.iter().position(|m|m.is_some_and(|m|m.id==id)).or_else(||expected.members.iter().position(|m|m.is_none()));
+   if let Some(i)=slot{{expected.members[i]=Some(Member{{old:true,..expected.members[i].unwrap_or(Member{{id,voter:false,old:false,learner:false}})}});}}
+   else{{error=Some(Error::Full);break;}}
+  }}}}
+  match(source.joint(target),error){{(Ok(actual),None)=>assert_eq!(actual,expected),(Err(actual),Some(expected))=>assert_eq!(actual,expected),pair=>panic!("mismatch {{pair:?}}")}}
+ }}}}
+}}
+fn main(){{check::<0>();check::<1>();check::<2>();}}
 "#
     );
     let source = w.source(&native);

@@ -13,7 +13,8 @@
     "membership::Membership::restore",
     "membership::Membership::new",
     "membership::Membership::peers",
-    "membership::Membership::with_learners"
+    "membership::Membership::with_learners",
+    "membership::Membership::joint"
   ],
   "proofs": "Proofs.lean",
   "obligations": [
@@ -352,6 +353,70 @@
     {
       "theorem": "LearnerReplacement.not_joint",
       "function": "membership_Membership_with_learners"
+    },
+    {
+      "theorem": "JointConstruction.success_shape",
+      "function": "membership_Membership_joint"
+    },
+    {
+      "theorem": "JointConstruction.capacity_preserved",
+      "function": "membership_Membership_joint"
+    },
+    {
+      "theorem": "JointConstruction.unique_identities",
+      "function": "membership_Membership_joint"
+    },
+    {
+      "theorem": "JointConstruction.flags",
+      "function": "membership_Membership_joint"
+    },
+    {
+      "theorem": "JointConstruction.voters_exact",
+      "function": "membership_Membership_joint"
+    },
+    {
+      "theorem": "JointConstruction.learners_exact",
+      "function": "membership_Membership_joint"
+    },
+    {
+      "theorem": "JointConstruction.old_voters_exact",
+      "function": "membership_Membership_joint"
+    },
+    {
+      "theorem": "JointConstruction.identities",
+      "function": "membership_Membership_joint"
+    },
+    {
+      "theorem": "JointConstruction.accepts",
+      "function": "membership_Membership_joint"
+    },
+    {
+      "theorem": "JointConstruction.accepts_iff",
+      "function": "membership_Membership_joint"
+    },
+    {
+      "theorem": "JointConstruction.accepts_by_count",
+      "function": "membership_Membership_joint"
+    },
+    {
+      "theorem": "JointConstruction.guard_error_iff",
+      "function": "membership_Membership_joint"
+    },
+    {
+      "theorem": "JointConstruction.error_codes",
+      "function": "membership_Membership_joint"
+    },
+    {
+      "theorem": "JointConstruction.full_iff",
+      "function": "membership_Membership_joint"
+    },
+    {
+      "theorem": "JointConstruction.full_by_count",
+      "function": "membership_Membership_joint"
+    },
+    {
+      "theorem": "JointConstruction.joint_iff_source_voters",
+      "function": "membership_Membership_joint"
     }
   ]
 }
