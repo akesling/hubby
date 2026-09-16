@@ -262,10 +262,23 @@ fn m1_actual_cargo_compilation_is_bound_to_original_sources() {
     assert_eq!(report.subject.packages.len(), 1);
     assert_eq!(report.subject.packages[0].name, "jarl");
     assert!(!report.semantic_preservation_proved);
-    assert!(report.invocations.iter().any(|i| i
-        .arguments
-        .windows(2)
-        .any(|pair| pair[0] == "--crate-name" && pair[1] == "jarl")));
+    let unit = report
+        .invocations
+        .iter()
+        .find(|i| {
+            i.arguments
+                .windows(2)
+                .any(|pair| pair[0] == "--crate-name" && pair[1] == "jarl")
+        })
+        .unwrap();
+    let cfg = unit.effective_cfg.as_ref().unwrap();
+    let width = report
+        .subject
+        .target_cfg
+        .lines()
+        .find(|line| line.starts_with("target_pointer_width="))
+        .unwrap();
+    assert!(cfg.lines().any(|line| line == width));
 }
 
 #[test]

@@ -1276,3 +1276,25 @@ audits. The numeric-buffer kernel suite checked 35 contracts/examples and reject
 12 runtime mutations; insufficient cleanup fuel is explicitly exercised. Existing
 predicate protocol kernel checks, provider ordinary tests, Clippy, formatting and
 Jarl coverage review passed. Lean ran one process at a time with a 16384 MiB cap.
+
+### M1 P01: effective compilation-unit cfg
+
+Provium's Cargo wrapper now captures `rustc --print cfg` using each compilation
+unit's actual argument vector and Cargo-provided environment. This includes
+features and build-script cfg, and reflects profile overrides that differ from
+the subject report's requested settings. Compiler probes remain distinct from
+compiled units; a root compilation requires successful cfg capture. Unsupported
+response-file arguments fail closed, and failed capture invalidates prior success.
+
+Jarl's host capture records 64-bit pointers and unwind; installed wasm32 release
+capture records 32-bit pointers and abort. These remain build evidence, not a
+semantic-preservation certificate. Applying cfg to resolved module/type/call
+closure, capturing all generated/dependency/environment/sysroot inputs, and
+connecting those facts to verification remain open under P01/P10. M1/M2 are not
+complete.
+
+Validation: five capture integration tests passed, including effective profile,
+feature and build-script cfg, source mutation, unsupported configuration, and
+response-file rejection with stale-success invalidation. Jarl's original-source
+capture test and wasm32 capture passed. Provider ordinary tests, provider/Jarl
+proof-test Clippy, formatting and provider rustdoc passed. No Lean code changed.

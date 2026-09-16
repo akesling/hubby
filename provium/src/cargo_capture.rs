@@ -18,7 +18,7 @@ fn run() -> Result<i32, Box<dyn std::error::Error>> {
     let program = args.first().ok_or("missing compiler executable")?;
     let directory = env::var_os("PROVIUM_CAPTURE_RECORDS").ok_or("missing capture directory")?;
     let path = std::path::PathBuf::from(directory).join(format!("{}.args", std::process::id()));
-    let mut file = OpenOptions::new().write(true).create_new(true).open(path)?;
+    let mut file = OpenOptions::new().write(true).create_new(true).open(&path)?;
     let cwd = env::current_dir()?;
     let cwd = cwd.to_str().ok_or("non-UTF8 compiler working directory")?;
     for arg in std::iter::once(cwd).chain(args.iter().map(String::as_str)) {
@@ -26,6 +26,23 @@ fn run() -> Result<i32, Box<dyn std::error::Error>> {
         file.write_all(arg.as_bytes())?;
     }
     file.sync_all()?;
+    // Cargo probes may request several different printed values. Only actual
+    // compilation units get a cfg query; preserve their complete argument vector
+    // and Cargo-provided environment, including build-script cfg settings.
+    let probe = args[1..].iter().any(|a| a == "--print" || a.starts_with("--print=")
+        || a == "-vV" || a == "--version" || a == "-V");
+    if !probe {
+        if args[1..].iter().any(|a| a.starts_with('@')) {
+            return Err("compiler response-file capture is not implemented".into());
+        }
+        let cfg = Command::new(program).args(&args[1..]).args(["--print", "cfg"]).output()?;
+        if !cfg.status.success() {
+            return Err(format!("effective cfg query failed: {}", String::from_utf8_lossy(&cfg.stderr)).into());
+        }
+        let mut cfg_file = OpenOptions::new().write(true).create_new(true).open(path.with_extension("cfg"))?;
+        cfg_file.write_all(&cfg.stdout)?;
+        cfg_file.sync_all()?;
+    }
     Ok(Command::new(program).args(&args[1..]).status()?.code().unwrap_or(1))
 }
 fn main() -> ExitCode {
@@ -42,6 +59,9 @@ pub struct Invocation {
     pub working_directory: PathBuf,
     pub executable: String,
     pub arguments: Vec<String>,
+    /// rustc --print cfg with this unit's actual arguments and Cargo environment.
+    /// None identifies a compiler probe, not a compiled unit.
+    pub effective_cfg: Option<String>,
 }
 #[derive(Debug, Serialize)]
 pub struct CompilerIdentity {
@@ -93,6 +113,7 @@ fn decode(bytes: &[u8]) -> Result<Invocation, String> {
         working_directory: PathBuf::from(args.remove(0)),
         executable: args.remove(0),
         arguments: args,
+        effective_cfg: None,
     })
 }
 fn compiler_identity(
@@ -331,10 +352,25 @@ pub fn capture(request: cargo_subject::Request, output: &Path) -> Result<Capture
         .map(|e| e.map(|e| e.path()))
         .collect::<Result<Vec<PathBuf>, _>>()
         .map_err(|e| e.to_string())?;
+    files.retain(|p| p.extension().is_some_and(|ext| ext == "args"));
     files.sort();
     let invocations = files
         .iter()
-        .map(|p| decode(&fs::read(p).map_err(|e| e.to_string())?))
+        .map(|p| {
+            let mut invocation = decode(&fs::read(p).map_err(|e| e.to_string())?)?;
+            let probe = invocation.arguments.iter().any(|a| {
+                a == "--print"
+                    || a.starts_with("--print=")
+                    || matches!(a.as_str(), "-vV" | "--version" | "-V")
+            });
+            if !probe {
+                invocation.effective_cfg = Some(
+                    fs::read_to_string(p.with_extension("cfg"))
+                        .map_err(|e| format!("missing effective compiler cfg: {e}"))?,
+                );
+            }
+            Ok::<_, String>(invocation)
+        })
         .collect::<Result<Vec<_>, _>>()?;
     let mut compilers = BTreeMap::new();
     for invocation in &invocations {
@@ -363,10 +399,11 @@ pub fn capture(request: cargo_subject::Request, output: &Path) -> Result<Capture
             return false;
         };
         invocations.iter().any(|invocation| {
-            invocation
-                .arguments
-                .windows(2)
-                .any(|pair| pair[0] == "--crate-name" && pair[1] == name.replace('-', "_"))
+            invocation.effective_cfg.is_some()
+                && invocation
+                    .arguments
+                    .windows(2)
+                    .any(|pair| pair[0] == "--crate-name" && pair[1] == name.replace('-', "_"))
                 && invocation.arguments.iter().any(|arg| {
                     invocation
                         .working_directory
@@ -408,7 +445,7 @@ pub fn capture(request: cargo_subject::Request, output: &Path) -> Result<Capture
         invocations, compilers, wrapper_sha256: project::hash(WRAPPER), cargo_stdout_sha256: project::hash(&result.stdout),
         cargo_stderr_sha256: project::hash(&result.stderr), semantic_preservation_proved: false,
         limitations: vec!["Generated/dependency source files, environment, build-script inputs and compiler sysroot/dynamic libraries still require complete attestation".into(),
-            "Captured commands are build provenance, not expanded Rust, resolved calls or a source-preservation theorem".into()] };
+            "Captured commands and effective cfg are build provenance, not expanded Rust, resolved modules/calls or a source-preservation theorem".into()] };
     let publication = run.join("captured-build.json");
     fs::write(
         &publication,

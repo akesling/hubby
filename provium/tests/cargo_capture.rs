@@ -107,6 +107,13 @@ fn actual_compiler_arguments_and_sources_are_captured_and_failure_invalidates() 
     assert!(args.iter().any(|a| a == "opt-level=3"));
     assert!(args.iter().any(|a| a == "panic=abort"));
     assert!(args.iter().any(|a| a == "--emit=metadata"));
+    let cfg = root["effective_cfg"].as_str().unwrap();
+    assert!(cfg.lines().any(|line| line == "panic=\"abort\""));
+    assert!(!cfg.lines().any(|line| line == "debug_assertions"));
+    assert!(cfg
+        .lines()
+        .any(|line| line.starts_with("target_pointer_width=")));
+    assert!(units.iter().any(|unit| unit["effective_cfg"].is_null()));
     assert_eq!(
         Path::new(root["working_directory"].as_str().unwrap()),
         subject.0
@@ -147,4 +154,102 @@ fn unhandled_cargo_configuration_does_not_silently_change_wrappers() {
     assert!(!result.status.success());
     assert!(String::from_utf8_lossy(&result.stderr)
         .contains("Cargo configuration capture is not implemented"));
+}
+
+#[test]
+fn effective_cfg_includes_build_script_features_and_actual_profile_override() {
+    let subject = Subject::new();
+    let manifest = subject.0.join("Cargo.toml");
+    let mut contents = fs::read_to_string(&manifest).unwrap();
+    contents.push_str("\n[features]\nselected=[]\n");
+    fs::write(manifest, contents).unwrap();
+    fs::write(subject.0.join("build.rs"),
+        "fn main() { println!(\"cargo::rustc-cfg=from_build_script\"); println!(\"cargo::rustc-check-cfg=cfg(from_build_script)\"); }").unwrap();
+    fs::write(
+        subject.0.join("build.json"),
+        r#"{"manifest":"Cargo.toml","target":"host","profile":"release","features":["selected"]}"#,
+    )
+    .unwrap();
+    let result = Command::new(env!("CARGO_BIN_EXE_provium"))
+        .args(["capture-cargo", "build.json", "--out", "evidence"])
+        .env("CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS", "true")
+        .current_dir(&subject.0)
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let report: serde_json::Value =
+        serde_json::from_slice(&fs::read(subject.certificate()).unwrap()).unwrap();
+    let units = report["invocations"].as_array().unwrap();
+    let root = units
+        .iter()
+        .find(|unit| {
+            unit["arguments"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|a| a == "capture_subject")
+        })
+        .unwrap();
+    let cfg = root["effective_cfg"].as_str().unwrap();
+    for expected in [
+        "debug_assertions",
+        "feature=\"selected\"",
+        "from_build_script",
+    ] {
+        assert!(
+            cfg.lines().any(|line| line == expected),
+            "missing {expected}: {cfg}"
+        );
+    }
+    // Metadata's requested release profile deliberately differs from Cargo's
+    // effective override, demonstrating why the unit-level query is necessary.
+    assert!(!report["subject"]["target_cfg"]
+        .as_str()
+        .unwrap()
+        .lines()
+        .any(|line| line == "debug_assertions"));
+    let build = units
+        .iter()
+        .find(|unit| {
+            unit["arguments"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|a| a == "build_script_build")
+        })
+        .unwrap();
+    assert!(!build["effective_cfg"]
+        .as_str()
+        .unwrap()
+        .lines()
+        .any(|line| line == "from_build_script"));
+}
+
+#[test]
+fn response_files_fail_closed_and_invalidate_prior_capture() {
+    let subject = Subject::new();
+    assert!(subject.capture().status.success());
+    let response = subject.0.join("flags.rsp");
+    fs::write(&response, "--cfg=hidden_configuration\n").unwrap();
+    let result = Command::new(env!("CARGO_BIN_EXE_provium"))
+        .args(["capture-cargo", "build.json", "--out", "evidence"])
+        .env(
+            "CARGO_ENCODED_RUSTFLAGS",
+            format!("@{}", response.display()),
+        )
+        .current_dir(&subject.0)
+        .output()
+        .unwrap();
+    assert!(!result.status.success());
+    assert!(
+        String::from_utf8_lossy(&result.stderr)
+            .contains("compiler response-file capture is not implemented"),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert!(!subject.certificate().exists());
 }

@@ -547,7 +547,12 @@ changing only the version number is rejected.
 records argument boundaries and working directories while Cargo builds the
 selected library in a fresh Cargo-owned target tree. The report includes observed
 compiler executable hashes/version, root-source snapshots, and manifest/lock
-identity. Build failure or changed source removes prior capture success.
+identity. Each compilation unit also records `effective_cfg`: the output of
+`rustc --print cfg` using its full argument vector and Cargo environment, including
+feature flags, build-script cfg and profile overrides. Compiler probes have no
+unit cfg. This does not expand or resolve cfg-selected modules. Response files
+are rejected until their inputs can be captured. Build failure, failed cfg capture
+or changed source removes prior capture success.
 Unsupported Cargo configuration and existing wrapper overrides fail explicitly.
 This is build provenance, not a proof certificate: expanded/resolved source,
 generated/dependency inputs, environment and compiler sysroot attestation remain
