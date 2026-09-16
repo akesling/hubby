@@ -369,7 +369,7 @@ impl Crate {
             error,
             capacity,
         };
-        Ok(Method {name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],iteration:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,view:None,record_at:None,lookup:None,selection:None,relocation:None,buffer:None,constructor:None,query:None,array:Some(arrays::Shape {field:field_name,capacity:tokens(&array.len),record,scope:"complete two-pass rebuild with source projection, exclusion query and insertion bodies; source/ownership refinement remains open",predicate:None,projection:None,preserve_slots:false,key:None,upsert:None,batch:None,rebuild:Some(Box::new(rebuild)),merge:None})})
+        Ok(Method {name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],iteration:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,view:None,record_at:None,lookup:None,selection:None,relocation:None,buffer:None,constructor:None,query:None,array:Some(arrays::Shape {field:field_name,capacity:tokens(&array.len),record,scope:"complete two-pass rebuild with source projection, exclusion query and insertion bodies; source/ownership refinement remains open",predicate:None,projection:None,preserve_slots:false,key:None,upsert:None,batch:None,rebuild:Some(Box::new(rebuild)),merge:None,fold:None})})
     }
 }
 

@@ -197,12 +197,14 @@ contracts. The logical query is connected to membership in the corresponding
 projection sequence. Relating logical equality to actual Rust values remains
 part of source refinement.
 
-A predicate-fold protocol is available as semantic groundwork for owned FnMut
-callbacks. It exposes changing callback handles, call order, destruction and
-normal/unwind/abort replies, with a checked bound on internal response steps.
-This protocol is not yet a supported Rust lowering. Its observation function
-requires completed external responses; it does not prove callback termination
-or Rust ownership/unwind refinement.
+Two-stage predicate counts support an owned FnMut callback, a typed local
+closure, pure optional-record selection, cloned iterator totals, and ordered
+callback filtering with a positive constant divisor and short-circuit gate.
+The generated interaction protocol exposes changing callback handles, call order,
+destruction and normal/unwind/abort replies. Kernel tests check source-derived
+traces and reject threshold and selection mutations. Its observation function
+requires completed external responses; it does not prove callback termination,
+Rust ownership/unwind refinement, or source-to-IR semantic preservation.
 
 Guarded by-value Copy-array merges support pure queries on both inputs, a pure
 source projection, and source-local target insertion with a constant `map_err`

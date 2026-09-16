@@ -9,7 +9,7 @@ pub(super) fn candidate(output: &syn::ReturnType) -> bool {
     matches!(output, syn::ReturnType::Type(_, ty) if matches!(&**ty, Type::ImplTrait(t) if t.bounds.iter().any(|b| matches!(b, syn::TypeParamBound::Trait(b) if b.path.segments.first().is_some_and(|s| s.ident == "Iterator")))))
 }
 
-fn closure(expression: &Expr) -> Result<&syn::ExprClosure, String> {
+pub(super) fn closure(expression: &Expr) -> Result<&syn::ExprClosure, String> {
     let Expr::Closure(c) = expression else {
         return Err("record projection requires an explicit closure".into());
     };
@@ -27,7 +27,7 @@ fn closure(expression: &Expr) -> Result<&syn::ExprClosure, String> {
     Ok(c)
 }
 
-fn option_payload(ty: &Type) -> Result<&Type, String> {
+pub(super) fn option_payload(ty: &Type) -> Result<&Type, String> {
     let Type::Path(option) = ty else {
         return Err("projection needs Option slots".into());
     };
@@ -280,6 +280,7 @@ impl Crate {
                 batch: None,
                 rebuild: None,
                 merge: None,
+                fold: None,
                 scope: if preserve_slots {
                     "complete Copy array/Option field mapping; slot positions preserved; source/type/layout/ownership refinement remains open"
                 } else {
