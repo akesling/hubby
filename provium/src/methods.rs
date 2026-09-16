@@ -507,6 +507,9 @@ impl Crate {
             }
             if matches!(&def.item.sig.output,syn::ReturnType::Type(_,ty) if matches!(&**ty,Type::ImplTrait(_)))
             {
+                if projections::candidate(&def.item.sig.output) {
+                    return self.lower_projection(name);
+                }
                 return self.lower_iteration(name);
             }
             if matches!(
@@ -1250,3 +1253,5 @@ pub mod enum_projections;
 pub mod validators;
 
 pub mod views;
+
+mod projections;

@@ -4008,12 +4008,31 @@
         "S11",
         "S12"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open.",
+      "status": "component_evidence",
+      "note": "Complete original copied-field iterator projection with exact ordered output and source-record origin; composition with finalized preserves voter/learner sequences and empties old voters. Arbitrary capacities and holes are modeled. Constructor/caller invariants and Rust ownership/layout/lifetime and source-to-IR refinement remain open.",
       "root_apis": [
         "crate::membership::<Membership < MAX >>::learners"
       ],
-      "contracts": [],
+      "contracts": [
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "MembershipProjection.learners_exact",
+          "function": "membership_Membership_learners",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "MembershipProjection.learners_member",
+          "function": "membership_Membership_learners",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "MembershipProjection.finalization_preserves_learners",
+          "function": "membership_Membership_learners",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        }
+      ],
       "context": "production"
     },
     "crate::membership::<Membership < MAX >>::new": {
@@ -4036,12 +4055,31 @@
         "S11",
         "S12"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open.",
+      "status": "component_evidence",
+      "note": "Complete original copied-field iterator projection with exact ordered output and source-record origin; composition with finalized preserves voter/learner sequences and empties old voters. Arbitrary capacities and holes are modeled. Constructor/caller invariants and Rust ownership/layout/lifetime and source-to-IR refinement remain open.",
       "root_apis": [
         "crate::membership::<Membership < MAX >>::old_voters"
       ],
-      "contracts": [],
+      "contracts": [
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "MembershipProjection.old_voters_exact",
+          "function": "membership_Membership_old_voters",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "MembershipProjection.old_voters_member",
+          "function": "membership_Membership_old_voters",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "MembershipProjection.finalization_has_no_old_voters",
+          "function": "membership_Membership_old_voters",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        }
+      ],
       "context": "production"
     },
     "crate::membership::<Membership < MAX >>::peers": {
@@ -4100,12 +4138,31 @@
         "S11",
         "S12"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open.",
+      "status": "component_evidence",
+      "note": "Complete original copied-field iterator projection with exact ordered output and source-record origin; composition with finalized preserves voter/learner sequences and empties old voters. Arbitrary capacities and holes are modeled. Constructor/caller invariants and Rust ownership/layout/lifetime and source-to-IR refinement remain open.",
       "root_apis": [
         "crate::membership::<Membership < MAX >>::voters"
       ],
-      "contracts": [],
+      "contracts": [
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "MembershipProjection.voters_exact",
+          "function": "membership_Membership_voters",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "MembershipProjection.voters_member",
+          "function": "membership_Membership_voters",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "MembershipProjection.finalization_preserves_voters",
+          "function": "membership_Membership_voters",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        }
+      ],
       "context": "production"
     },
     "crate::membership::<Membership < MAX >>::with_learners": {

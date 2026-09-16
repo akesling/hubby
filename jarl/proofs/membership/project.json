@@ -3,7 +3,10 @@
   "namespace": "JarlMembership",
   "methods": [
     "membership::Membership::finalized",
-    "membership::Membership::is_joint"
+    "membership::Membership::is_joint",
+    "membership::Membership::voters",
+    "membership::Membership::old_voters",
+    "membership::Membership::learners"
   ],
   "proofs": "Proofs.lean",
   "obligations": [
@@ -30,6 +33,42 @@
     {
       "theorem": "Finalization.identity_origin",
       "function": "membership_Membership_finalized"
+    },
+    {
+      "theorem": "MembershipProjection.voters_exact",
+      "function": "membership_Membership_voters"
+    },
+    {
+      "theorem": "MembershipProjection.voters_member",
+      "function": "membership_Membership_voters"
+    },
+    {
+      "theorem": "MembershipProjection.old_voters_exact",
+      "function": "membership_Membership_old_voters"
+    },
+    {
+      "theorem": "MembershipProjection.old_voters_member",
+      "function": "membership_Membership_old_voters"
+    },
+    {
+      "theorem": "MembershipProjection.learners_exact",
+      "function": "membership_Membership_learners"
+    },
+    {
+      "theorem": "MembershipProjection.learners_member",
+      "function": "membership_Membership_learners"
+    },
+    {
+      "theorem": "MembershipProjection.finalization_preserves_voters",
+      "function": "membership_Membership_voters"
+    },
+    {
+      "theorem": "MembershipProjection.finalization_preserves_learners",
+      "function": "membership_Membership_learners"
+    },
+    {
+      "theorem": "MembershipProjection.finalization_has_no_old_voters",
+      "function": "membership_Membership_old_voters"
     }
   ]
 }

@@ -9,8 +9,9 @@ pub struct Shape {
     pub record: String,
     pub scope: &'static str,
     pub predicate: Option<Condition>,
+    pub projection: Option<Vec<String>>,
 }
-fn copy_derived(item: &syn::ItemStruct) -> bool {
+pub(super) fn copy_derived(item: &syn::ItemStruct) -> bool {
     item.attrs.iter().any(|a| {
         a.path().is_ident("derive")
             && a.parse_args_with(
@@ -19,7 +20,7 @@ fn copy_derived(item: &syn::ItemStruct) -> bool {
             .is_ok_and(|ds| ds.iter().any(|d| d == "Copy"))
     })
 }
-fn binding(p: &Pat) -> Result<String, String> {
+pub(super) fn binding(p: &Pat) -> Result<String, String> {
     let Pat::Ident(p) = p else {
         return Err("array traversal requires identifier bindings".into());
     };
@@ -32,7 +33,7 @@ fn binding(p: &Pat) -> Result<String, String> {
 fn named(expr: &Expr, name: &str) -> bool {
     matches!(expr,Expr::Path(p) if p.qself.is_none() && p.path.is_ident(name) && p.attrs.is_empty())
 }
-fn relative(expr: &Expr, name: &str) -> Expr {
+pub(super) fn relative(expr: &Expr, name: &str) -> Expr {
     struct Rename<'a>(&'a str);
     impl VisitMut for Rename<'_> {
         fn visit_expr_mut(&mut self, e: &mut Expr) {
@@ -154,7 +155,7 @@ impl Crate {
         };
         let predicate = self.condition(&record_def, &relative(&closure.body, &member))?;
         Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],
-            iteration:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,view:None,record_at:None,lookup:None,selection:None,relocation:None,buffer:None,constructor:None,query:None,array:Some(Shape{field:p[0].clone(),capacity:tokens(&array.len),record,predicate:Some(predicate),scope:"complete shared optional-record array iterator query; Rust layout/borrowing and frontend refinement remain trusted"})})
+            iteration:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,view:None,record_at:None,lookup:None,selection:None,relocation:None,buffer:None,constructor:None,query:None,array:Some(Shape{field:p[0].clone(),capacity:tokens(&array.len),record,predicate:Some(predicate),projection:None,scope:"complete shared optional-record array iterator query; Rust layout/borrowing and frontend refinement remain trusted"})})
     }
     pub(super) fn lower_array(&self, name: &str) -> Result<Method, String> {
         let def = self.methods.get(name).ok_or("unknown array method")?;
@@ -281,7 +282,7 @@ impl Crate {
             &mut writes,
         )?;
         Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes,body,
-            iteration:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,view:None,record_at:None,lookup:None,selection:None,relocation:None,buffer:None,constructor:None,query:None,array:Some(Shape{field:array_path[0].clone(),capacity:tokens(&array.len),record,predicate:None,scope:"complete optional Copy-record array traversal; preserves length and visits each original slot exactly once; Rust layout/borrowing and frontend refinement remain trusted"})})
+            iteration:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,view:None,record_at:None,lookup:None,selection:None,relocation:None,buffer:None,constructor:None,query:None,array:Some(Shape{field:array_path[0].clone(),capacity:tokens(&array.len),record,predicate:None,projection:None,scope:"complete optional Copy-record array traversal; preserves length and visits each original slot exactly once; Rust layout/borrowing and frontend refinement remain trusted"})})
     }
     fn array_statements(
         &self,
@@ -362,6 +363,11 @@ impl Crate {
 }
 pub(super) fn generate(method: &Method) -> String {
     let name = &method.symbol;
+    if let Some(shape) = method.array.as_ref().filter(|s| s.projection.is_some()) {
+        let predicate = condition(shape.predicate.as_ref().unwrap());
+        let field = lean_path(shape.projection.as_ref().unwrap());
+        return format!("def {name}_ir : RecordProjection := ⟨{predicate}, {field}⟩\ndef {name} (entries : ArrayStore α) : List (Cell α) :=\n  projectArray {name}_ir entries\ntheorem {name}_correspondence (entries : ArrayStore α) : projectArray {name}_ir entries = {name} entries := by rfl\n");
+    }
     if let Some(predicate) = method.array.as_ref().and_then(|s| s.predicate.as_ref()) {
         return format!("def {name}_ir : Condition := {}\ndef {name} (entries : ArrayStore α) : Bool :=\n  entries.any (fun entry => match entry with | none => false | some state => evalCondition ({}) state)\ntheorem {name}_correspondence (entries : ArrayStore α) : queryArray {name}_ir entries = {name} entries := by rfl\n",condition(predicate),condition(predicate));
     }

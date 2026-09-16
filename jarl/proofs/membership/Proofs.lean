@@ -70,3 +70,106 @@ theorem no_longer_joint (entries : ArrayStore α) :
     have cleared := all_old_flags_cleared entries state member
     simp [evalCondition, cleared]
 end Finalization
+
+namespace MembershipProjection
+
+theorem voters_exact (entries : ArrayStore α) :
+    JarlMembership.membership_Membership_voters entries = entries.filterMap (fun entry =>
+      match entry with
+      | none => none
+      | some state => if evalCondition (.field ["voter"]) state then some (state ["id"]) else none) := rfl
+
+theorem voters_member (entries : ArrayStore α) (identity : Cell α) :
+    identity ∈ JarlMembership.membership_Membership_voters entries ↔
+      ∃ state, some state ∈ entries ∧ state ["voter"] = .boolean true ∧ state ["id"] = identity := by
+  simpa [JarlMembership.membership_Membership_voters,
+    JarlMembership.membership_Membership_voters_ir, evalCondition_field_true] using
+      projectArray_member JarlMembership.membership_Membership_voters_ir entries identity
+
+theorem old_voters_exact (entries : ArrayStore α) :
+    JarlMembership.membership_Membership_old_voters entries = entries.filterMap (fun entry =>
+      match entry with
+      | none => none
+      | some state => if evalCondition (.field ["old"]) state then some (state ["id"]) else none) := rfl
+
+theorem old_voters_member (entries : ArrayStore α) (identity : Cell α) :
+    identity ∈ JarlMembership.membership_Membership_old_voters entries ↔
+      ∃ state, some state ∈ entries ∧ state ["old"] = .boolean true ∧ state ["id"] = identity := by
+  simpa [JarlMembership.membership_Membership_old_voters,
+    JarlMembership.membership_Membership_old_voters_ir, evalCondition_field_true] using
+      projectArray_member JarlMembership.membership_Membership_old_voters_ir entries identity
+
+theorem learners_exact (entries : ArrayStore α) :
+    JarlMembership.membership_Membership_learners entries = entries.filterMap (fun entry =>
+      match entry with
+      | none => none
+      | some state => if evalCondition (.field ["learner"]) state then some (state ["id"]) else none) := rfl
+
+theorem learners_member (entries : ArrayStore α) (identity : Cell α) :
+    identity ∈ JarlMembership.membership_Membership_learners entries ↔
+      ∃ state, some state ∈ entries ∧ state ["learner"] = .boolean true ∧ state ["id"] = identity := by
+  simpa [JarlMembership.membership_Membership_learners,
+    JarlMembership.membership_Membership_learners_ir, evalCondition_field_true] using
+      projectArray_member JarlMembership.membership_Membership_learners_ir entries identity
+
+private theorem voters_slot (entry : Option (Store α)) :
+    projectSlot JarlMembership.membership_Membership_voters_ir
+      (mapSlot JarlMembership.membership_Membership_finalized_slot entry) =
+    projectSlot JarlMembership.membership_Membership_voters_ir entry := by
+  cases entry with
+  | none => rfl
+  | some state =>
+    cases hv : evalCondition (.field ["voter"]) state <;>
+      cases hl : evalCondition (.field ["learner"]) state <;>
+      simp only [evalCondition] at hv hl <;>
+      simp [projectSlot, JarlMembership.membership_Membership_voters_ir,
+        JarlMembership.membership_Membership_finalized_slot, mapSlot, evalCondition, put, hv, hl]
+
+theorem finalization_preserves_voters (entries : ArrayStore α) :
+    JarlMembership.membership_Membership_voters
+      (JarlMembership.membership_Membership_finalized entries) =
+    JarlMembership.membership_Membership_voters entries := by
+  change (entries.map (mapSlot JarlMembership.membership_Membership_finalized_slot)).filterMap
+    (projectSlot JarlMembership.membership_Membership_voters_ir) =
+    entries.filterMap (projectSlot JarlMembership.membership_Membership_voters_ir)
+  rw [List.filterMap_map]
+  apply congrArg (fun f => entries.filterMap f)
+  funext entry
+  exact voters_slot entry
+
+private theorem learners_slot (entry : Option (Store α)) :
+    projectSlot JarlMembership.membership_Membership_learners_ir
+      (mapSlot JarlMembership.membership_Membership_finalized_slot entry) =
+    projectSlot JarlMembership.membership_Membership_learners_ir entry := by
+  cases entry with
+  | none => rfl
+  | some state =>
+    cases hv : evalCondition (.field ["voter"]) state <;>
+      cases hl : evalCondition (.field ["learner"]) state <;>
+      simp only [evalCondition] at hv hl <;>
+      simp [projectSlot, JarlMembership.membership_Membership_learners_ir,
+        JarlMembership.membership_Membership_finalized_slot, mapSlot, evalCondition, put, hv, hl]
+
+theorem finalization_preserves_learners (entries : ArrayStore α) :
+    JarlMembership.membership_Membership_learners
+      (JarlMembership.membership_Membership_finalized entries) =
+    JarlMembership.membership_Membership_learners entries := by
+  change (entries.map (mapSlot JarlMembership.membership_Membership_finalized_slot)).filterMap
+    (projectSlot JarlMembership.membership_Membership_learners_ir) =
+    entries.filterMap (projectSlot JarlMembership.membership_Membership_learners_ir)
+  rw [List.filterMap_map]
+  apply congrArg (fun f => entries.filterMap f)
+  funext entry
+  exact learners_slot entry
+
+theorem finalization_has_no_old_voters (entries : ArrayStore α) :
+    JarlMembership.membership_Membership_old_voters
+      (JarlMembership.membership_Membership_finalized entries) = [] := by
+  apply List.filterMap_eq_nil_iff.mpr
+  intro entry member
+  cases entry with
+  | none => rfl
+  | some state =>
+    have cleared := Finalization.all_old_flags_cleared entries state member
+    simp [projectSlot, JarlMembership.membership_Membership_old_voters_ir, evalCondition, cleared]
+end MembershipProjection

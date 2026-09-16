@@ -747,3 +747,31 @@ were kernel-checked. Clippy across Jarl targets, formatting, source coverage and
 M0 review binding passed. Only the reviewed coverage metadata hash changed in
 M0's input binding; its scope is unchanged. Lean ran sequentially with a 16384 MiB
 limit. Production Rust and the reusable Provium implementation are unchanged.
+
+## M1: membership projection and finalization composition
+
+Provium now translates complete pure optional-record
+`iter().flatten().filter(...).map(...)` methods. The reusable IR retains the
+predicate and copied field path, with ordered lazy sequence semantics, output
+origin and length bounds. It accepts concrete Copy fields without requiring the
+borrowed slot record itself to be Copy. Arbitrary callbacks, cloning, extra body
+effects, trait shadows and unresolved generic Copy bounds are rejected.
+
+Jarl owns nine new obligations for its original `voters`, `old_voters` and
+`learners` bodies: exact ordered output, selected-record origin, and composition
+with `finalized`. Finalization preserves the voter and learner sequences exactly
+and leaves no old voters, for arbitrary slot counts and holes. No production
+Jarl Rust was changed.
+
+Validation: the membership project checked five complete methods and 15
+obligations on the host and installed wasm32 target. All ordinary provider tests,
+six iterator regressions and three projection tests passed; projection native
+comparisons cover 4096 slot/flag patterns and track payload Drop. Provider
+predicate/field mutations and six Jarl membership mutations invalidate their
+contracts and stale certificates. Clippy, rustdoc, format and coverage/review
+binding checks passed. Lean runs were serialized with a 16384 MiB ceiling.
+
+This advances P02/P03 and C03 in CORRECTNESS_PLAN.md. The coverage ledger records
+component evidence only. Membership construction, identity validation, lifecycle,
+quorum helpers and reachable callers remain open, as do P04/P10 ownership and
+Rust semantic preservation. M1 and M2 remain incomplete.

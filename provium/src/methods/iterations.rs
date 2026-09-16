@@ -65,7 +65,7 @@ fn receiver_call(c: &syn::ExprMethodCall, def: &Definition) -> Result<String, St
         .to_owned())
 }
 impl Crate {
-    fn iterator_traits(&self) -> Result<(), String> {
+    pub(super) fn iterator_traits(&self) -> Result<(), String> {
         if self.array_iterator_shadow {
             return Err("iterator standard traits require unambiguous source resolution".into());
         }
@@ -97,8 +97,8 @@ impl Crate {
         for source in self.files.values() {
             for item in syn::parse_file(source).map_err(|e| e.to_string())?.items {
                 let shadows=match item{
-                Item::Trait(t) if !test_only(&t.attrs)=>["Iterator","DoubleEndedIterator"].iter().any(|n|t.ident==*n) || t.items.iter().any(|i|matches!(i,syn::TraitItem::Fn(f) if ["iter","flatten","next_back","next","map_or"].iter().any(|n|f.sig.ident==*n))),
-                Item::Impl(i) if i.trait_.is_some() && !test_only(&i.attrs)=>i.items.iter().any(|i|matches!(i,syn::ImplItem::Fn(f) if ["iter","flatten","next_back","next","map_or"].iter().any(|n|f.sig.ident==*n))),
+                Item::Trait(t) if !test_only(&t.attrs)=>["Iterator","DoubleEndedIterator"].iter().any(|n|t.ident==*n) || t.items.iter().any(|i|matches!(i,syn::TraitItem::Fn(f) if ["iter","flatten","next_back","next","map_or","filter","map"].iter().any(|n|f.sig.ident==*n))),
+                Item::Impl(i) if i.trait_.is_some() && !test_only(&i.attrs)=>i.items.iter().any(|i|matches!(i,syn::ImplItem::Fn(f) if ["iter","flatten","next_back","next","map_or","filter","map"].iter().any(|n|f.sig.ident==*n))),
                 _=>false,
             };
                 if shadows {

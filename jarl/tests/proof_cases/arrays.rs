@@ -148,6 +148,9 @@ fn original_membership_mutations_break_the_array_contracts() {
             "!member.voter || !member.learner",
         ),
         ("any(|m| m.old)", "any(|m| m.voter)"),
+        ("filter(|m| m.voter)", "filter(|m| m.old)"),
+        ("filter(|m| m.old)", "filter(|m| m.learner)"),
+        ("filter(|m| m.learner)", "filter(|m| m.voter)"),
     ] {
         assert!(original.contains(from));
         fs::write(&source, original.replace(from, to)).unwrap();

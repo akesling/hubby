@@ -330,6 +330,46 @@ def queryArray (predicate : Condition) (entries : ArrayStore α) : Bool :=
     | none => false
     | some state => evalCondition predicate state)
 
+theorem evalCondition_field_true (state : Store α) (path : Path) :
+    evalCondition (.field path) state = true ↔ state path = .boolean true := by
+  cases h : state path <;> simp [evalCondition, h]
+
+-- Copied-field projections of pure optional-record iterators. The list denotes
+-- the lazy output sequence; Rust neither allocates it nor clones payloads.
+structure RecordProjection where
+  predicate : Condition
+  field : Path
+
+def projectSlot (program : RecordProjection) : Option (Store α) → Option (Cell α)
+  | none => none
+  | some state => if evalCondition program.predicate state then some (state program.field) else none
+
+def projectArray (program : RecordProjection) (entries : ArrayStore α) : List (Cell α) :=
+  entries.filterMap (projectSlot program)
+
+theorem projectArray_member (program : RecordProjection) (entries : ArrayStore α) (value : Cell α) :
+    value ∈ projectArray program entries ↔
+      ∃ state, some state ∈ entries ∧ evalCondition program.predicate state = true ∧
+        state program.field = value := by
+  simp only [projectArray, List.mem_filterMap]
+  constructor
+  · rintro ⟨entry, member, selected⟩
+    cases entry with
+    | none => simp [projectSlot] at selected
+    | some state =>
+      simp only [projectSlot] at selected
+      split at selected
+      · cases selected
+        exact ⟨state, member, by assumption, rfl⟩
+      · cases selected
+  · rintro ⟨state, member, selected, valueEq⟩
+    refine ⟨some state, member, ?_⟩
+    simp [projectSlot, selected, valueEq]
+
+theorem projectArray_length (program : RecordProjection) (entries : ArrayStore α) :
+    (projectArray program entries).length ≤ entries.length :=
+  List.length_filterMap_le _ _
+
 -- Shared Result queries do not modify the store. The frontend checks the types
 -- of every accessed place. As above, malformed stores have a total extension;
 -- field-layout/source correspondence remains an explicit refinement obligation.

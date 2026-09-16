@@ -171,6 +171,15 @@ this is not a source-level ownership proof or a refinement for other backends.
 
 Whole-array and shared-slice iterators support builtin `iter().flatten()` without
 a separate length field. Their denotation retains holes and both iterator ends.
+
+Pure optional-record `iter().flatten().filter(...).map(...)` projections retain
+the complete boolean predicate and copied field path. Their list model denotes
+the ordered lazy output sequence; it does not introduce Rust allocation or
+payload cloning. Concrete Copy fields are supported even when the borrowed slot
+record has Drop. Generic Copy bounds, arbitrary callbacks, and source ownership,
+layout and lifetime refinement remain open. Kernel contracts check output origin
+and length bounds; native comparisons check order and payload destruction, and
+source mutations must invalidate the proof.
 Borrowed-slice locations can be rebased to the source array and loaded without
 silently discarding invalid locations; these logical relations do not discharge
 physical reference/lifetime refinement.
