@@ -204,3 +204,13 @@ batches and overflow. Five 32-bit mutations reject removed hole, successor,
 snapshot-index and campaign guards and a broken batch counter.
 Source/borrow/layout refinement and composition with `append` / `step` remain
 outstanding; these are contracts of the generated structural semantics.
+
+`replication-contract` imports the original storage and validation proofs through
+Provium's `proof_modules` support. Both projects use the generated namespace
+`Jarl` so their unchanged contracts compose in one generated program. The bridge
+proves that accepted append validation supplies storage's `LogSuccessor`
+condition, then derives log preservation and an unchanged existing prefix from
+the actual generated `State::push`. Field correspondence, the actual last record,
+available capacity and an already advanced hard term remain explicit premises.
+This is a composed component contract, not a proof of `Node::append` or
+`Node::step`; their complete bodies must establish the caller premises.

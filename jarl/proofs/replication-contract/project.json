@@ -1,0 +1,38 @@
+{
+  "crate_root": "../../src/lib.rs",
+  "namespace": "Jarl",
+  "methods": [
+    "state::State::push",
+    "state::State::new",
+    "state::State::grow",
+    "state::State::truncate",
+    "state::State::install",
+    "state::State::restore",
+    "node::Node::valid"
+  ],
+  "proof_modules": [
+    {
+      "name": "StorageContracts",
+      "path": "../storage/Proofs.lean"
+    },
+    {
+      "name": "ValidationContracts",
+      "path": "../message-validation/Proofs.lean"
+    }
+  ],
+  "proofs": "Proofs.lean",
+  "obligations": [
+    {
+      "theorem": "Replication.validation_supplies_successor",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Replication.validated_append_preserves_log",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Replication.validated_append_preserves_log",
+      "function": "state_State_push"
+    }
+  ]
+}

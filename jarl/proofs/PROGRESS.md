@@ -440,3 +440,30 @@ runtime exploration tests pass. Jarl runtime source is unchanged.
 - Complete validation-to-append/step composition remains next. The frontend, Rust
   memory/borrows, whole-program transition system, durability and safety/liveness
   milestones remain open.
+
+
+## Validation/storage composition (partial P09 evidence)
+
+- Provium method projects accept ordered, consumer-owned proof modules. All
+  module sources are hashed, checked for changes, and included in transitive
+  root axiom audits. Every verification uses a fresh Lean import directory;
+  stale artifacts cannot satisfy an omitted library import. Generic regressions
+  cover dependency order, reserved/duplicate names, output/input separation,
+  stale imports and forbidden axioms hidden in library dependencies.
+- Jarl's replication-contract project reuses the complete validation and storage
+  proof files. Their generated namespace is now consistently `Jarl`; no source
+  methods or proof logic were rewritten for reuse.
+- `validation_supplies_successor` discharges the storage successor/term predicate
+  from accepted append validation and explicit view/advanced-term premises.
+  `validated_append_preserves_log` composes it with generated `State::push`,
+  preserving the log representation and every existing slot. The root is audited
+  against both generated methods, so neither component can be omitted silently.
+- The complete Node append/step bodies must still establish representation,
+  actual-predecessor, term and space premises, plus clone/drop, truncation,
+  membership and commitment behavior. No whole-program milestone is complete.
+
+Validation: all provider format/lint/test/kernel gates pass, including library
+freshness and transitive-axiom regressions. All 20 Jarl proof tests pass, including
+the new composed contract on 32-bit; the final host composition also passes with
+the fresh-build checker. Coverage, formatting and Clippy pass. Jarl production
+Rust and runtime dependencies remain unchanged.

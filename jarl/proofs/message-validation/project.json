@@ -1,6 +1,6 @@
 {
   "crate_root": "../../src/lib.rs",
-  "namespace": "JarlValidation",
+  "namespace": "Jarl",
   "methods": [
     "node::Node::valid"
   ],

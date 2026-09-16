@@ -106,3 +106,6 @@ mod message_dispatch;
 
 #[path = "proof_cases/message_validation.rs"]
 mod message_validation;
+
+#[path = "proof_cases/replication_contract.rs"]
+mod replication_contract;

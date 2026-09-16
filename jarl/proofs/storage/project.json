@@ -1,6 +1,6 @@
 {
   "crate_root": "../../src/lib.rs",
-  "namespace": "JarlStorage",
+  "namespace": "Jarl",
   "methods": [
     "state::State::push",
     "state::State::new",

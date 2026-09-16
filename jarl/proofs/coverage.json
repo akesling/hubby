@@ -3597,7 +3597,7 @@
         "C08"
       ],
       "status": "component_evidence",
-      "note": "Complete original body and Message::term helper lowered by the generic pure validator backend in proofs/message-validation. 56 kernel obligations characterize all variants on typed bounded views, including arbitrary finite batch lists below the i32 counter bound. Accepted batches are nonempty occupied prefixes with consecutive indices and positive, nondecreasing terms bounded by the message term. The batch contract is both necessary and sufficient; totality and absence of faults hold for every canonical validation view at fuel 256. Five source mutations are rejected on 32-bit. Source/borrow/layout refinement and append/step composition remain open."
+      "note": "Complete original body and Message::term helper lowered by the generic pure validator backend in proofs/message-validation. 56 kernel obligations characterize all variants on typed bounded views, including arbitrary finite batch lists below the i32 counter bound. Accepted batches are nonempty occupied prefixes with consecutive indices and positive, nondecreasing terms bounded by the message term. The batch contract is both necessary and sufficient; totality and absence of faults hold for every canonical validation view at fuel 256. Five source mutations are rejected on 32-bit. proofs/replication-contract composes accepted append validation with generated State::push under explicit field, advanced-term, predecessor and space premises. Source/borrow/layout refinement and complete append/step caller discharge remain open."
     },
     "crate::node::<item:0>": {
       "requirements": [
@@ -3909,7 +3909,7 @@
         "R05"
       ],
       "status": "component_evidence",
-      "note": "Complete bounded append and original full helper in proofs/storage: exact no-drop success, shape/prefix preservation, full-input drop suspension, and append-only induction from generated initialization. Conditional ordered-log and committed-prefix append preservation are checked; actual caller validation, destructor unwinding and source/layout refinement remain open."
+      "note": "Complete bounded append and original full helper in proofs/storage: exact no-drop success, shape/prefix preservation, full-input drop suspension, and append-only induction from generated initialization. Conditional ordered-log and committed-prefix append preservation are checked. proofs/replication-contract derives the successor contract from generated Node::valid and composes it with push under explicit representation and caller premises; complete Node caller discharge, destructor unwinding and source/layout refinement remain open."
     },
     "crate::state::<State < V , S , CAP >>::restore": {
       "requirements": [
