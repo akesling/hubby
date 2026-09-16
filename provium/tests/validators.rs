@@ -264,6 +264,13 @@ import Provium.Audit
 #provium_check Provium.State.pure_u64_bounded_arithmetic references Provium.State.pureBinary
 #provium_check Provium.State.pure_u64_saturation_bounds references Min.min
 #provium_check Provium.State.pure_u64_saturation_exact references Min.min
+#provium_check Provium.State.pureEvalSymbolic_eq references Provium.State.pureEval
+#provium_check Provium.State.pureValidateSymbolic_eq references Provium.State.pureValidate
+#provium_check Provium.State.pure_eval_symbolic_step references Provium.State.pureEvalSymbolic
+#provium_check Provium.State.pure_match_any references Provium.State.pureMatch
+#provium_check Provium.State.pure_match_bind references Provium.State.pureMatch
+#provium_check Provium.State.pure_match_present references Provium.State.pureMatch
+#provium_check Provium.State.pure_match_variant references Provium.State.pureMatch
 open Provium.State
 theorem symbolic_literal (env : PureEnv) :
     pureEval 256 (.literal (.boolean true)) env = .ok (.boolean true,env) := by
@@ -302,7 +309,7 @@ theorem symbolic_literal (env : PureEnv) :
         String::from_utf8_lossy(&checked.stdout)
             .matches("PROVIUM_VERIFIED ")
             .count(),
-        10
+        17
     );
 }
 
@@ -624,6 +631,102 @@ fn optional_record_equality_agrees_with_native_rust_and_evaluates_both_operands_
     fs::write(
         w.0.join("lib.rs"),
         OPTIONAL_RECORDS.replace("trace+=trace;*right", "trace+=trace;*left"),
+    )
+    .unwrap();
+    let error = provium::methods::verify(&config, &w.0.join("out")).unwrap_err();
+    assert!(error.contains("Lean rejected Proofs.lean"), "{error}");
+    assert!(!w.0.join("out/verified.json").exists());
+}
+
+#[test]
+#[ignore = "requires pinned Lean; scripts/verify.sh runs this"]
+fn optional_record_equality_is_symbolic_over_all_bounded_fields() {
+    const SOURCE: &str = r#"
+#[derive(Clone,Copy,PartialEq)] struct Key { generation:u64, position:u64 }
+enum Packet { Compare { left:Option<Key>, right:Option<Key> } }
+struct Checker;
+impl Checker { fn check(packet:&Packet)->bool {
+    match packet { Packet::Compare {left,right} => *left == *right }
+} }
+"#;
+    let w = Work::new(SOURCE);
+    fs::write(w.0.join("Proofs.lean"), r#"
+import Generated
+open Provium.State
+set_option maxRecDepth 10000
+set_option maxHeartbeats 200000
+theorem arbitrary_present (a b c d : Nat)
+    (ha : a < 2^64) (hb : b < 2^64) (hc : c < 2^64) (hd : d < 2^64) :
+    Subject.Checker_check 32 (.variant "Packet" "Compare"
+      [("left",.present (.record "Key" [("generation",.number "u64" a),("position",.number "u64" b)])),
+       ("right",.present (.record "Key" [("generation",.number "u64" c),("position",.number "u64" d)]))]) =
+      .ok (a == c && b == d) := by
+  have hna : ¬18446744073709551616 ≤ a := Nat.not_le_of_gt ha
+  have hnb : ¬18446744073709551616 ≤ b := Nat.not_le_of_gt hb
+  have hnc : ¬18446744073709551616 ≤ c := Nat.not_le_of_gt hc
+  have hnd : ¬18446744073709551616 ≤ d := Nat.not_le_of_gt hd
+  unfold Subject.Checker_check
+  rw [← pureValidateSymbolic_eq]
+  cases ac : (a == c) <;> cases bd : (b == d) <;>
+    as_aux_lemma =>
+      simp (config := {implicitDefEqProofs := false}) (disch := decide)
+        [Subject.Checker_check_ir,pureValidateSymbolic,pure_eval_symbolic_step,pure_match_bind,pure_match_present,pure_match_variant,
+         pureSet,pureField,pureFields,pureBinary,pureBound,hna,hnb,hnc,hnd,ac,bd,
+         List.findSome?,List.find?,List.foldlM,bind,Option.bind,Except.bind,pure,Except.pure]
+
+theorem arbitrary_left_absent (a b : Nat) :
+    Subject.Checker_check 32 (.variant "Packet" "Compare"
+      [("left",.absent),("right",.present (.record "Key" [("generation",.number "u64" a),("position",.number "u64" b)]))]) = .ok false := by
+  unfold Subject.Checker_check
+  rw [← pureValidateSymbolic_eq]
+  simp (config := {implicitDefEqProofs := false}) (disch := decide)
+    [Subject.Checker_check_ir,pureValidateSymbolic,pure_eval_symbolic_step,
+     pure_match_any,pure_match_bind,pure_match_present,pure_match_variant,
+     pureSet,List.findSome?,List.find?,List.foldlM,
+     bind,Option.bind,Except.bind,pure,Except.pure]
+
+theorem arbitrary_right_absent (a b : Nat) :
+    Subject.Checker_check 32 (.variant "Packet" "Compare"
+      [("left",.present (.record "Key" [("generation",.number "u64" a),("position",.number "u64" b)])),("right",.absent)]) = .ok false := by
+  unfold Subject.Checker_check
+  rw [← pureValidateSymbolic_eq]
+  simp (config := {implicitDefEqProofs := false}) (disch := decide)
+    [Subject.Checker_check_ir,pureValidateSymbolic,pure_eval_symbolic_step,
+     pure_match_any,pure_match_bind,pure_match_present,pure_match_variant,
+     pureSet,List.findSome?,List.find?,List.foldlM,
+     bind,Option.bind,Except.bind,pure,Except.pure]
+
+theorem both_absent :
+    Subject.Checker_check 32 (.variant "Packet" "Compare"
+      [("left",.absent),("right",.absent)]) = .ok true := by
+  unfold Subject.Checker_check
+  rw [← pureValidateSymbolic_eq]
+  simp (config := {implicitDefEqProofs := false}) (disch := decide)
+    [Subject.Checker_check_ir,pureValidateSymbolic,pure_eval_symbolic_step,
+     pure_match_any,pure_match_bind,pure_match_present,pure_match_variant,
+     pureSet,List.findSome?,List.find?,List.foldlM,
+     bind,Option.bind,Except.bind,pure,Except.pure]
+"#).unwrap();
+    let config = w.0.join("project.json");
+    fs::write(
+        &config,
+        serde_json::to_vec(&serde_json::json!({
+            "crate_root":"lib.rs", "namespace":"Subject", "methods":["Checker::check"],
+            "proofs":"Proofs.lean",
+            "obligations":[
+                {"theorem":"arbitrary_present","function":"Checker_check"},
+                {"theorem":"arbitrary_left_absent","function":"Checker_check"},
+                {"theorem":"arbitrary_right_absent","function":"Checker_check"},
+                {"theorem":"both_absent","function":"Checker_check"}
+            ]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    provium::methods::verify(&config, &w.0.join("out")).unwrap();
+    fs::write(
+        w.0.join("lib.rs"),
+        SOURCE.replace("*left == *right", "*left == *left"),
     )
     .unwrap();
     let error = provium::methods::verify(&config, &w.0.join("out")).unwrap_err();

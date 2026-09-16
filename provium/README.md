@@ -386,3 +386,13 @@ scripts run Rust tests serially. Separate verifier processes still have separate
 budgets; do not run multiple proof gates concurrently. Resource exhaustion is a
 verification failure, never proof success. Failed Lean checks report the process
 exit status as well as diagnostics.
+
+For symbolic proofs of pure methods, `Provium.State.pureEvalSymbolic` and
+`pureValidateSymbolic` provide an opaque evaluator with kernel-checked equality
+to `pureEval` and `pureValidate`. Rewrite with `← pureValidateSymbolic_eq`, then
+use `pure_eval_symbolic_step` and the `pure_match_*` constructor rules. This
+avoids repeatedly unfolding the recursive evaluator during kernel conversion;
+it does not change the semantics or add an axiom. The step rule requires a
+nonzero fuel budget and a non-loop expression; loops still need the existing
+compositional invariant rules. See the symbolic optional-record regression in
+`tests/validators.rs` for a complete generated-method proof.

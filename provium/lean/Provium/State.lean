@@ -1455,4 +1455,124 @@ theorem pure_eval_step (fuel : Nat) (expression : PureExpr) (env : PureEnv)
   | zero => simp at nonzero
   | succ fuel => cases expression <;> rfl
 
+/- Symbolic proofs use an opaque, certified copy of the evaluator to prevent
+   kernel conversion from repeatedly expanding the recursive interpreter.
+   The package stores the original evaluator and its equality proof; opacity
+   changes proof reduction only. Axiom auditing traverses its stored value. -/
+private structure PureEvalPackage where
+  run : Nat → PureExpr → PureEnv → PureResult
+  correct : run = pureEval
+private opaque pureEvalPackage : PureEvalPackage := ⟨pureEval,rfl⟩
+def pureEvalSymbolic : Nat → PureExpr → PureEnv → PureResult := pureEvalPackage.run
+theorem pureEvalSymbolic_eq (fuel : Nat) (expression : PureExpr) (env : PureEnv) :
+    pureEvalSymbolic fuel expression env = pureEval fuel expression env :=
+  congrFun (congrFun (congrFun pureEvalPackage.correct fuel) expression) env
+
+theorem pure_eval_symbolic_step (fuel : Nat) (expression : PureExpr) (env : PureEnv)
+    (nonzero : (fuel == 0) = false) (notLoop : pureIsLoop expression = false) :
+    pureEvalSymbolic fuel expression env = (match expression with
+
+    | .literal value => .ok (value, env)
+    | .read slot => match env slot with
+      | some value => .ok (value, env)
+      | none => .error (.fault .representation)
+    | .copy value => pureEvalSymbolic (fuel-1) value env
+    | .present value => do
+      let (value, env) ← pureEvalSymbolic (fuel-1) value env
+      return (.present value, env)
+    | .field value name => do
+      let (value, env) ← pureEvalSymbolic (fuel-1) value env
+      match pureField value name with
+      | some value => return (value, env)
+      | none => .error (.fault .representation)
+    | .negate value => do
+      let (.boolean value, env) ← pureEvalSymbolic (fuel-1) value env
+        | .error (.fault .representation)
+      return (.boolean (!value), env)
+    | .binary op left right => do
+      let (left, env) ← pureEvalSymbolic (fuel-1) left env
+      if op = "&&" || op = "||" then
+        let .boolean value := left | .error (.fault .representation)
+        if (op = "&&" && !value) || (op = "||" && value) then
+          return (.boolean value, env)
+        else
+          let (.boolean value, env) ← pureEvalSymbolic (fuel-1) right env
+            | .error (.fault .representation)
+          return (.boolean value, env)
+      else
+        let (right, env) ← pureEvalSymbolic (fuel-1) right env
+        let value ← pureBinary op left right
+        return (value, env)
+    | .sequence first second => do
+      let (_, env) ← pureEvalSymbolic (fuel-1) first env
+      pureEvalSymbolic (fuel-1) second env
+    | .write slot value => do
+      let (value, env) ← pureEvalSymbolic (fuel-1) value env
+      return (.unit, pureSet env slot value)
+    | .branch condition yes no => do
+      let (.boolean condition, env) ← pureEvalSymbolic (fuel-1) condition env
+        | .error (.fault .representation)
+      pureEvalSymbolic (fuel-1) (if condition then yes else no) env
+    | .choose value arms => do
+      let (value, env) ← pureEvalSymbolic (fuel-1) value env
+      match arms.findSome? (fun arm =>
+        (pureMatch (fuel-1) arm.1 value env).map (fun env => (arm.2,env))) with
+      | some (body, env) => pureEvalSymbolic (fuel-1) body env
+      | none => .error (.fault .representation)
+    | .each value slot body => pureEvalSymbolic fuel (.each value slot body) env
+    | .ret value => do
+      let (value, _) ← pureEvalSymbolic (fuel-1) value env
+      .error (.returned value)
+) := by
+  unfold pureEvalSymbolic
+  rw [pureEvalPackage.correct]
+  exact pure_eval_step fuel expression env nonzero notLoop
+
+def pureValidateSymbolic (fuel : Nat) (body : PureExpr) (input : PureValue) : Except PureFault Bool :=
+  match pureEvalSymbolic fuel body (pureSet (fun _ => none) 0 input) with
+  | .ok (.boolean value, _) | .error (.returned (.boolean value)) => .ok value
+  | .error (.fault reason) => .error reason
+  | _ => .error .representation
+
+theorem pureValidateSymbolic_eq (fuel : Nat) (body : PureExpr) (input : PureValue) :
+    pureValidateSymbolic fuel body input = pureValidate fuel body input := by
+  simp only [pureValidateSymbolic,pureValidate,pureEvalSymbolic_eq]
+
+
+theorem pure_match_any (fuel : Nat) (value : PureValue) (env : PureEnv)
+    (nonzero : (fuel == 0) = false) :
+    pureMatch fuel .any value env = some env := by
+  cases fuel with
+  | zero => simp at nonzero
+  | succ fuel => rfl
+
+theorem pure_match_bind (fuel slot : Nat) (value : PureValue) (env : PureEnv)
+    (nonzero : (fuel == 0) = false) :
+    pureMatch fuel (.bind slot) value env = some (pureSet env slot value) := by
+  cases fuel with
+  | zero => simp at nonzero
+  | succ fuel => rfl
+
+theorem pure_match_present (fuel : Nat) (pattern : PurePattern) (value : PureValue) (env : PureEnv)
+    (nonzero : (fuel == 0) = false) :
+    pureMatch fuel (.present pattern) value env = (match value with
+      | .present value => pureMatch (fuel-1) pattern value env
+      | _ => none) := by
+  cases fuel with
+  | zero => simp at nonzero
+  | succ fuel => rfl
+
+theorem pure_match_variant (fuel : Nat) (owner tag : String) (patterns : List (String × PurePattern))
+    (value : PureValue) (env : PureEnv) (nonzero : (fuel == 0) = false) :
+    pureMatch fuel (.variant owner tag patterns) value env = (match value with
+      | .variant actual variant fields =>
+        if actual != owner || variant != tag then none else
+        patterns.foldlM (fun env pair => do
+          let field ← fields.find? (fun field => field.1 == pair.1)
+          pureMatch (fuel-1) pair.2 field.2 env) env
+      | _ => none) := by
+  cases fuel with
+  | zero => simp at nonzero
+  | succ fuel => rfl
+
 end Provium.State

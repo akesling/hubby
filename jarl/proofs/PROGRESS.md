@@ -522,19 +522,39 @@ graph, toolchains and Provium implementation are unchanged in this checkpoint.
 
 Resource correction: overlapping symbolic optional-record experiments exhausted
 host memory. Those runs were stopped and the expensive experiment was removed
-from the verification gate; its universal claim is not established. The 50-case
-native comparison and changed-operand rejection remain the optional-record
-evidence. Provium now defaults to a configurable 2 GiB Lean memory limit, one
-Lean worker thread, and a per-process execution lock. Both projects' proof scripts
+from the verification gate; that attempt established no universal claim. At
+that checkpoint the optional-record evidence was the 50-case native comparison
+and changed-operand rejection. Provium now defaults to a configurable 2 GiB
+Lean memory limit, one Lean worker thread, and a per-process execution lock. Both projects' proof scripts
 run tests serially.
 Do not run separate proof gates concurrently: their memory budgets are separate.
 
 The authorized working budget is 16 GB total. Current verification uses
-`PROVIUM_LEAN_MEMORY_MB=8192`, with one Lean job at a time and no overlapping
-proof gates, leaving headroom for Rust and verifier overhead.
+`PROVIUM_LEAN_MEMORY_MB=16384`, as explicitly requested, with one Lean job at a
+time and no overlapping proof gates. This is Lean's built-in allocation limit,
+not an operating-system limit on total resident memory.
 
 Validation: Provium's full format/lint/test/kernel gate and all 20 Jarl proof
-tests pass with that capped, serial execution. The additional resource regression
+tests passed with serial execution and an 8 GiB limit before the working budget
+was raised to 16 GiB. The additional resource regression
 verifies a small program successfully, reruns it with a 1 MiB budget, and checks
 that failure removes its previous success certificate. The State library also
 checks under the 2 GiB default. No Jarl runtime code or dependencies changed.
+
+Symbolic optional-record follow-up: Provium now provides an opaque evaluator
+packaged with a kernel-checked equality to the existing pure interpreter. Its
+explicit step equations avoid the repeated interpreter expansion that exhausted
+memory in the earlier attempt. This support is general and lives in Provium.
+The source-generated comparison regression proves equality for every pair of
+present two-u64 records with bounded fields, both mixed Some/None cases, and
+None/None. A changed Rust operand must reject the proof and remove the previous
+certificate. These claims concern the generated pure semantics; they do not
+establish compiler correctness or Rust memory refinement. Jarl's complete
+append/step translation and global Raft safety/liveness remain open.
+
+Validation of this follow-up: all six validator kernel tests passed (four in the
+initial run and the three affected record tests after correcting proof lint and
+an audit reference). The seven new generic rules passed the axiom audit. Runs
+used the requested 16 GiB limit, serially. Format, Clippy, documentation, and
+ordinary Rust tests also passed. The unchanged Jarl proof projects were not
+rerun for this additive Provium proof-library change.
