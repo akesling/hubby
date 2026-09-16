@@ -1229,3 +1229,28 @@ corrupted buffer/arithmetic definitions failed kernel checking. All 108 Jarl
 membership obligations replayed on host and installed wasm32. Provider ordinary
 tests, Clippy, formatting, rustdoc and coverage review passed. Lean checks stayed
 serialized with a 16384 MiB ceiling.
+
+## M1: complete typed-word numeric execution
+
+The numeric word model now executes typed count increments inside both callback
+loops and typed rank arithmetic at both indexed reads. Buffer writes, sorting,
+callback handles, early return, final minimum and cleanup remain in the same
+execution. Structural refinement covers all callback responses and both overflow
+profiles under explicit supported-width and representable-capacity premises.
+
+Jarl owns a new `QuorumIndex.word_execution` contract connecting that complete
+word execution to its source-derived numeric method. The membership project now
+has 109 obligations across the same 15 methods. The word proof derives each
+increment bound from the buffer capacity and each pass bound from source
+projections; it does not assume that callbacks produce stable answers.
+
+Binding width/capacity to the actual source/build representation remains open,
+as do source preservation, Rust memory/ownership, sorting implementation, panic
+detail/policy binding and caller invariants. This is component refinement, not
+source-level or global Raft correctness. M1 and M2 remain incomplete.
+
+Validation: 29 buffer/word contracts and examples passed axiom auditing; 12
+corrupted runtime definitions failed kernel checking, including lost and shifted
+word increments. All 109 Jarl membership obligations replayed on host and
+installed wasm32. Provider ordinary tests, Clippy, formatting, rustdoc and
+coverage review passed. Lean checks stayed serialized with a 16384 MiB ceiling.

@@ -451,6 +451,10 @@
     {
       "theorem": "QuorumIndex.empty_current",
       "function": "membership_Membership_quorum_index"
+    },
+    {
+      "theorem": "QuorumIndex.word_execution",
+      "function": "membership_Membership_quorum_index"
     }
   ]
 }

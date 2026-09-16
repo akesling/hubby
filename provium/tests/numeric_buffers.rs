@@ -106,6 +106,9 @@ open Provium.State
 #provium_check Provium.RankArithmetic.empty_offset references Provium.RankArithmetic.offset
 #provium_check Provium.RankArithmetic.increment_within_capacity references Provium.RankArithmetic.increment
 #provium_check Provium.RankArithmetic.empty_wrapping_not_index references Provium.RankArithmetic.offset
+#provium_check Provium.State.fillNumericWords_refines references Provium.State.fillNumericWords
+#provium_check Provium.State.fillNumericRankWords_refines references Provium.State.fillNumericWords
+#provium_check Provium.State.runNumericWords_refines references Provium.State.runNumericWords
 #provium_check callback_before_bounds references Provium.State.fillNumericCallbacks
 #provium_check bounds_abort references Provium.State.fillNumericCallbacks
 #provium_check writes references Provium.State.writeNumeric
@@ -119,6 +122,14 @@ open Provium.State
         String::from_utf8_lossy(&result.stderr)
     );
     for (from, to) in [
+        (
+            "fillNumericWords rest advanced written successor bits",
+            "fillNumericWords rest advanced written count bits",
+        ),
+        (
+            "match Provium.RankArithmetic.increment bits count checked with",
+            "match Provium.RankArithmetic.increment bits (count + 1) checked with",
+        ),
         ("++ buffer.drop count", "++ buffer.drop (count + 1)"),
         (
             "else buffer[Provium.OrderStatistics.rankOffset count divisor]?",

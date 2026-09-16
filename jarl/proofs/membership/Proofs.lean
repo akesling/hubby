@@ -1433,4 +1433,14 @@ theorem empty_current (entries : ArrayStore α) (callback : σ) (abortOnPanic : 
   rw [execution, empty]
   rfl
 
+theorem word_execution (entries : ArrayStore α) (callback : σ) (bits : Nat)
+    (checked abortOnPanic : Bool) (width : Provium.validWidth bits = true)
+    (capacity : entries.length < 2^bits) :
+    runNumericWords membership_Membership_quorum_index_ir entries callback bits checked abortOnPanic =
+      membership_Membership_quorum_index entries callback abortOnPanic := by
+  have divisor_fits : 2 < 2^bits := by
+    simp only [Provium.validWidth, Bool.or_eq_true, beq_iff_eq] at width
+    rcases width with ((rfl | rfl) | rfl) | rfl <;> decide
+  exact runNumericWords_refines _ entries callback bits checked abortOnPanic width capacity divisor_fits
+
 end QuorumIndex

@@ -102,6 +102,45 @@ def fillNumericCallbacks (keys : List (Cell α)) (callback : σ) (buffer : List 
     | .unwind advanced => finishCallback advanced .unwind
     | .abort => .returned .abort
 
+def fillNumericWords (keys : List (Cell α)) (callback : σ) (buffer : List UInt64)
+    (count bits : Nat) (checked abortOnPanic : Bool)
+    (next : List UInt64 → Nat → σ → CallbackRun α σ UInt64 UInt64) : CallbackRun α σ UInt64 UInt64 :=
+  match keys with
+  | [] => next buffer count callback
+  | key :: rest => .call key callback fun reply => match reply with
+    | .value answer advanced =>
+      if count < buffer.length then
+        let written := buffer.set count answer
+        match Provium.RankArithmetic.increment bits count checked with
+        | .ok (.uint _ successor) => fillNumericWords rest advanced written successor bits checked abortOnPanic next
+        | _ => finishNumericPanic advanced abortOnPanic
+      else finishNumericPanic advanced abortOnPanic
+    | .unwind advanced => finishCallback advanced .unwind
+    | .abort => .returned .abort
+
+theorem fillNumericWords_refines (keys : List (Cell α)) (callback : σ) (buffer : List UInt64)
+    (count bits : Nat) (checked abortOnPanic : Bool)
+    (next : List UInt64 → Nat → σ → CallbackRun α σ UInt64 UInt64)
+    (width : Provium.validWidth bits = true) (capacity : buffer.length < 2^bits) :
+    fillNumericWords keys callback buffer count bits checked abortOnPanic next =
+      fillNumericCallbacks keys callback buffer count abortOnPanic next := by
+  induction keys generalizing callback buffer count with
+  | nil => rfl
+  | cons key rest ih =>
+    simp only [fillNumericWords, fillNumericCallbacks]
+    congr 1
+    funext reply
+    cases reply with
+    | value answer advanced =>
+      dsimp only
+      split
+      · rename_i within
+        rw [Provium.RankArithmetic.increment_within_capacity bits count buffer.length checked width within capacity]
+        exact ih advanced (buffer.set count answer) (count + 1) (by simpa only [List.length_set] using capacity)
+      · rfl
+    | unwind advanced => rfl
+    | abort => rfl
+
 theorem fillNumericCallbacks_refines (keys : List (Cell α)) (callback : σ) (buffer : List UInt64)
     (count : Nat) (abortOnPanic : Bool)
     (next : List UInt64 → Nat → σ → CallbackRun α σ UInt64 UInt64)
@@ -238,6 +277,24 @@ theorem fillNumericRank_refines (keys : List (Cell α)) (callback : σ) (buffer 
   rw [selectNumericBuffer_refines _ _ _ (by simpa only [writeNumeric_length, length] using room)]
   rw [writeNumeric_prefix buffer values (by omega)]
 
+theorem fillNumericRankWords_refines (keys : List (Cell α)) (callback : σ) (buffer : List UInt64)
+    (bits divisor : Nat) (checked abortOnPanic : Bool) (next : Option UInt64 → σ → CallbackRun α σ UInt64 UInt64)
+    (width : Provium.validWidth bits = true) (capacity : buffer.length < 2^bits)
+    (proper : 1 < divisor) (divisor_fits : divisor < 2^bits) (room : keys.length ≤ buffer.length) :
+    fillNumericWords keys callback buffer 0 bits checked abortOnPanic
+      (fun buffer count advanced => next (Provium.RankArithmetic.select (sortNumericBuffer buffer count) bits count divisor checked).toOption advanced) =
+      collectCallbacks keys callback (fun values advanced => next (numericRank values divisor) advanced) := by
+  rw [fillNumericWords_refines _ _ _ _ _ _ _ _ width capacity]
+  rw [fillNumericCallbacks_refines _ _ _ _ _ _ (by simpa using room)]
+  apply collectCallbacks_congr
+  intro values advanced length
+  simp only [Nat.zero_add]
+  rw [selectNumericBuffer_word_refines _ _ _ _ _ width
+    (by simpa only [sortNumericBuffer_length, writeNumeric_length, length] using room)
+    (by simpa only [sortNumericBuffer_length, writeNumeric_length] using capacity) proper divisor_fits]
+  rw [selectNumericBuffer_refines _ _ _ (by simpa only [writeNumeric_length, length] using room)]
+  rw [writeNumeric_prefix buffer values (by omega)]
+
 def runNumericFoldList (program : NumericFold) (entries : ArrayStore α) (callback : σ)
     (abortOnPanic : Bool) : CallbackRun α σ UInt64 UInt64 :=
   collectCallbacks (projectArray program.first entries) callback fun values advanced =>
@@ -289,6 +346,54 @@ theorem runNumericFold_refines (program : NumericFold) (entries : ArrayStore α)
         (fun result advanced => match result with
           | none => finishNumericPanic advanced abortOnPanic
           | some second => finishCallback advanced (.value (min first second)))
+        (by simpa only [sortNumericBuffer_length, writeNumeric_length, List.length_replicate] using projectArray_length program.second entries)
+    · rfl
+
+def runNumericWords (program : NumericFold) (entries : ArrayStore α) (callback : σ)
+    (bits : Nat) (checked abortOnPanic : Bool) : CallbackRun α σ UInt64 UInt64 :=
+  fillNumericWords (projectArray program.first entries) callback (List.replicate entries.length 0) 0 bits checked abortOnPanic
+    fun buffer count advanced =>
+      let sorted := sortNumericBuffer buffer count
+      match (Provium.RankArithmetic.select sorted bits count program.divisor checked).toOption with
+      | none => finishNumericPanic advanced abortOnPanic
+      | some first =>
+        if queryArray program.secondRequired entries then
+          fillNumericWords (projectArray program.second entries) advanced sorted 0 bits checked abortOnPanic
+            fun buffer count advanced =>
+              let sorted := sortNumericBuffer buffer count
+              match (Provium.RankArithmetic.select sorted bits count program.divisor checked).toOption with
+              | none => finishNumericPanic advanced abortOnPanic
+              | some second => finishCallback advanced (.value (min first second))
+        else finishCallback advanced (.value first)
+
+theorem runNumericWords_refines (program : NumericFold) (entries : ArrayStore α) (callback : σ)
+    (bits : Nat) (checked abortOnPanic : Bool) (width : Provium.validWidth bits = true)
+    (capacity : entries.length < 2^bits) (divisor_fits : program.divisor < 2^bits) :
+    runNumericWords program entries callback bits checked abortOnPanic = runNumericFold program entries callback abortOnPanic := by
+  rw [runNumericFold_refines]
+  unfold runNumericWords runNumericFoldList
+  rw [fillNumericWords_refines _ _ _ _ _ _ _ _ width (by simpa using capacity)]
+  rw [fillNumericCallbacks_refines _ _ _ _ _ _ (by simpa using projectArray_length program.first entries)]
+  apply collectCallbacks_congr
+  intro values advanced length
+  simp only [Nat.zero_add]
+  rw [selectNumericBuffer_word_refines _ _ _ _ _ width
+    (by simpa only [sortNumericBuffer_length, writeNumeric_length, List.length_replicate, length] using projectArray_length program.first entries)
+    (by simpa only [sortNumericBuffer_length, writeNumeric_length, List.length_replicate] using capacity)
+    program.divisorProper divisor_fits]
+  rw [selectNumericBuffer_refines _ _ _ (by simpa only [writeNumeric_length, List.length_replicate, length] using projectArray_length program.first entries)]
+  rw [writeNumeric_prefix _ values (by simpa [length] using projectArray_length program.first entries)]
+  cases ranked : numericRank values program.divisor with
+  | none => rfl
+  | some first =>
+    simp only []
+    split
+    · exact fillNumericRankWords_refines (projectArray program.second entries) advanced _ bits program.divisor checked abortOnPanic
+        (fun result advanced => match result with
+          | none => finishNumericPanic advanced abortOnPanic
+          | some second => finishCallback advanced (.value (min first second)))
+        width (by simpa only [sortNumericBuffer_length, writeNumeric_length, List.length_replicate] using capacity)
+        program.divisorProper divisor_fits
         (by simpa only [sortNumericBuffer_length, writeNumeric_length, List.length_replicate] using projectArray_length program.second entries)
     · rfl
 

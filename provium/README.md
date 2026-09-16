@@ -228,6 +228,8 @@ contracts; Rust sorting and buffer refinement remain separate obligations.
 wrapping rank arithmetic and loop increments. Its selection refinement requires
 explicit supported-width and representable-capacity premises; empty input retains
 distinct overflow and bounds faults. Build/profile binding remains separate.
+The typed-word execution model composes those operations through both callback
+loops and rank reads, with a checked refinement to the numeric-fold model.
 
 Guarded by-value Copy-array merges support pure queries on both inputs, a pure
 source projection, and source-local target insertion with a constant `map_err`
