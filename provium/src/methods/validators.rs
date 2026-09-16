@@ -152,6 +152,7 @@ impl Compiler<'_> {
     fn copyable(&self, ty: &Ty) -> Result<(), String> {
         match ty {
             Ty::Bool | Ty::Number(_) | Ty::Ref(_) => Ok(()),
+            Ty::Option(inner) => self.copyable(inner),
             Ty::Named(name) => {
                 let s = self
                     .krate
@@ -227,6 +228,58 @@ impl Compiler<'_> {
         let ty = self.ty_in(&f.ty, &s.generics, &self.krate.struct_modules[name])?;
         self.copyable(&ty)?;
         Ok(ty)
+    }
+    fn record_equality(
+        &mut self,
+        left: String,
+        right: String,
+        name: &str,
+    ) -> Result<String, String> {
+        let s = self
+            .krate
+            .structs
+            .get(name)
+            .ok_or("equality requires a source record")?;
+        self.derived(s, "PartialEq")?;
+        self.copyable(&Ty::Named(name.to_owned()))?;
+        let left_slot = self.next;
+        let right_slot = self.next + 1;
+        self.next += 2;
+        let mut expression = ".literal (.boolean true)".to_string();
+        for field in s.fields.iter().rev() {
+            let member = field
+                .ident
+                .as_ref()
+                .ok_or("unnamed equality field")?
+                .to_string();
+            expression = format!(".binary \"&&\" (.binary \"==\" (.field (.read {left_slot}) {}) (.field (.read {right_slot}) {})) ({expression})", q(&member), q(&member));
+        }
+        Ok(seq(
+            format!(".write {left_slot} ({left})"),
+            seq(format!(".write {right_slot} ({right})"), expression),
+        ))
+    }
+    fn optional_record_equality(
+        &mut self,
+        left: String,
+        right: String,
+        name: &str,
+    ) -> Result<String, String> {
+        let left_slot = self.next;
+        let right_slot = self.next + 1;
+        let left_inner = self.next + 2;
+        let right_inner = self.next + 3;
+        self.next += 4;
+        let equal = self.record_equality(
+            format!(".read {left_inner}"),
+            format!(".read {right_inner}"),
+            name,
+        )?;
+        // Store both operands before inspecting their discriminants: an absent
+        // left operand must not suppress evaluation of the right operand.
+        let both_present = format!(".choose (.read {right_slot}) [(.present (.bind {right_inner}), {equal}), (.any, .literal (.boolean false))]");
+        let left_absent = format!(".choose (.read {right_slot}) [(.present .any, .literal (.boolean false)), (.any, .literal (.boolean true))]");
+        Ok(seq(format!(".write {left_slot} ({left})"), seq(format!(".write {right_slot} ({right})"), format!(".choose (.read {left_slot}) [(.present (.bind {left_inner}), {both_present}), (.any, {left_absent})]"))))
     }
     fn block(&mut self, b: &syn::Block) -> Result<(String, Ty), String> {
         let saved = self.env.clone();
@@ -465,6 +518,15 @@ impl Compiler<'_> {
             }
             Expr::Path(_) => {
                 let name = path_name(e)?;
+                if name == "None" {
+                    if self.krate.struct_modules.contains_key("None") {
+                        return Err("shadowed None constructor".into());
+                    }
+                    let Some(ty @ Ty::Option(_)) = expected else {
+                        return Err("None requires a known Option type".into());
+                    };
+                    return Ok((".literal .absent".into(), ty.clone()));
+                }
                 let b = self.env.get(&name).ok_or("unknown local")?;
                 (format!(".read {}", b.slot), b.ty.clone())
             }
@@ -559,39 +621,27 @@ impl Compiler<'_> {
                             Ty::Number(_) | Ty::Bool => {}
                             Ty::Option(t) if matches!(&**t, Ty::Number(_)) => {}
                             Ty::Named(name) => {
-                                let s = self
-                                    .krate
-                                    .structs
-                                    .get(name)
-                                    .ok_or("equality requires a source record")?;
-                                self.derived(s, "PartialEq")?;
-                                self.copyable(&ty)?;
-                                let left_slot = self.next;
-                                let right_slot = self.next + 1;
-                                self.next += 2;
-                                let left_value = left.clone();
-                                let right_value = right.clone();
-                                let left = format!(".read {left_slot}");
-                                let right = format!(".read {right_slot}");
-                                let mut expr = ".literal (.boolean true)".to_string();
-                                for f in s.fields.iter().rev() {
-                                    let member = f
-                                        .ident
-                                        .as_ref()
-                                        .ok_or("unnamed equality field")?
-                                        .to_string();
-                                    expr=format!(".binary \"&&\" (.binary \"==\" (.field ({left}) {}) (.field ({right}) {})) ({expr})",q(&member),q(&member));
-                                }
-                                let expr = if op == "!=" {
-                                    format!(".negate ({expr})")
-                                } else {
-                                    expr
-                                };
+                                let equal = self.record_equality(left, right, name)?;
                                 return Ok((
-                                    seq(
-                                        format!(".write {left_slot} ({left_value})"),
-                                        seq(format!(".write {right_slot} ({right_value})"), expr),
-                                    ),
+                                    if op == "!=" {
+                                        format!(".negate ({equal})")
+                                    } else {
+                                        equal
+                                    },
+                                    Ty::Bool,
+                                ));
+                            }
+                            Ty::Option(inner) if matches!(&**inner, Ty::Named(_)) => {
+                                let Ty::Named(name) = &**inner else {
+                                    unreachable!()
+                                };
+                                let equal = self.optional_record_equality(left, right, name)?;
+                                return Ok((
+                                    if op == "!=" {
+                                        format!(".negate ({equal})")
+                                    } else {
+                                        equal
+                                    },
                                     Ty::Bool,
                                 ));
                             }
@@ -838,6 +888,27 @@ impl Compiler<'_> {
                             format!(".binary \"checked_add\" ({value}) ({rhs})"),
                             Ty::Option(Box::new(ty)),
                         )
+                    }
+                    method @ ("min" | "max" | "saturating_add" | "saturating_sub"
+                    | "checked_sub")
+                        if c.args.len() == 1 =>
+                    {
+                        // Require a builtin value receiver. Automatically dereferencing
+                        // a borrowed receiver needs additional trait-resolution evidence.
+                        if matches!(method, "min" | "max")
+                            && self.krate.trait_methods.contains(method)
+                        {
+                            return Err("unresolved trait method shadows builtin ordering".into());
+                        }
+                        Self::require(&ty, &Ty::Number("u64"))?;
+                        let (rhs, rhs_type) = self.expr(&c.args[0], Some(&ty))?;
+                        Self::require(&rhs_type, &ty)?;
+                        let result = if method == "checked_sub" {
+                            Ty::Option(Box::new(ty))
+                        } else {
+                            ty
+                        };
+                        (format!(".binary {} ({value}) ({rhs})", q(method)), result)
                     }
                     method if c.args.is_empty() => {
                         let Ty::Named(owner) = ty.value() else {

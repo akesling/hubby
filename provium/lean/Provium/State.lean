@@ -1193,6 +1193,12 @@ def pureBinary (op : String) (left right : PureValue) : Except PureExit PureValu
       .error (.fault .representation)
     else if op = "checked_add" then
       .ok (if a+b < pureBound kind then .present (.number kind (a+b)) else .absent)
+    else if op = "checked_sub" then
+      .ok (if b ≤ a then .present (.number kind (a-b)) else .absent)
+    else if op = "saturating_add" then .ok (.number kind (min (a+b) (pureBound kind - 1)))
+    else if op = "saturating_sub" then .ok (.number kind (a-b))
+    else if op = "min" then .ok (.number kind (min a b))
+    else if op = "max" then .ok (.number kind (max a b))
     else if op = "+" then
       if a+b < pureBound kind then .ok (.number kind (a+b)) else .error (.fault .overflow)
     else if op = "==" then .ok (.boolean (a == b))
@@ -1209,6 +1215,27 @@ def pureBinary (op : String) (left right : PureValue) : Except PureExit PureValu
       else if op = "!=" then .ok (.boolean (!value))
       else .error (.fault .representation)
     | none => .error (.fault .representation)
+
+-- Reusable primitive contracts. These describe the expression semantics;
+-- source parsing, resolution and Rust memory refinement remain separate.
+theorem pure_u64_bounded_arithmetic (a b : Nat) (aBound : a < 2^64) (bBound : b < 2^64) :
+    pureBinary "saturating_add" (.number "u64" a) (.number "u64" b) =
+      .ok (.number "u64" (min (a+b) (2^64-1))) ∧
+    pureBinary "saturating_sub" (.number "u64" a) (.number "u64" b) = .ok (.number "u64" (a-b)) ∧
+    pureBinary "min" (.number "u64" a) (.number "u64" b) = .ok (.number "u64" (min a b)) ∧
+    pureBinary "max" (.number "u64" a) (.number "u64" b) = .ok (.number "u64" (max a b)) ∧
+    pureBinary "checked_sub" (.number "u64" a) (.number "u64" b) =
+      .ok (if b ≤ a then .present (.number "u64" (a-b)) else .absent) := by
+  have ha : ¬18446744073709551616 ≤ a := Nat.not_le_of_gt aBound
+  have hb : ¬18446744073709551616 ≤ b := Nat.not_le_of_gt bBound
+  simp [pureBinary,pureBound,ha,hb]
+
+theorem pure_u64_saturation_bounds (a b : Nat) (aBound : a < 2^64) (bBound : b < 2^64) :
+    min (a+b) (2^64-1) < 2^64 ∧ a ≤ min (a+b) (2^64-1) ∧ b ≤ min (a+b) (2^64-1) ∧
+    a-b < 2^64 ∧ min a b < 2^64 ∧ max a b < 2^64 := by omega
+
+theorem pure_u64_saturation_exact (a b : Nat) (fits : a+b < 2^64) :
+    min (a+b) (2^64-1) = a+b := by omega
 
 def pureEval : Nat → PureExpr → PureEnv → PureResult
   | 0, _, _ => .error (.fault .exhausted)

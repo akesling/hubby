@@ -501,3 +501,40 @@ passes on 32-bit and rejects changed lookup offsets and truncation inclusivity;
 the storage 32-bit proof/mutation suite also passes with all 44 obligations.
 Formatting, Clippy and diff checks pass. Jarl production Rust, runtime dependency
 graph, toolchains and Provium implementation are unchanged in this checkpoint.
+
+## General expression support for the append frontier (partial M1)
+
+- Provium now lowers builtin `u64` minimum/maximum, checked subtraction and
+  saturating arithmetic in complete supported pure functions. Its generic
+  arithmetic contracts establish exact results and saturation bounds for all
+  bounded operands; a translated source fixture also has an all-input addition
+  theorem and 162 native Rust comparisons, including overflow boundaries.
+- Optional records with derived primitive-field equality now lower through
+  source field declarations. Both operands execute once in order, including
+  absent-left cases. Custom equality and unresolved ordering remain rejected.
+  These capabilities and their regression fixtures live in Provium; no Raft
+  definitions were added to the provider.
+- These are compiler prerequisites for the comparisons and arithmetic in the
+  original Node::append. Its complete body is still outside the translated
+  subset. Mutation/call composition, Clone/Drop, membership and commitment,
+  source refinement, and global safety/liveness remain open. No full-correctness
+  milestone is closed by this checkpoint, and Jarl production Rust is unchanged.
+
+Resource correction: overlapping symbolic optional-record experiments exhausted
+host memory. Those runs were stopped and the expensive experiment was removed
+from the verification gate; its universal claim is not established. The 50-case
+native comparison and changed-operand rejection remain the optional-record
+evidence. Provium now defaults to a configurable 2 GiB Lean memory limit, one
+Lean worker thread, and a per-process execution lock. Both projects' proof scripts
+run tests serially.
+Do not run separate proof gates concurrently: their memory budgets are separate.
+
+The authorized working budget is 16 GB total. Current verification uses
+`PROVIUM_LEAN_MEMORY_MB=8192`, with one Lean job at a time and no overlapping
+proof gates, leaving headroom for Rust and verifier overhead.
+
+Validation: Provium's full format/lint/test/kernel gate and all 20 Jarl proof
+tests pass with that capped, serial execution. The additional resource regression
+verifies a small program successfully, reruns it with a 1 MiB budget, and checks
+that failure removes its previous success certificate. The State library also
+checks under the 2 GiB default. No Jarl runtime code or dependencies changed.

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+export RUST_TEST_THREADS=1
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 cargo run --locked -- verify examples/assertions/project.json --out artifacts/assertions
 cargo test --locked --test lean -- --ignored

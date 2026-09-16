@@ -90,6 +90,43 @@ fn kernel_rejects_admits_unrelated_claims_and_stale_success() {
 
 #[test]
 #[ignore = "requires pinned Lean; scripts/verify.sh runs this"]
+fn memory_budget_failure_invalidates_previous_success() {
+    let w = Work::new();
+    let p = project(&w, true);
+    w.write("source.rs", "fn f(x:u8)->u8{x}");
+    w.write(
+        "Proofs.lean",
+        "import Generated\ntheorem checked : Subject.f [.uint 8 1] = .ok (.uint 8 1) := by rfl\n",
+    );
+    verify(&p, &w.out()).unwrap();
+    assert!(w.out().join("verified.json").exists());
+
+    // A tiny, otherwise valid proof must fail with an insufficient budget. If
+    // the memory flag stops being forwarded, this succeeds and the test fails.
+    // Use a child environment so concurrent tests never see a changed budget.
+    let limited = std::process::Command::new(env!("CARGO_BIN_EXE_provium"))
+        .arg("verify")
+        .arg(&p)
+        .arg("--out")
+        .arg(w.out())
+        .env("PROVIUM_LEAN_MEMORY_MB", "1")
+        .output()
+        .unwrap();
+    let diagnostic = format!(
+        "{}{}",
+        String::from_utf8_lossy(&limited.stdout),
+        String::from_utf8_lossy(&limited.stderr)
+    );
+    assert!(
+        !limited.status.success(),
+        "ignored memory budget: {diagnostic}"
+    );
+    assert!(diagnostic.contains("memory"), "{diagnostic}");
+    assert!(!w.out().join("verified.json").exists());
+}
+
+#[test]
+#[ignore = "requires pinned Lean; scripts/verify.sh runs this"]
 fn generated_lean_agrees_with_native_rust_boundary_results() {
     let w = Work::new();
     w.write("source.rs", include_str!("fixtures/scalars.rs"));

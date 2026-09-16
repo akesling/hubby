@@ -148,9 +148,14 @@ println!("{{variant}} {{epoch}} {{request}} {{}}",message.epoch());
             toolchain.trim(),
             "lean",
             "--trust=0",
+            "--threads=1",
             "-DwarningAsError=true",
-            "Broken.lean",
         ])
+        .arg(format!(
+            "--memory={}",
+            provium::project::lean_memory_limit_mb().unwrap()
+        ))
+        .arg("Broken.lean")
         .current_dir(&out)
         .env("LEAN_PATH", &out)
         .output()

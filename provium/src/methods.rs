@@ -115,6 +115,7 @@ pub struct Crate {
     methods: BTreeMap<String, Definition>,
     drops: Vec<String>,
     array_iterator_shadow: bool,
+    trait_methods: std::collections::BTreeSet<String>,
 }
 fn tokens(t: &impl ToTokens) -> String {
     t.to_token_stream().to_string()
@@ -173,6 +174,7 @@ impl Crate {
             methods: BTreeMap::new(),
             drops: vec![],
             array_iterator_shadow: false,
+            trait_methods: std::collections::BTreeSet::new(),
         };
         krate.file(root, "", true)?;
         Ok(krate)
@@ -223,9 +225,12 @@ impl Crate {
                                 Err("renamed/glob imports require qualified resolution".into())
                             }
                             syn::UseTree::Name(n)
-                                if ["None", "Option", "bool", "u8", "u16", "u32", "u64", "i32", "usize", "Result", "Ok", "Err", "Some"]
-                                    .iter()
-                                    .any(|s| n.ident == *s) =>
+                                if [
+                                    "None", "Option", "bool", "u8", "u16", "u32", "u64", "i32",
+                                    "usize", "Result", "Ok", "Err", "Some",
+                                ]
+                                .iter()
+                                .any(|s| n.ident == *s) =>
                             {
                                 Err("shadowed primitive/prelude names are unsupported".into())
                             }
@@ -278,14 +283,22 @@ impl Crate {
                         }
                     }
                 }
-                Item::Enum(e) if ["Option", "bool", "u8", "u16", "u32", "u64", "i32", "usize", "Result", "Ok", "Err", "Some"].iter().any(|n| e.ident == *n) => {
+                Item::Enum(e)
+                    if [
+                        "Option", "bool", "u8", "u16", "u32", "u64", "i32", "usize", "Result",
+                        "Ok", "Err", "Some",
+                    ]
+                    .iter()
+                    .any(|n| e.ident == *n) =>
+                {
                     return Err("shadowed primitive/prelude type".into())
                 }
                 Item::Enum(e) if !test_only(&e.attrs) => {
                     if self.structs.contains_key(&e.ident.to_string()) {
                         return Err("ambiguous enum/struct type name".into());
                     }
-                    self.struct_modules.insert(e.ident.to_string(), module.to_owned());
+                    self.struct_modules
+                        .insert(e.ident.to_string(), module.to_owned());
                     if self.enums.insert(e.ident.to_string(), e).is_some() {
                         return Err("ambiguous enum type".into());
                     }
@@ -312,7 +325,13 @@ impl Crate {
                     if self.enums.contains_key(&s.ident.to_string()) {
                         return Err("ambiguous enum/struct type name".into());
                     }
-                    if ["Option", "bool", "u8", "u16", "u32", "u64", "i32", "usize", "Result", "Ok", "Err", "Some"].iter().any(|n| s.ident == *n) {
+                    if [
+                        "Option", "bool", "u8", "u16", "u32", "u64", "i32", "usize", "Result",
+                        "Ok", "Err", "Some",
+                    ]
+                    .iter()
+                    .any(|n| s.ident == *n)
+                    {
                         return Err("shadowed primitive/prelude type".into());
                     }
                     for attr in &s.attrs {
@@ -345,17 +364,36 @@ impl Crate {
                     }
                 }
                 Item::Trait(t) if !test_only(&t.attrs) => {
+                    for item in &t.items {
+                        if let syn::TraitItem::Fn(method) = item {
+                            self.trait_methods.insert(method.sig.ident.to_string());
+                        }
+                    }
                     if t.items.iter().any(|i| matches!(i,syn::TraitItem::Fn(f) if ["iter","flatten","any"].iter().any(|n|f.sig.ident==*n))) {
                         self.array_iterator_shadow = true;
                     }
                 }
                 Item::Impl(i) if !test_only(&i.attrs) => {
-                    if i.generics.type_params().any(|p| ["Option", "Result", "bool", "u8", "u16", "u32", "u64", "i32", "usize", "Ok", "Err", "Some"].iter().any(|n| p.ident == *n)) {
-                        return Err("impl generic parameter shadows a primitive/prelude type".into());
+                    if i.generics.type_params().any(|p| {
+                        [
+                            "Option", "Result", "bool", "u8", "u16", "u32", "u64", "i32", "usize",
+                            "Ok", "Err", "Some",
+                        ]
+                        .iter()
+                        .any(|n| p.ident == *n)
+                    }) {
+                        return Err(
+                            "impl generic parameter shadows a primitive/prelude type".into()
+                        );
                     }
                     let receiver = base_type(&i.self_ty)?;
                     attrs(&i.attrs)?;
                     if let Some((_, trait_path, _)) = &i.trait_ {
+                        for item in &i.items {
+                            if let syn::ImplItem::Fn(method) = item {
+                                self.trait_methods.insert(method.sig.ident.to_string());
+                            }
+                        }
                         if i.items.iter().any(|i| matches!(i,syn::ImplItem::Fn(f) if ["iter","flatten","any"].iter().any(|n|f.sig.ident==*n))) {
                             self.array_iterator_shadow = true;
                         }

@@ -44,6 +44,12 @@ It does not silently skip proofs or install toolchains. Install elan and the
 supported Lean toolchain first; failure messages provide the exact command.
 The current pin is in [lean-toolchain](lean-toolchain).
 
+Lean checks default to a 2 GiB memory budget and one worker thread. Set
+`PROVIUM_LEAN_MEMORY_MB` to adjust the per-process budget; for example,
+`PROVIUM_LEAN_MEMORY_MB=8192 cargo test --test proofs -- --test-threads=1`.
+Provium serializes Lean within a verifier process. Separate verifier processes
+have separate budgets, so run proof gates sequentially to bound their total use.
+
 The macro resolves paths from the **calling crate**, independent of the working
 directory. It discovers `project.json` files beneath the selected directory,
 selects their verification backend, and writes each project's generated Lean,
@@ -331,7 +337,7 @@ array loops, immutable captured closures, derived primitive-record defaults and
 equality, and checked integer addition. Enum field helpers are translated from
 their complete source bodies. The compiler resolves each accessed declaration,
 rejects opaque calls and overloaded operations, and keeps inferred `i32` counters
-separate from `u64` protocol fields. Record equality evaluates each operand once
+separate from `u64` fields. Record equality evaluates each operand once
 in source order. No consumer-specific protocol names occur in this backend.
 
 The generated function takes explicit fuel and a structural `PureValue` input.
@@ -356,3 +362,27 @@ expressions while applying a separate invariant or scan theorem at each loop.
 Its axiom audit and a symbolic evaluation regression run in the verifier gates.
 Signed source fields are rejected: the current `i32` support is restricted to
 inferred nonnegative locals and positive literals, such as array-loop counters.
+
+The pure-expression backend also supports builtin `u64` value receivers for
+`min`, `max`, `saturating_add`, `saturating_sub`, and `checked_sub`, plus typed
+`None` expressions. Arithmetic operands execute once in Rust's evaluation order.
+Ordering methods that could resolve to source traits are rejected until their
+resolution can be established; borrowed numeric method receivers remain outside
+this subset. Provium owns the generic arithmetic contracts and native/kernel
+boundary tests. Application invariants belong in the consumer's proof modules.
+
+Equality also supports `Option` of source records with derived `Copy` and
+`PartialEq` and primitive fields. Translation compares the discriminants and
+the declared fields, while evaluating both operands once in source order.
+Hand-written record equality remains unsupported. The input representation
+premise still applies: these expressions operate on typed structural views,
+not arbitrary malformed `PureValue` encodings.
+
+Lean checks default to a 2 GiB Lean memory limit and one Lean worker thread.
+Set `PROVIUM_LEAN_MEMORY_MB` to a positive MiB budget (for example, `8192`
+for 8 GiB). Zero and invalid values are rejected.
+Provium serializes Lean invocations within each verifier process, and the test
+scripts run Rust tests serially. Separate verifier processes still have separate
+budgets; do not run multiple proof gates concurrently. Resource exhaustion is a
+verification failure, never proof success. Failed Lean checks report the process
+exit status as well as diagnostics.

@@ -5,10 +5,28 @@ use std::{
     fs,
     path::{Path, PathBuf},
     process::Command,
+    sync::Mutex,
 };
 pub const TOOLCHAIN: &str = "leanprover/lean4:v4.33.1";
 pub const SEMANTICS: &str = include_str!("../lean/Provium/Semantics.lean");
 pub const AUDIT: &str = include_str!("../lean/Provium/Audit.lean");
+
+fn parse_lean_memory_limit(value: &str) -> Result<u32, String> {
+    match value.parse::<u32>() {
+        Ok(limit) if limit > 0 => Ok(limit),
+        _ => Err("PROVIUM_LEAN_MEMORY_MB must be a positive integer (MiB)".into()),
+    }
+}
+
+/// Per-process Lean memory budget, in MiB. Verifier invocations are serialized
+/// within a process; independent verifier processes have independent budgets.
+pub fn lean_memory_limit_mb() -> Result<u32, String> {
+    match std::env::var("PROVIUM_LEAN_MEMORY_MB") {
+        Ok(value) => parse_lean_memory_limit(&value),
+        Err(std::env::VarError::NotPresent) => Ok(2048),
+        Err(error) => Err(format!("invalid PROVIUM_LEAN_MEMORY_MB: {error}")),
+    }
+}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Obligation {
@@ -367,7 +385,7 @@ pub fn compile(project_path: &Path, output: &Path) -> Result<Manifest, String> {
         semantics_sha256: hash(SEMANTICS), generated_sha256: hash(generated), proofs_sha256: proofs.map(hash),
         usize_bits: project.usize_bits, overflow: "checked (explicit wrapping/saturating methods retain their semantics)",
         functions, obligations: project.obligations,
-        trusted_boundary: "syn parsing, source name/type checking and AST-to-IR lowering, the specified Rust subset semantics, explicit slice bindings and scope (when used), successful-state field projections and borrow/layout refinement (when used), and Lean's trusted implementation. Generated correspondence proves backend agreement with IR, not frontend correctness or whole-Jarl safety.",
+        trusted_boundary: "syn parsing, source name/type checking and AST-to-IR lowering, the specified Rust subset semantics, explicit slice bindings and scope (when used), successful-state field projections and borrow/layout refinement (when used), and Lean's trusted implementation. Generated correspondence proves backend agreement with IR, not frontend correctness or whole-program correctness.",
     };
     io(fs::write(
         output.join("manifest.json"),
@@ -393,6 +411,12 @@ fn rustc_output(args: &[&str], target: Option<&str>) -> Result<String, String> {
     String::from_utf8(result.stdout).map_err(|e| e.to_string())
 }
 pub(crate) fn lean_file(output: &Path, file: &str, object: Option<&str>) -> Result<String, String> {
+    // A test binary may verify several projects concurrently. Keep their Lean
+    // heaps from accumulating, independently of the Rust test runner settings.
+    static LEAN_PROCESS: Mutex<()> = Mutex::new(());
+    let _permit = LEAN_PROCESS
+        .lock()
+        .map_err(|_| "Lean execution lock poisoned")?;
     let mut command = Command::new("elan");
     command
         .args([
@@ -400,8 +424,10 @@ pub(crate) fn lean_file(output: &Path, file: &str, object: Option<&str>) -> Resu
             TOOLCHAIN,
             "lean",
             "--trust=0",
+            "--threads=1",
             "-DwarningAsError=true",
         ])
+        .arg(format!("--memory={}", lean_memory_limit_mb()?))
         .current_dir(output)
         .env("LEAN_PATH", output)
         .env_remove("LEAN_SRC_PATH");
@@ -418,7 +444,7 @@ pub(crate) fn lean_file(output: &Path, file: &str, object: Option<&str>) -> Resu
         String::from_utf8_lossy(&result.stderr)
     );
     if !result.status.success() {
-        return Err(format!("Lean rejected {file}:\n{text}"));
+        return Err(format!("Lean rejected {file} ({}):\n{text}", result.status));
     }
     Ok(text)
 }
@@ -494,4 +520,18 @@ pub fn verify(project_path: &Path, output: &Path) -> Result<String, String> {
         serde_json::to_string_pretty(&certificate).map_err(|e| e.to_string())?,
     ))?;
     Ok(format!("Verified {} generated backend certificates and {} invariant obligations.\nTranslated Rust SHA-256: {}\n{}", manifest.functions.len(), manifest.obligations.len(), manifest.source_sha256, report))
+}
+
+#[cfg(test)]
+mod resource_tests {
+    use super::parse_lean_memory_limit;
+
+    #[test]
+    fn memory_budget_cannot_disable_the_limit() {
+        for value in ["0", "-1", "", "unlimited", "1.5", "4294967296"] {
+            assert!(parse_lean_memory_limit(value).is_err(), "accepted {value}");
+        }
+        assert_eq!(parse_lean_memory_limit("2048").unwrap(), 2048);
+        assert_eq!(parse_lean_memory_limit("8192").unwrap(), 8192);
+    }
 }

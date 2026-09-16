@@ -261,6 +261,9 @@ import Provium.Audit
 #provium_check Provium.State.pure_each_invariant references Provium.State.pureEval
 #provium_check Provium.State.pure_fold_history references Provium.State.pureEval
 #provium_check Provium.State.pure_eval_step references Provium.State.pureEval
+#provium_check Provium.State.pure_u64_bounded_arithmetic references Provium.State.pureBinary
+#provium_check Provium.State.pure_u64_saturation_bounds references Min.min
+#provium_check Provium.State.pure_u64_saturation_exact references Min.min
 open Provium.State
 theorem symbolic_literal (env : PureEnv) :
     pureEval 256 (.literal (.boolean true)) env = .ok (.boolean true,env) := by
@@ -277,9 +280,14 @@ theorem symbolic_literal (env : PureEnv) :
             toolchain.trim(),
             "lean",
             "--trust=0",
+            "--threads=1",
             "-DwarningAsError=true",
-            "Rules.lean",
         ])
+        .arg(format!(
+            "--memory={}",
+            provium::project::lean_memory_limit_mb().unwrap()
+        ))
+        .arg("Rules.lean")
         .current_dir(&out)
         .env("LEAN_PATH", &out)
         .output()
@@ -294,7 +302,7 @@ theorem symbolic_literal (env : PureEnv) :
         String::from_utf8_lossy(&checked.stdout)
             .matches("PROVIUM_VERIFIED ")
             .count(),
-        7
+        10
     );
 }
 
@@ -373,4 +381,252 @@ impl Checker { fn check(packet:&Packet)->bool {
     )
     .unwrap();
     assert!(w.lower().unwrap().validator.is_some());
+}
+
+const ARITHMETIC: &str = r#"
+enum Packet {
+    Minimum { a:u64, b:u64, expected:u64 },
+    Maximum { a:u64, b:u64, expected:u64 },
+    Add { a:u64, b:u64, expected:u64 },
+    Subtract { a:u64, b:u64, expected:u64 },
+    Checked { a:u64, b:u64, expected:u64, missing:bool },
+}
+struct Checker;
+impl Checker { fn check(packet:&Packet)->bool {
+    match packet {
+        Packet::Minimum {a,b,expected} => (*a).min(*b)==*expected,
+        Packet::Maximum {a,b,expected} => (*a).max(*b)==*expected,
+        Packet::Add {a,b,expected} => {
+            let mut trace=0;
+            let value=({trace+=1;*a}).saturating_add({trace+=trace;*b});
+            trace==2 && value==*expected
+        },
+        Packet::Subtract {a,b,expected} => (*a).saturating_sub(*b)==*expected,
+        Packet::Checked {a,b,expected,missing} => {
+            if *missing { (*a).checked_sub(*b)==None } else { (*a).checked_sub(*b)==Some(*expected) }
+        }
+    }
+} }
+"#;
+
+#[test]
+fn arithmetic_requires_builtin_value_receivers_and_unambiguous_ordering() {
+    assert!(Work::new(ARITHMETIC).lower().unwrap().validator.is_some());
+    for source in [
+        ARITHMETIC.replace("(*a).min(*b)","a.min(b)"),
+        ARITHMETIC.replace("trace+=trace;*b","trace+=trace;true"),
+        format!("trait Ord {{fn min(self, other:Self)->Self;}} impl Ord for u64 {{fn min(self,_other:Self)->Self{{0}}}} {ARITHMETIC}"),
+        ARITHMETIC.replace("a:u64", "a:i32"),
+        format!("struct None;{ARITHMETIC}"),
+    ] {
+        assert!(Work::new(&source).lower().is_err(),"accepted {source}");
+    }
+}
+
+#[test]
+#[ignore = "requires pinned Lean; scripts/verify.sh runs this"]
+fn builtin_arithmetic_agrees_with_native_rust_at_word_boundaries() {
+    let w = Work::new(ARITHMETIC);
+    let mut native = format!("{ARITHMETIC}\nfn main(){{\n");
+    let mut inputs = Vec::new();
+    for (a, b) in [
+        (0, 0),
+        (0, 1),
+        (1, 0),
+        (1, 1),
+        (u64::MAX, 0),
+        (u64::MAX, 1),
+        (1, u64::MAX),
+        (u64::MAX, u64::MAX),
+        (u64::MAX - 1, 2),
+    ] {
+        for expected in [0, 1, u64::MAX] {
+            for (tag, missing) in [
+                ("Minimum", None),
+                ("Maximum", None),
+                ("Add", None),
+                ("Subtract", None),
+                ("Checked", Some(false)),
+                ("Checked", Some(true)),
+            ] {
+                let native_extra =
+                    missing.map_or(String::new(), |value| format!(",missing:{value}"));
+                let lean_extra = missing.map_or(String::new(), |value| {
+                    format!(",(\"missing\",.boolean {value})")
+                });
+                native.push_str(&format!("println!(\"{{}}\",Checker::check(&Packet::{tag}{{a:{a},b:{b},expected:{expected}{native_extra}}}));\n"));
+                inputs.push(format!(".variant \"Packet\" \"{tag}\" [(\"a\",.number \"u64\" {a}),(\"b\",.number \"u64\" {b}),(\"expected\",.number \"u64\" {expected}){lean_extra}]"));
+            }
+        }
+    }
+    native.push('}');
+    fs::write(w.0.join("native.rs"), native).unwrap();
+    let binary = w.0.join("native");
+    let compiled = std::process::Command::new("rustc")
+        .args(["--edition=2021", "-C", "overflow-checks=yes"])
+        .arg(w.0.join("native.rs"))
+        .arg("-o")
+        .arg(&binary)
+        .output()
+        .unwrap();
+    assert!(
+        compiled.status.success(),
+        "{}",
+        String::from_utf8_lossy(&compiled.stderr)
+    );
+    let ran = std::process::Command::new(binary).output().unwrap();
+    assert!(ran.status.success());
+    let results = String::from_utf8(ran.stdout).unwrap();
+    assert_eq!(results.lines().count(), inputs.len());
+    let mut proofs =
+        "import Generated\nopen Provium.State\nset_option maxRecDepth 10000\nset_option maxHeartbeats 2000000\n".to_owned();
+    let mut obligations = Vec::new();
+    for (index, (input, result)) in inputs.iter().zip(results.lines()).enumerate() {
+        assert!(matches!(result, "true" | "false"));
+        proofs.push_str(&format!("theorem native_{index} : Subject.Checker_check 256 ({input}) = .ok {result} := by rfl\n"));
+        obligations.push(
+            serde_json::json!({"theorem":format!("native_{index}"),"function":"Checker_check"}),
+        );
+    }
+    proofs.push_str(
+        r#"
+theorem arbitrary_sum (a b expected : Nat)
+    (aBound : a < 2^64) (bBound : b < 2^64) (expectedBound : expected < 2^64) :
+    Subject.Checker_check 256 (.variant "Packet" "Add"
+      [("a",.number "u64" a),("b",.number "u64" b),("expected",.number "u64" expected)]) =
+      .ok (min (a+b) (2^64-1) == expected) := by
+  have ha : ¬18446744073709551616 ≤ a := Nat.not_le_of_gt aBound
+  have hb : ¬18446744073709551616 ≤ b := Nat.not_le_of_gt bBound
+  have he : ¬18446744073709551616 ≤ expected := Nat.not_le_of_gt expectedBound
+  have hs : ¬18446744073709551616 ≤ min (a+b) 18446744073709551615 := by omega
+  simp [Subject.Checker_check,Subject.Checker_check_ir,pureValidate,pureEval,pureMatch,
+    pureSet,pureBinary,pureBound,ha,hb,he,hs,
+    List.findSome?,List.find?,List.foldlM,bind,Option.bind,Except.bind,pure,Except.pure]
+"#,
+    );
+    obligations.push(serde_json::json!({"theorem":"arbitrary_sum","function":"Checker_check"}));
+    fs::write(w.0.join("Proofs.lean"), proofs).unwrap();
+    let config = w.0.join("project.json");
+    fs::write(&config,serde_json::to_vec(&serde_json::json!({"crate_root":"lib.rs","namespace":"Subject","methods":["Checker::check"],"proofs":"Proofs.lean","obligations":obligations})).unwrap()).unwrap();
+    provium::methods::verify(&config, &w.0.join("out")).unwrap();
+    fs::write(
+        w.0.join("lib.rs"),
+        ARITHMETIC.replace(".saturating_add(", ".saturating_sub("),
+    )
+    .unwrap();
+    let error = provium::methods::verify(&config, &w.0.join("out")).unwrap_err();
+    assert!(error.contains("Lean rejected Proofs.lean"), "{error}");
+    assert!(!w.0.join("out/verified.json").exists());
+}
+
+const OPTIONAL_RECORDS: &str = r#"
+#[derive(Clone,Copy,PartialEq)] struct Key { generation:u64, position:u64 }
+enum Packet { Compare { left:Option<Key>, right:Option<Key>, negated:bool } }
+struct Checker;
+impl Checker { fn check(packet:&Packet)->bool {
+    match packet {
+        Packet::Compare {left,right,negated} => {
+            let mut trace=0;
+            let equal = if *negated {
+                ({trace+=1;*left}) != ({trace+=trace;*right})
+            } else {
+                ({trace+=1;*left}) == ({trace+=trace;*right})
+            };
+            trace==2 && equal
+        }
+    }
+} }
+"#;
+
+#[test]
+fn optional_record_equality_requires_derived_primitive_records() {
+    assert!(Work::new(OPTIONAL_RECORDS)
+        .lower()
+        .unwrap()
+        .validator
+        .is_some());
+    for source in [
+        OPTIONAL_RECORDS.replace(",PartialEq", ""),
+        format!(
+            "{} impl PartialEq for Key {{ fn eq(&self, _other:&Self)->bool {{ false }} }}",
+            OPTIONAL_RECORDS.replace(",PartialEq", "")
+        ),
+        OPTIONAL_RECORDS.replace(",Copy", ""),
+        OPTIONAL_RECORDS.replace("generation:u64", "generation:i32"),
+        OPTIONAL_RECORDS.replace("generation:u64", "generation:Option<u64>"),
+    ] {
+        assert!(Work::new(&source).lower().is_err(), "accepted {source}");
+    }
+}
+
+#[test]
+#[ignore = "requires pinned Lean; scripts/verify.sh runs this"]
+fn optional_record_equality_agrees_with_native_rust_and_evaluates_both_operands_once() {
+    let w = Work::new(OPTIONAL_RECORDS);
+    let values = [
+        None,
+        Some((0, 0)),
+        Some((0, 1)),
+        Some((1, 0)),
+        Some((u64::MAX, u64::MAX)),
+    ];
+    let rust_value = |value: Option<(u64, u64)>| {
+        value.map_or("None".to_owned(), |(a, b)| {
+            format!("Some(Key{{generation:{a},position:{b}}})")
+        })
+    };
+    let lean_value = |value: Option<(u64, u64)>| {
+        value.map_or(".absent".to_owned(), |(a,b)|format!(".present (.record \"Key\" [(\"generation\",.number \"u64\" {a}),(\"position\",.number \"u64\" {b})])"))
+    };
+    let mut native = format!("{OPTIONAL_RECORDS}\nfn main(){{\n");
+    let mut inputs = Vec::new();
+    for left in values {
+        for right in values {
+            for negated in [false, true] {
+                native.push_str(&format!("println!(\"{{}}\",Checker::check(&Packet::Compare{{left:{},right:{},negated:{negated}}}));\n",rust_value(left),rust_value(right)));
+                inputs.push(format!(".variant \"Packet\" \"Compare\" [(\"left\",{}),(\"right\",{}),(\"negated\",.boolean {negated})]",lean_value(left),lean_value(right)));
+            }
+        }
+    }
+    native.push('}');
+    fs::write(w.0.join("native.rs"), native).unwrap();
+    let binary = w.0.join("native");
+    let compiled = std::process::Command::new("rustc")
+        .args(["--edition=2021", "-C", "overflow-checks=yes"])
+        .arg(w.0.join("native.rs"))
+        .arg("-o")
+        .arg(&binary)
+        .output()
+        .unwrap();
+    assert!(
+        compiled.status.success(),
+        "{}",
+        String::from_utf8_lossy(&compiled.stderr)
+    );
+    let ran = std::process::Command::new(binary).output().unwrap();
+    assert!(ran.status.success());
+    let results = String::from_utf8(ran.stdout).unwrap();
+    assert_eq!(results.lines().count(), inputs.len());
+    let mut proofs =
+        "import Generated\nopen Provium.State\nset_option maxRecDepth 10000\n".to_owned();
+    let mut obligations = Vec::new();
+    for (index, (input, result)) in inputs.iter().zip(results.lines()).enumerate() {
+        assert!(matches!(result, "true" | "false"));
+        proofs.push_str(&format!("theorem native_{index} : Subject.Checker_check 256 ({input}) = .ok {result} := by rfl\n"));
+        obligations.push(
+            serde_json::json!({"theorem":format!("native_{index}"),"function":"Checker_check"}),
+        );
+    }
+    fs::write(w.0.join("Proofs.lean"), proofs).unwrap();
+    let config = w.0.join("project.json");
+    fs::write(&config,serde_json::to_vec(&serde_json::json!({"crate_root":"lib.rs","namespace":"Subject","methods":["Checker::check"],"proofs":"Proofs.lean","obligations":obligations})).unwrap()).unwrap();
+    provium::methods::verify(&config, &w.0.join("out")).unwrap();
+    fs::write(
+        w.0.join("lib.rs"),
+        OPTIONAL_RECORDS.replace("trace+=trace;*right", "trace+=trace;*left"),
+    )
+    .unwrap();
+    let error = provium::methods::verify(&config, &w.0.join("out")).unwrap_err();
+    assert!(error.contains("Lean rejected Proofs.lean"), "{error}");
+    assert!(!w.0.join("out/verified.json").exists());
 }
