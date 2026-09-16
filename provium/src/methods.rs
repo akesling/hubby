@@ -31,6 +31,7 @@ pub struct ProofModule {
     pub name: String,
     pub path: PathBuf,
 }
+mod initialized;
 mod proof_modules;
 #[derive(Serialize)]
 pub struct Input {
@@ -972,6 +973,7 @@ pub fn generate(methods: &[Method], namespace: &str) -> String {
             executable(&method.body, 2)
         ));
         text.push_str(&format!("theorem {name}_correspondence (state : Store α) : execute {name}_ir state = {name} state := by rfl\n"));
+        text.push_str(&initialized::generate(method));
     }
     text.push_str(&format!("end {namespace}\n"));
     text
@@ -1006,6 +1008,9 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
             format!("{}_ir", m.symbol),
             format!("{}_slot", m.symbol),
             format!("{}_correspondence", m.symbol),
+            format!("{}_layout", m.symbol),
+            format!("{}_well_typed", m.symbol),
+            format!("{}_initialized_refinement", m.symbol),
         ] {
             if !identifier(&name) || !symbols.insert(name) {
                 return Err("invalid/colliding generated method symbol".into());
@@ -1086,7 +1091,13 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
         audit.push_str(&format!(
             "#provium_check {}.{}_correspondence references {}.{}\n",
             project.namespace, m.symbol, project.namespace, m.symbol
-        ))
+        ));
+        if initialized::supported(m) {
+            audit.push_str(&format!(
+                "#provium_check {}.{}_initialized_refinement references {}.{}\n",
+                project.namespace, m.symbol, project.namespace, m.symbol
+            ));
+        }
     }
     for o in &project.obligations {
         audit.push_str(&format!(
@@ -1131,7 +1142,10 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
     }
     report.push_str(&workspace.check("Proofs.lean", Some("Proofs.olean"))?);
     report.push_str(&workspace.check("Check.lean", None)?);
-    if report.matches("PROVIUM_VERIFIED ").count() != methods.len() + project.obligations.len() {
+    let initialized_refinements = methods.iter().filter(|m| initialized::supported(m)).count();
+    if report.matches("PROVIUM_VERIFIED ").count()
+        != methods.len() + initialized_refinements + project.obligations.len()
+    {
         return Err("incomplete method axiom audit".into());
     }
     for (file, text) in &artifacts {
@@ -1193,7 +1207,7 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
     let manifest = serde_json::json!({"format":1,"compiler_sha256":hash(fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"scope":"complete explicit method bodies in supported Lean semantics; frontend, field resolution, borrowing/layout refinement and host durability remain trusted; not whole-program correctness", "lean_toolchain":TOOLCHAIN,"rustc":String::from_utf8_lossy(&rustc.stdout).trim(),"rust_target":project.rust_target,"rust_target_cfg":String::from_utf8_lossy(&cfg.stdout),"typecheck_args":typecheck_args,"config_sha256":hash(config_bytes),"sources":inputs,"proof_modules":libraries.iter().map(|library| serde_json::json!({"name":library.module,"path":library.path,"artifact":library.artifact,"sha256":hash(&library.source)})).collect::<Vec<_>>(),"methods":methods,"unproved_methods":krate.inventory().into_iter().filter(|n|!project.methods.contains(n)).collect::<Vec<_>>(),"artifacts":artifacts.iter().map(|(p,t)|(p,hash(t))).collect::<BTreeMap<_,_>>(),"obligations":project.obligations,"audit":report});
     let bytes = serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?;
     fs::write(out.join("manifest.json"), &bytes).map_err(|e| e.to_string())?;
-    fs::write(out.join("verified.json"),serde_json::to_vec_pretty(&serde_json::json!({"manifest_sha256":hash(bytes),"whole_program_proved":false,"complete_method_bodies":methods.len(),"obligations":project.obligations.len()})).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;
+    fs::write(out.join("verified.json"),serde_json::to_vec_pretty(&serde_json::json!({"manifest_sha256":hash(bytes),"whole_program_proved":false,"complete_method_bodies":methods.len(),"initialized_slot_refinements":initialized_refinements,"obligations":project.obligations.len()})).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;
     Ok(format!("Verified {} complete method bodies and {} obligations in supported Lean semantics. Whole-program proof remains incomplete.\n{report}",methods.len(),project.obligations.len()))
 }
 

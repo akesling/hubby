@@ -611,3 +611,31 @@ toolchains, dependencies or runtime changes. The ordinary Jarl proof test checks
 that host build capture binds to its current source inventory. These are build
 identity facts only; source preservation, resolved closure, primitive ownership
 and exceptional semantics, and the M2 global election induction remain open.
+
+## Initialized scalar slots (partial P04/P10 foundation)
+
+Provium's non-dropping scalar assignment backend now emits a method footprint,
+a kernel-checked `ProgramTyped` theorem, and an audited
+`*_initialized_refinement` theorem. The latter connects the generated method to
+an interpreter over typed, possibly uninitialized slots. A live Rust `None`
+(`some .absent`) is distinct from moved-out storage (`none`). Reads reject
+uninitialized/undeclared slots, assignments check the layout and can reinitialize
+storage, and conditions preserve short-circuit evaluation. The generic refinement
+covers sequences, both branches, and inlined calls in this backend. Move
+invalidation, validity preservation, and disjoint-slot frame lemmas are checked
+in Provium's shared semantics.
+
+This closes neither P04 nor P10. The footprint is a scalar access footprint, not
+an established Rust object layout. The theorem requires a related initialized
+input heap; source place resolution, reference identity, alias exclusion,
+reborrows, lifetimes, consumed receiver destruction, and the mapping from Rust
+execution remain open. Other method backends do not acquire an initialized-slot
+refinement from this change. Jarl production code is unchanged.
+
+Validation: all 12 Provium method tests (including normally ignored Lean tests),
+formatting, Clippy, and rustdoc passed. Rechecking the original
+`proofs/persistence/project.json` produced the new audited
+`JarlMethods.ready_Ready_persisted_initialized_refinement` plus the existing
+correspondence and three persistence obligations. Evidence is in
+`artifacts/provium/m1-initialized-persistence/`; the certificate retains
+`whole_program_proved=false`. Lean ran sequentially with a 16384 MiB limit.

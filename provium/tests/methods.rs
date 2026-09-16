@@ -121,6 +121,49 @@ fn kernel_checks_complete_methods_and_rejects_a_changed_postcondition() {
 }
 
 #[test]
+#[ignore = "requires pinned Lean; scripts/verify.sh runs this"]
+fn initialized_refinement_checks_moves_reinitialization_and_short_circuiting() {
+    let w = Work::new();
+    w.source("struct State { flag: bool, other: bool, value: Option<u64> } impl State { fn update(&mut self) { if self.flag && (!self.other || true) { self.value = None; } else { self.flag = true; } } fn empty(&mut self) {} }");
+    fs::write(w.0.join("Proofs.lean"), r#"import Generated
+open Provium.State
+theorem checked (heap : Initialized.Heap α) (state : Store α)
+    (related : Initialized.Relates Subject.State_update_layout heap state) :
+    ∃ result, Initialized.execute Subject.State_update_layout Subject.State_update_ir heap = .ok result ∧
+      Initialized.Relates Subject.State_update_layout result (Subject.State_update state) :=
+  Subject.State_update_initialized_refinement heap state related
+
+-- A live None is readable; uninitialized storage is not.
+example : Initialized.read (fun _ => some .optional)
+    (fun _ => some (Cell.absent (α := Unit))) ["value"] = .ok .absent := rfl
+example : Initialized.read (α := Unit) (fun _ => some .optional)
+    (fun _ => none) ["value"] = .error .uninitialized := rfl
+example : Initialized.assign (α := Unit) (fun _ => some .boolean)
+    (fun _ => none) ⟨["flag"], .absent⟩ = .error .wrongType := rfl
+example : Initialized.read (α := Unit) (fun _ => none)
+    (fun _ => some (.boolean true)) ["unknown"] = .error .invalidPlace := rfl
+example : Initialized.read (fun _ => some .optional)
+    (Initialized.set (fun _ => some (Cell.absent (α := Unit))) ["value"] none)
+    ["value"] = .error .uninitialized := rfl
+-- A legal assignment can reinitialize storage after a move.
+example : Initialized.assign (α := Unit) (fun _ => some .optional)
+    (fun _ => none) ⟨["value"], .absent⟩ =
+    .ok (Initialized.set (fun _ => none) ["value"] (some .absent)) := rfl
+-- The missing field is deliberately uninitialized and must not be read.
+example : Initialized.condition (α := Unit) (fun _ => some .boolean) (fun _ => none)
+    (.and (.boolean false) (.field ["missing"])) = .ok false := rfl
+example : Initialized.condition (α := Unit) (fun _ => some .boolean) (fun _ => none)
+    (.or (.boolean true) (.field ["missing"])) = .ok true := rfl
+example : Initialized.condition (α := Unit) (fun _ => some .boolean) (fun _ => none)
+    (.and (.boolean true) (.field ["missing"])) = .error .uninitialized := rfl
+"#).unwrap();
+    let config = serde_json::json!({"crate_root":"lib.rs","namespace":"Subject","methods":["State::update", "State::empty"],"proofs":"Proofs.lean","obligations":[{"theorem":"checked","function":"State_update"}]});
+    let path = w.0.join("project.json");
+    fs::write(&path, config.to_string()).unwrap();
+    provium::methods::verify(&path, &w.0.join("out")).unwrap();
+}
+
+#[test]
 fn field_effects_agree_with_executing_the_original_rust_body() {
     use std::process::Command;
     let w = Work::new();

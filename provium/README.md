@@ -158,6 +158,17 @@ Consumed wrappers must consist entirely of mutable references; custom receiver
 destructors are rejected. Generic field traversal, import aliases, item macros,
 conditional production definitions, and unsupported attributes are rejected.
 
+For this non-dropping scalar backend, generated methods also include
+`<method>_layout`, `<method>_well_typed`, and
+`<method>_initialized_refinement`. Lean checks that the program's accesses fit
+the generated scalar footprint and that execution on a related initialized heap
+refines the field-store method. Uninitialized storage differs from an initialized
+`None`; the interpreter retains read/type faults and short-circuiting. The
+refinement theorem's axioms are audited with the ordinary method obligations.
+It assumes a related input heap. Source layout, pointer identity, exclusive
+access, reborrows, lifetimes, and destructor semantics remain separate obligations;
+this is not a source-level ownership proof or a refinement for other backends.
+
 Optional-record array methods support a complete exclusive traversal with a
 `Some` binding, boolean field updates/branches, and slot deletion. Consumed
 receivers and records must derive builtin `Copy`; rustc checks that deletion

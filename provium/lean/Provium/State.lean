@@ -94,6 +94,222 @@ theorem execute_frame (program : Program) (state : Store α) (key : Path)
     split
     · exact ihyes _ untouched.1
     · exact ihno _ untouched.2
+-- Initialized-slot refinement for the non-dropping scalar assignment backend.
+-- `none` here means moved-out/uninitialized storage; `some .absent` is a live
+-- Rust Option::None. Paths still require source/layout and loan validation.
+-- This does not model dropping assignments, pointer aliasing, or reborrows.
+namespace Initialized
+inductive Kind where
+  | boolean
+  | optional
+  | payload
+  deriving DecidableEq
+
+def Fits : Kind → Cell α → Prop
+  | .boolean, .boolean _ => True
+  | .optional, .absent => True
+  | .optional, .other _ => True
+  | .payload, .other _ => True
+  | _, _ => False
+
+abbrev Layout := Path → Option Kind
+abbrev Heap (α : Type) := Path → Option (Cell α)
+
+def Valid (layout : Layout) (heap : Heap α) : Prop :=
+  ∀ p cell, heap p = some cell → ∃ kind, layout p = some kind ∧ Fits kind cell
+
+def set (heap : Heap α) (path : Path) (slot : Option (Cell α)) : Heap α :=
+  fun key => if key = path then slot else heap key
+
+inductive Fault where
+  | invalidPlace
+  | uninitialized
+  | wrongType
+  deriving DecidableEq
+
+def read (layout : Layout) (heap : Heap α) (path : Path) : Except Fault (Cell α) :=
+  match layout path with
+  | none => .error .invalidPlace
+  | some _ => match heap path with
+    | none => .error .uninitialized
+    | some cell => .ok cell
+
+-- Move transfers a value to the result and invalidates the source slot.
+-- This primitive is admissible only after exclusive access is established.
+def move (layout : Layout) (heap : Heap α) (path : Path) :
+    Except Fault (Cell α × Heap α) := do
+  let cell ← read layout heap path
+  pure (cell, set heap path none)
+
+def literalKind : Literal → Kind
+  | .boolean _ => .boolean
+  | .absent => .optional
+
+-- Assignment may reinitialize moved-out storage. Payload destruction is not
+-- implicit: this rule applies to the frontend's non-dropping assignment subset.
+def assign (layout : Layout) (heap : Heap α) (write : Write) : Except Fault (Heap α) :=
+  match layout write.path with
+  | none => .error .invalidPlace
+  | some kind =>
+    if kind = literalKind write.value then
+      .ok (set heap write.path (some (value write.value)))
+    else .error .wrongType
+
+def run : List Write → Layout → Heap α → Except Fault (Heap α)
+  | [], _, heap => .ok heap
+  | w :: rest, layout, heap => do
+    let next ← assign layout heap w
+    run rest layout next
+
+-- Related heaps contain all declared fields, with their proper scalar types.
+-- No constraint is imposed by the total leaf store on undeclared paths.
+def Relates (layout : Layout) (heap : Heap α) (store : Store α) : Prop :=
+  ∀ p kind, layout p = some kind → heap p = some (store p) ∧ Fits kind (store p)
+
+theorem literal_fits (literal : Literal) : Fits (literalKind literal) (value (α := α) literal) := by
+  cases literal <;> trivial
+
+theorem set_valid (valid : Valid layout heap)
+    (typed : ∀ cell, slot = some cell → ∃ kind, layout path = some kind ∧ Fits kind cell) :
+    Valid layout (set heap path slot) := by
+  intro p cell found
+  by_cases same : p = path
+  · subst p
+    exact typed cell (by simpa [set] using found)
+  · exact valid p cell (by simpa [set, same] using found)
+
+theorem move_invalidates (declared : layout path = some kind)
+    (live : heap path = some cell) :
+    move layout heap path = .ok (cell, set heap path none) ∧
+    read layout (set heap path none) path = .error .uninitialized := by
+  simp [move, read, declared, live, set]
+  rfl
+
+theorem move_preserves_validity (valid : Valid layout heap) :
+    Valid layout (set heap path none) := by
+  exact set_valid valid (by intro cell impossible; cases impossible)
+
+theorem set_frame (different : key ≠ path) :
+    set heap path slot key = heap key := by simp [set, different]
+
+theorem assign_refines (related : Relates layout heap store)
+    (typed : layout write.path = some (literalKind write.value)) :
+    assign layout heap write = .ok (set heap write.path (some (value write.value))) ∧
+    Relates layout (set heap write.path (some (value write.value)))
+      (put store write.path (value write.value)) := by
+  constructor
+  · simp [assign, typed]
+  · intro p kind declared
+    by_cases same : p = write.path
+    · subst p
+      have kinds : kind = literalKind write.value := Option.some.inj (declared.symm.trans typed)
+      subst kind
+      simp only [set, put]
+      exact ⟨rfl, literal_fits write.value⟩
+    · simpa [set, put, same] using related p kind declared
+
+-- This is a refinement of the existing generated assignment semantics, not a
+-- second independently written algorithm: both sides consume the same writes.
+theorem run_refines (effects : List Write) (related : Relates layout heap store)
+    (typed : ∀ w ∈ effects, layout w.path = some (literalKind w.value)) :
+    ∃ result, run effects layout heap = .ok result ∧
+      Relates layout result (Provium.State.run effects store) := by
+  induction effects generalizing heap store with
+  | nil => exact ⟨heap, rfl, related⟩
+  | cons w rest ih =>
+    obtain ⟨assigned, nextRelated⟩ := assign_refines related (typed w (by simp))
+    obtain ⟨result, completed, finalRelated⟩ := ih nextRelated
+      (by intro v hv; exact typed v (List.mem_cons_of_mem _ hv))
+    refine ⟨result, ?_, finalRelated⟩
+    simp only [run, assigned]
+    exact completed
+def ConditionTyped (layout : Layout) : Condition → Prop
+  | .boolean _ => True
+  | .field p => layout p = some .boolean
+  | .not c => ConditionTyped layout c
+  | .and a b | .or a b => ConditionTyped layout a ∧ ConditionTyped layout b
+
+def ProgramTyped (layout : Layout) : Program → Prop
+  | .done => True
+  | .write w => layout w.path = some (literalKind w.value)
+  | .seq a b => ProgramTyped layout a ∧ ProgramTyped layout b
+  | .branch c a b => ConditionTyped layout c ∧ ProgramTyped layout a ∧ ProgramTyped layout b
+
+def condition (layout : Layout) (heap : Heap α) : Condition → Except Fault Bool
+  | .boolean b => .ok b
+  | .field p => do
+    let cell ← read layout heap p
+    match cell with
+    | .boolean b => .ok b
+    | _ => .error .wrongType
+  | .not c => do return !(← condition layout heap c)
+  | .and a b => do
+    if ← condition layout heap a then condition layout heap b else pure false
+  | .or a b => do
+    if ← condition layout heap a then pure true else condition layout heap b
+
+def execute (layout : Layout) : Program → Heap α → Except Fault (Heap α)
+  | .done, heap => .ok heap
+  | .write w, heap => assign layout heap w
+  | .seq a b, heap => do execute layout b (← execute layout a heap)
+  | .branch c a b, heap => do
+    if ← condition layout heap c then execute layout a heap else execute layout b heap
+
+theorem condition_refines (c : Condition) (related : Relates layout heap store)
+    (typed : ConditionTyped layout c) :
+    condition layout heap c = .ok (evalCondition c store) := by
+  induction c with
+  | boolean b => rfl
+  | field p =>
+    change layout p = some .boolean at typed
+    obtain ⟨live, fits⟩ := related p .boolean typed
+    cases found : store p with
+    | boolean b => simp [condition, read, typed, live, found, evalCondition]; rfl
+    | absent => simp [found, Fits] at fits
+    | other v => simp [found, Fits] at fits
+  | not c ih =>
+    simp only [condition, ih typed, evalCondition]
+    rfl
+  | and a b iha ihb =>
+    simp only [condition, iha typed.1, evalCondition]
+    cases evalCondition a store <;> simp [ihb typed.2] <;> rfl
+  | or a b iha ihb =>
+    simp only [condition, iha typed.1, evalCondition]
+    cases evalCondition a store <;> simp [ihb typed.2] <;> rfl
+
+theorem execute_refines (program : Program) (related : Relates layout heap store)
+    (typed : ProgramTyped layout program) :
+    ∃ result, execute layout program heap = .ok result ∧
+      Relates layout result (Provium.State.execute program store) := by
+  induction program generalizing heap store with
+  | done => exact ⟨heap, rfl, related⟩
+  | write w =>
+    obtain ⟨assigned, nextRelated⟩ := assign_refines related typed
+    exact ⟨_, assigned, nextRelated⟩
+  | seq a b iha ihb =>
+    obtain ⟨middle, first, midRelated⟩ := iha related typed.1
+    obtain ⟨result, second, finalRelated⟩ := ihb midRelated typed.2
+    refine ⟨result, ?_, finalRelated⟩
+    simp only [execute, first]
+    exact second
+  | branch c a b iha ihb =>
+    have checked := condition_refines c related typed.1
+    cases choice : evalCondition c store with
+    | false =>
+      obtain ⟨result, completed, finalRelated⟩ := ihb related typed.2.2
+      refine ⟨result, ?_, ?_⟩
+      · simp only [execute, checked, choice]
+        exact completed
+      · simpa [Provium.State.execute, choice] using finalRelated
+    | true =>
+      obtain ⟨result, completed, finalRelated⟩ := iha related typed.2.1
+      refine ⟨result, ?_, ?_⟩
+      · simp only [execute, checked, choice]
+        exact completed
+      · simpa [Provium.State.execute, choice] using finalRelated
+
+end Initialized
+
 -- Option-array representation preserves empty slots and capacity. The reserved
 -- presence leaf records slot deletion and is not a Rust record field.
 abbrev ArrayStore (α : Type) := List (Option (Store α))
