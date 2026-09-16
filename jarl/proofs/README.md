@@ -190,11 +190,17 @@ valid durable recovery, protocol safety and Rust memory refinement remain open.
 
 `message-validation` translates the complete original `node::Node::valid`,
 including its `Message::term` helper, captured `valid_id` closure and batch loop.
-Its 51 obligations include general bounded-value acceptance conditions for every
-non-batch variant. Accepted append entries must have the successor index and a
-positive term between the predecessor's and message's terms. Array-loop proofs
-reject all-empty batches of any length and leading holes with arbitrary suffixes.
-Concrete cases also cover full 16-entry batches and overflow. The 32-bit mutation
-check rejects removing the batch-hole, snapshot-index or campaign guards.
-General nonempty batch preservation, source/borrow/layout refinement and
-composition with `append` / `step` remain outstanding.
+Its 56 obligations characterize every variant for bounded scalar inputs. Accepted
+append entries have the successor index and a positive term between the
+predecessor's and message's terms. The complete batch theorem covers arbitrary
+finite typed slot lists shorter than the i32 counter bound: accepted batches are
+nonempty occupied prefixes with consecutive indices and positive, nondecreasing
+terms bounded by the message term. The converse is proved too: these conditions
+are sufficient for acceptance. A unified theorem proves Boolean termination
+without faults for all canonical typed validation views at fuel 256. This domain
+describes the fields inspected by validation; Rust memory refinement remains
+separate. Concrete cases also cover full 16-entry
+batches and overflow. Five 32-bit mutations reject removed hole, successor,
+snapshot-index and campaign guards and a broken batch counter.
+Source/borrow/layout refinement and composition with `append` / `step` remain
+outstanding; these are contracts of the generated structural semantics.

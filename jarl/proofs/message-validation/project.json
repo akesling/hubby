@@ -209,6 +209,26 @@
     {
       "theorem": "Validation.leading_hole_rejected",
       "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.batch_range",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.batch_accepted",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.validation_total",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.validation_no_fault",
+      "function": "node_Node_valid"
+    },
+    {
+      "theorem": "Validation.batch_accepts_iff",
+      "function": "node_Node_valid"
     }
   ]
 }

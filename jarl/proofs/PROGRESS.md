@@ -409,7 +409,7 @@ runtime exploration tests pass. Jarl runtime source is unchanged.
 
 ## General validation postconditions (partial C04–C08 evidence)
 
-- The message-validation project now has 51 obligations. General theorems
+- The message-validation project now has 56 obligations. General theorems
   characterize every non-batch branch for all bounded scalar inputs: campaign
   positivity independent of durable term, Vote/PreVote log validity, heartbeat
   predecessor validity, snapshot index/term validity and replication replies.
@@ -423,6 +423,20 @@ runtime exploration tests pass. Jarl runtime source is unchanged.
 - Provium's kernel-checked symbolic step rule leaves loops as proof boundaries.
   The source body is still compiled in full; helper extraction identities are
   checked by the kernel, not asserted as equivalence axioms.
-- General nonempty batch preservation and complete validation-to-append/step
-  composition remain next. The frontend, Rust memory/borrows, whole-program
-  transition system, durability and safety/liveness milestones remain open.
+- The complete batch theorem relates the actual generated loop to a logical
+  scan for arbitrary typed slot lists shorter than the i32 counter bound. Its
+  accepted-batch corollary establishes nonemptiness, an occupied prefix,
+  consecutive indices, and positive, nondecreasing terms bounded by the message
+  term. The scan simulation proves the counter cannot overflow under that bound.
+  The declarative ordered-slots property is derived from the scan, not assumed.
+- The declarative ordered-slot contract is necessary and sufficient for batch
+  acceptance under the typed bounds and valid header. The unified totality and
+  no-fault theorems cover all canonical validation views at fuel 256, including
+  invalid protocol values. These views are not a Rust heap/borrow relation.
+- Five 32-bit mutations check campaign, snapshot, hole and successor guards plus
+  the batch counter increment. Provium regression checks also preserve lexical
+  closure captures and reject accessed opaque generic fields rather than resolve
+  them to same-named nominal records.
+- Complete validation-to-append/step composition remains next. The frontend, Rust
+  memory/borrows, whole-program transition system, durability and safety/liveness
+  milestones remain open.

@@ -3597,7 +3597,7 @@
         "C08"
       ],
       "status": "component_evidence",
-      "note": "Complete original body and Message::term helper lowered by the generic pure validator backend in proofs/message-validation. 51 kernel obligations include general bounded-value acceptance characterizations for every non-batch variant, accepted append successor/term postconditions, all-empty batches at arbitrary lengths and leading holes with arbitrary suffixes. Source guard mutations are rejected on 32-bit. General nonempty batch preservation, source/borrow/layout refinement and append/step composition remain open."
+      "note": "Complete original body and Message::term helper lowered by the generic pure validator backend in proofs/message-validation. 56 kernel obligations characterize all variants on typed bounded views, including arbitrary finite batch lists below the i32 counter bound. Accepted batches are nonempty occupied prefixes with consecutive indices and positive, nondecreasing terms bounded by the message term. The batch contract is both necessary and sufficient; totality and absence of faults hold for every canonical validation view at fuel 256. Five source mutations are rejected on 32-bit. Source/borrow/layout refinement and append/step composition remain open."
     },
     "crate::node::<item:0>": {
       "requirements": [

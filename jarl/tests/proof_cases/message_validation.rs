@@ -37,6 +37,11 @@ fn complete_validation_rejects_missing_batch_and_snapshot_guards() {
             "snapshot.last.index >= 0 && valid_id(snapshot.last)",
         ),
         ("return *campaign > 0;", "return *campaign >= 0;"),
+        (
+            "previous.index.checked_add(1) != Some(entry.id.index)",
+            "false",
+        ),
+        ("count += 1;", "count += 0;"),
     ] {
         assert_eq!(source.matches(original).count(), 1);
         fs::write(&file, source.replace(original, changed)).unwrap();
