@@ -1063,3 +1063,30 @@ and invalidates stale certificates. Original-Rust callback tests, Jarl Clippy,
 formatting and coverage/review checks pass.
 Host and installed wasm32 verification each checked all 105 obligations with
 axiom auditing. Lean checks ran one process at a time with a 16384 MiB ceiling.
+
+## M1: numeric callback behavior and typed protocol
+
+Original `Membership::quorum_index` now has an independent native threshold
+oracle over every optional-slot/flag combination at capacities 0 through 4.
+It checks stateful callback order (including repeated shared identities), tied
+and maximum u64 values, empty-current panic, callback panic at each position,
+and callback-drop panic in both overflow-check profiles. The oracle uses the
+largest value supported by a strict majority rather than copying the sort/rank
+implementation. These finite tests specify regression expectations, not an
+unbounded theorem or a source-preservation proof.
+
+Provium's existing Boolean interaction now specializes a generic typed callback
+protocol. Callback and enclosing return types may differ. Ordered collection
+retains advanced callback handles and normal/unwind/abort cleanup behavior.
+Kernel checks cover repeated-key numeric replies, order, empty collection,
+unwind and abort; existing Boolean protocol checks remain in place.
+
+`quorum_index` remains planned: source-derived numeric loops, array writes and
+bounds, sorting/rank selection, profile-dependent empty-input steps and caller
+invariants still need translation and refinement. M1 and M2 remain incomplete.
+
+Validation: typed and Boolean kernel callback checks, original numeric native
+checks, provider ordinary tests, provider/Jarl Clippy, formatting and provider
+rustdoc passed. All 105 existing membership obligations replayed on host and
+installed wasm32 after the typed-protocol change. Lean remained serialized with
+a 16384 MiB ceiling. No numeric source-linked obligation is counted yet.

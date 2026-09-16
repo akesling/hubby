@@ -205,6 +205,9 @@ destruction and normal/unwind/abort replies. Kernel tests check source-derived
 traces and reject threshold and selection mutations. Its observation function
 requires completed external responses; it does not prove callback termination,
 Rust ownership/unwind refinement, or source-to-IR semantic preservation.
+The underlying callback protocol also supports typed callback and enclosing return
+values. Ordered collection of numeric replies shares the same state and cleanup
+semantics; numeric rank-selection Rust lowering is not yet implemented.
 
 Guarded by-value Copy-array merges support pure queries on both inputs, a pure
 source projection, and source-local target insertion with a constant `map_err`

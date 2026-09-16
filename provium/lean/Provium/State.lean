@@ -1311,14 +1311,14 @@ theorem runArrayMerge_guard_error [DecidableEq α] (program : ArrayMerge)
 -- Owned FnMut predicate folds expose every call and the final callback drop.
 -- The opaque handle is replaced after each response: repeated keys need not
 -- receive equal answers. Unwinding and abort are distinct external outcomes.
-inductive PredicateExit where
-  | value (result : Bool)
+inductive CallbackExit (ρ : Type) where
+  | value (result : ρ)
   | unwind
   | abort
   deriving DecidableEq, Repr
 
-inductive PredicateReply (σ : Type) where
-  | value (result : Bool) (callback : σ)
+inductive CallbackReply (β σ : Type) where
+  | value (result : β) (callback : σ)
   | unwind (callback : σ)
   | abort
   deriving DecidableEq, Repr
@@ -1329,18 +1329,47 @@ inductive PredicateDropReply where
   | abort
   deriving DecidableEq, Repr
 
-inductive PredicateRun (α σ : Type) where
-  | returned (result : PredicateExit)
-  | call (key : Cell α) (callback : σ) (resume : PredicateReply σ → PredicateRun α σ)
-  | drop (callback : σ) (resume : PredicateDropReply → PredicateRun α σ)
+-- Callback results and enclosing return values need not have the same type.
+-- β/ρ denote logical values; connecting their representation and destruction to
+-- Rust remains a separate obligation (numeric scalar values have no destructor).
+inductive CallbackRun (α σ β ρ : Type) where
+  | returned (result : CallbackExit ρ)
+  | call (key : Cell α) (callback : σ) (resume : CallbackReply β σ → CallbackRun α σ β ρ)
+  | drop (callback : σ) (resume : PredicateDropReply → CallbackRun α σ β ρ)
+
+abbrev PredicateExit := CallbackExit Bool
+abbrev PredicateReply (σ : Type) := CallbackReply Bool σ
+abbrev PredicateRun (α σ : Type) := CallbackRun α σ Bool Bool
 
 -- A second panic while unwinding aborts. An abort does not run local drops.
-def finishPredicate (callback : σ) : PredicateExit → PredicateRun α σ
+def finishCallback (callback : σ) : CallbackExit ρ → CallbackRun α σ β ρ
   | .abort => .returned .abort
   | .value result => .drop callback fun reply => .returned (match reply with
     | .returned => .value result | .unwind => .unwind | .abort => .abort)
   | .unwind => .drop callback fun reply => .returned (match reply with
     | .returned => .unwind | .unwind => .abort | .abort => .abort)
+
+abbrev finishPredicate (callback : σ) (result : PredicateExit) : PredicateRun α σ :=
+  finishCallback callback result
+
+-- Collect scalar callback replies in visit order, retaining the advanced handle.
+-- This list is a semantic sequence, not a claim that Rust allocates a list.
+def collectCallbacks (keys : List (Cell α)) (callback : σ)
+    (next : List β → σ → CallbackRun α σ β ρ) : CallbackRun α σ β ρ :=
+  match keys with
+  | [] => next [] callback
+  | key :: rest => .call key callback fun reply => match reply with
+    | .value answer advanced => collectCallbacks rest advanced (fun values final => next (answer :: values) final)
+    | .unwind advanced => finishCallback advanced .unwind
+    | .abort => .returned .abort
+
+theorem collect_callbacks_head (key : Cell α) (rest : List (Cell α)) (callback : σ)
+    (next : List β → σ → CallbackRun α σ β ρ) :
+    collectCallbacks (key :: rest) callback next =
+      .call key callback (fun reply => match reply with
+        | .value answer advanced => collectCallbacks rest advanced (fun values final => next (answer :: values) final)
+        | .unwind advanced => finishCallback advanced .unwind
+        | .abort => .returned .abort) := rfl
 
 def countPredicates (keys : List (Cell α)) (callback : σ) (count : Nat)
     (next : Nat → σ → PredicateRun α σ) : PredicateRun α σ :=
@@ -1448,7 +1477,7 @@ theorem predicate_budget_add (fuel extra : Nat) (run : PredicateRun α σ)
 
 theorem predicate_finish_budget (callback : σ) (result : PredicateExit) :
     predicateBudget 2 (finishPredicate callback result : PredicateRun α σ) := by
-  cases result <;> simp [predicateBudget, finishPredicate]
+  cases result <;> simp [predicateBudget, finishPredicate, finishCallback]
 
 theorem predicate_count_budget (keys : List (Cell α)) (callback : σ) (count : Nat)
     (next : Nat → σ → PredicateRun α σ) (budget : Nat) (room : 2 ≤ budget)

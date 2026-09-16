@@ -29,6 +29,21 @@ fn kernel_predicate_calls_preserve_state_order_cleanup_and_panic_paths() {
 import Provium.Audit
 open Provium.State
 namespace Check
+ def numericNext (values : List UInt64) (handle : Nat) : CallbackRun Nat Nat UInt64 (List UInt64) :=
+   finishCallback handle (.value values)
+ def replyNumeric (run : CallbackRun Nat Nat UInt64 (List UInt64)) (reply : CallbackReply UInt64 Nat) :=
+   match run with
+   | .call _ _ resume => resume reply
+   | _ => .returned .abort
+ theorem numeric_order :
+   replyNumeric (replyNumeric (collectCallbacks [.other 7, .other 7] 0 numericNext) (.value 9 1)) (.value 2 2) =
+     finishCallback 2 (.value [9, 2]) := rfl
+ theorem numeric_unwind :
+   replyNumeric (replyNumeric (collectCallbacks [.other 7, .other 7] 0 numericNext) (.value 9 1)) (.unwind 2) =
+     .drop 2 (fun reply => .returned (match reply with | .returned => .unwind | .unwind => .abort | .abort => .abort)) := rfl
+ theorem numeric_abort :
+   replyNumeric (collectCallbacks [.other 7, .other 7] 0 numericNext) .abort = .returned .abort := rfl
+ theorem numeric_empty : collectCallbacks [] 0 numericNext = finishCallback 0 (.value []) := rfl
  def row (key:Nat) (current old:Bool):Store Nat := fun field=>
    if field=["key"] then .other key else if field=["current"] then .boolean current
    else if field=["old"] then .boolean old else .absent
@@ -81,6 +96,10 @@ namespace Check
      call drop (runPredicateFold plan entries callback) = some outcome :=
    predicate_observation_complete _ _ (predicate_fold_budget plan entries callback) call drop
 end Check
+#provium_check Check.numeric_order references Provium.State.collectCallbacks
+#provium_check Check.numeric_unwind references Provium.State.collectCallbacks
+#provium_check Check.numeric_abort references Provium.State.collectCallbacks
+#provium_check Check.numeric_empty references Provium.State.collectCallbacks
 #provium_check Check.empty references Provium.State.runPredicateFold
 #provium_check Check.finish_abort references Provium.State.finishPredicate
 #provium_check Check.bounded references Provium.State.runPredicateFold
