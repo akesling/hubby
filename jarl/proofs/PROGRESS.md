@@ -1298,3 +1298,26 @@ feature and build-script cfg, source mutation, unsupported configuration, and
 response-file rejection with stale-success invalidation. Jarl's original-source
 capture test and wasm32 capture passed. Provider ordinary tests, provider/Jarl
 proof-test Clippy, formatting and provider rustdoc passed. No Lean code changed.
+
+### M1 P01: configured declaration inventory
+
+Provium now evaluates cfg flags, repeated string-valued keys, all/any/not and
+nested cfg_attr for module/item/associated-item declarations. The separate
+configured inventory retains original syntax/source hashes and is tied to the
+captured root compilation through `configured_root_invocation`. Inactive modules
+are not traversed; active unsupported path overrides and predicate syntax reject
+selection. The existing conservative inventory and review ledger are unchanged.
+
+Host and installed wasm32 captures each select 180 declarations from Jarl's 184
+conservative entries, excluding four test-module declarations. This is declaration
+accounting, not complete conditional Rust interpretation: fields, expressions,
+macros, name/type/call resolution and source-preservation proofs remain open.
+Capture still requires the conservative pre-build inventory, so arbitrary mutually
+exclusive source layouts are not yet supported. M1/M2 remain incomplete.
+
+Validation: five cfg tests passed, including 56 predicate comparisons against the
+installed Rust compiler across eight configurations. Five capture tests passed;
+changing an effective profile override switches enabled declarations without
+changing source inventory. Jarl host/wasm32 capture and existing coverage review,
+provider ordinary tests, provider/Jarl proof-test Clippy, formatting and provider
+rustdoc passed. No Lean or production Jarl Rust changed.

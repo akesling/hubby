@@ -550,7 +550,13 @@ compiler executable hashes/version, root-source snapshots, and manifest/lock
 identity. Each compilation unit also records `effective_cfg`: the output of
 `rustc --print cfg` using its full argument vector and Cargo environment, including
 feature flags, build-script cfg and profile overrides. Compiler probes have no
-unit cfg. This does not expand or resolve cfg-selected modules. Response files
+unit cfg. The report's `configured_root_invocation` identifies the compilation
+whose cfg selects declarations in `configured_inventory`. This additional inventory
+handles module/item/associated-item `cfg` and nested `cfg_attr`, while retaining
+original source hashes. It does not select fields or expressions, expand macros,
+or resolve names. `coverage::inventory_configured` exposes that accounting with
+an explicit `cfg::Configuration`. Capture still requires its conservative pre-build
+source inventory; it does not yet support all mutually exclusive source layouts. Response files
 are rejected until their inputs can be captured. Build failure, failed cfg capture
 or changed source removes prior capture success.
 Unsupported Cargo configuration and existing wrapper overrides fail explicitly.

@@ -170,6 +170,17 @@ fn effective_cfg_includes_build_script_features_and_actual_profile_override() {
         r#"{"manifest":"Cargo.toml","target":"host","profile":"release","features":["selected"]}"#,
     )
     .unwrap();
+    fs::write(
+        subject.0.join("src/lib.rs"),
+        r#"
+        #![no_std]
+        #[cfg(all(from_build_script, feature="selected", debug_assertions))]
+        pub fn enabled() {}
+        #[cfg(not(all(from_build_script, feature="selected", debug_assertions)))]
+        pub fn disabled() {}
+    "#,
+    )
+    .unwrap();
     let result = Command::new(env!("CARGO_BIN_EXE_provium"))
         .args(["capture-cargo", "build.json", "--out", "evidence"])
         .env("CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS", "true")
@@ -205,6 +216,30 @@ fn effective_cfg_includes_build_script_features_and_actual_profile_override() {
             "missing {expected}: {cfg}"
         );
     }
+    assert_eq!(
+        &units[report["configured_root_invocation"].as_u64().unwrap() as usize],
+        root
+    );
+    let selected = report["configured_inventory"]["items"].as_array().unwrap();
+    assert!(selected.iter().any(|i| i["id"] == "crate::enabled"));
+    assert!(!selected.iter().any(|i| i["id"] == "crate::disabled"));
+    let result = Command::new(env!("CARGO_BIN_EXE_provium"))
+        .args(["capture-cargo", "build.json", "--out", "evidence"])
+        .env("CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS", "false")
+        .current_dir(&subject.0)
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let changed: serde_json::Value =
+        serde_json::from_slice(&fs::read(subject.certificate()).unwrap()).unwrap();
+    let selected = changed["configured_inventory"]["items"].as_array().unwrap();
+    assert!(!selected.iter().any(|i| i["id"] == "crate::enabled"));
+    assert!(selected.iter().any(|i| i["id"] == "crate::disabled"));
+    assert_eq!(report["source_inventory"], changed["source_inventory"]);
     // Metadata's requested release profile deliberately differs from Cargo's
     // effective override, demonstrating why the unit-level query is necessary.
     assert!(!report["subject"]["target_cfg"]

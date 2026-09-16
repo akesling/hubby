@@ -2,6 +2,7 @@
 //! The Rust frontend and Lean operational semantics remain in the trusted base.
 pub mod cargo_capture;
 pub mod cargo_subject;
+pub mod cfg;
 pub mod coverage;
 pub mod extract;
 pub mod frontend;

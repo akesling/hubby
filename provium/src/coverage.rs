@@ -123,6 +123,7 @@ impl<'ast> Visit<'ast> for Calls {
 
 struct Collector<'a> {
     root: &'a Path,
+    cfg: Option<&'a crate::cfg::Configuration>,
     inventory: Inventory,
 }
 impl Collector<'_> {
@@ -168,6 +169,11 @@ impl Collector<'_> {
             path: relative.clone(),
             sha256: hash(source),
         });
+        if let Some(cfg) = self.cfg {
+            if cfg.attributes(&parsed.attrs)?.is_none() {
+                return Ok(());
+            }
+        }
         self.items(&parsed.items, module, &relative, directory)
     }
 
@@ -179,6 +185,11 @@ impl Collector<'_> {
         directory: &Path,
     ) -> Result<(), String> {
         for (ordinal, item) in items.iter().enumerate() {
+            if let Some(cfg) = self.cfg {
+                if cfg.declaration(item)?.is_none() {
+                    continue;
+                }
+            }
             let anonymous = format!("{module}::<item:{ordinal}>");
             let mut calls = Calls(vec![]);
             calls.visit_item(item);
@@ -195,13 +206,21 @@ impl Collector<'_> {
                     );
                     // Exact #[cfg(test)] modules are recorded but not traversed.
                     // Other cfgs are conservatively included, never evaluated away.
-                    if m.attrs.iter().any(|a| {
-                        a.path().is_ident("cfg")
-                            && a.parse_args::<syn::Ident>().is_ok_and(|i| i == "test")
-                    }) {
+                    if self.cfg.is_none()
+                        && m.attrs.iter().any(|a| {
+                            a.path().is_ident("cfg")
+                                && a.parse_args::<syn::Ident>().is_ok_and(|i| i == "test")
+                        })
+                    {
                         continue;
                     }
-                    if m.attrs.iter().any(|a| a.path().is_ident("path")) {
+                    let has_path = if let Some(cfg) = self.cfg {
+                        cfg.attributes(&m.attrs)?
+                            .is_some_and(|attrs| attrs.iter().any(|a| a.path().is_ident("path")))
+                    } else {
+                        m.attrs.iter().any(|a| a.path().is_ident("path"))
+                    };
+                    if has_path {
                         return Err(format!(
                             "{name}: #[path] module resolution is not supported"
                         ));
@@ -232,6 +251,11 @@ impl Collector<'_> {
                     };
                     self.record(anonymous, "impl", source, i, false, vec![]);
                     for member in &i.items {
+                        if let Some(cfg) = self.cfg {
+                            if cfg.declaration(member)?.is_none() {
+                                continue;
+                            }
+                        }
                         let (ident, kind, public) = match member {
                             syn::ImplItem::Fn(f) => (
                                 &f.sig.ident,
@@ -301,6 +325,11 @@ impl Collector<'_> {
                         calls.0,
                     );
                     for member in &t.items {
+                        if let Some(cfg) = self.cfg {
+                            if cfg.declaration(member)?.is_none() {
+                                continue;
+                            }
+                        }
                         if let syn::TraitItem::Fn(f) = member {
                             let mut calls = Calls(vec![]);
                             calls.visit_trait_item_fn(f);
@@ -327,10 +356,29 @@ impl Collector<'_> {
 /// Inventory a library's original source without compiling or installing tools.
 /// Every source item is included conservatively; this is not a reachable-code proof.
 pub fn inventory(crate_root: &Path, library: &Path) -> Result<Inventory, String> {
+    collect(crate_root, library, None)
+}
+
+/// Select module/item/associated-item declarations using effective compiler cfg.
+/// Fields, expressions, macro-generated items and name resolution are not resolved.
+/// Original syntax hashes retain all nested syntax, including inactive branches.
+pub fn inventory_configured(
+    crate_root: &Path,
+    library: &Path,
+    cfg: &crate::cfg::Configuration,
+) -> Result<Inventory, String> {
+    collect(crate_root, library, Some(cfg))
+}
+fn collect(
+    crate_root: &Path,
+    library: &Path,
+    cfg: Option<&crate::cfg::Configuration>,
+) -> Result<Inventory, String> {
     let root = crate_root.canonicalize().map_err(|e| e.to_string())?;
     let library = root.join(library);
     let mut collector = Collector {
         root: &root,
+        cfg,
         inventory: Inventory {
             schema: 2,
             sources: vec![],
@@ -344,6 +392,9 @@ pub fn inventory(crate_root: &Path, library: &Path) -> Result<Inventory, String>
             ],
         },
     };
+    if cfg.is_some() {
+        collector.inventory.limitations[1] = "cfg/cfg_attr selects declarations only; fields, expressions and macro expansion remain unresolved; hashes retain original nested syntax".into();
+    }
     collector.file(
         &library,
         "crate",

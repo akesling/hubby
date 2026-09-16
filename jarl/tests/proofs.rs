@@ -279,6 +279,22 @@ fn m1_actual_cargo_compilation_is_bound_to_original_sources() {
         .find(|line| line.starts_with("target_pointer_width="))
         .unwrap();
     assert!(cfg.lines().any(|line| line == width));
+    assert!(std::ptr::eq(
+        unit,
+        &report.invocations[report.configured_root_invocation]
+    ));
+    let expected = provium::coverage::inventory_configured(
+        root,
+        Path::new("src/lib.rs"),
+        &provium::cfg::Configuration::parse(cfg).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(report.configured_inventory, expected);
+    assert!(report
+        .configured_inventory
+        .items
+        .iter()
+        .all(|item| !item.id.contains("::tests")));
 }
 
 #[test]

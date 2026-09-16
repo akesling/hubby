@@ -75,6 +75,8 @@ pub struct Capture {
     pub kind: &'static str,
     pub subject: cargo_subject::Report,
     pub source_inventory: crate::coverage::Inventory,
+    pub configured_root_invocation: usize,
+    pub configured_inventory: crate::coverage::Inventory,
     pub run_directory: PathBuf,
     pub cargo_working_directory: PathBuf,
     pub cargo_arguments: Vec<String>,
@@ -223,7 +225,9 @@ pub fn capture(request: cargo_subject::Request, output: &Path) -> Result<Capture
         })
         .and_then(|t| t["src_path"].as_str())
         .ok_or("capture requires a library target")?;
-    let library = PathBuf::from(library);
+    let library = PathBuf::from(library)
+        .canonicalize()
+        .map_err(|e| e.to_string())?;
     let package_root = root_package
         .manifest
         .parent()
@@ -426,6 +430,27 @@ pub fn capture(request: cargo_subject::Request, output: &Path) -> Result<Capture
     }) {
         return Err("capture does not inventory cfg(test) modules".into());
     }
+    let configured_root_invocation = invocations
+        .iter()
+        .position(|invocation| {
+            invocation.effective_cfg.is_some()
+                && invocation.arguments.iter().any(|arg| {
+                    invocation
+                        .working_directory
+                        .join(arg)
+                        .canonicalize()
+                        .is_ok_and(|path| path == library)
+                })
+        })
+        .ok_or("missing root compilation cfg")?;
+    let cfg = crate::cfg::Configuration::parse(
+        invocations[configured_root_invocation]
+            .effective_cfg
+            .as_deref()
+            .ok_or("missing effective cfg")?,
+    )?;
+    let configured_inventory =
+        crate::coverage::inventory_configured(&package_root, &library, &cfg)?;
     if crate::coverage::inventory(&package_root, &library)? != source_inventory {
         return Err("source inputs changed during capture".into());
     }
@@ -441,7 +466,7 @@ pub fn capture(request: cargo_subject::Request, output: &Path) -> Result<Capture
             return Err("workspace inputs changed during capture".into());
         }
     }
-    let report = Capture { schema: 1, kind: "compiler_invocation_capture", subject, source_inventory, run_directory: run.clone(), cargo_working_directory: cwd, cargo_arguments: args,
+    let report = Capture { schema: 1, kind: "compiler_invocation_capture", subject, source_inventory, configured_root_invocation, configured_inventory, run_directory: run.clone(), cargo_working_directory: cwd, cargo_arguments: args,
         invocations, compilers, wrapper_sha256: project::hash(WRAPPER), cargo_stdout_sha256: project::hash(&result.stdout),
         cargo_stderr_sha256: project::hash(&result.stderr), semantic_preservation_proved: false,
         limitations: vec!["Generated/dependency source files, environment, build-script inputs and compiler sysroot/dynamic libraries still require complete attestation".into(),
