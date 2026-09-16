@@ -1,5 +1,6 @@
-//! Pure optional-record filtering and copied-field projection. The resulting
-//! list denotes the lazy iterator's value sequence, not an allocation in Rust.
+//! Pure optional-record filtering and copied-field projection. Iterator output
+//! denotes a lazy value sequence; array output retains every optional slot.
+//! Lean lists model these values without implying an allocation in Rust.
 use super::arrays::{binding, copy_derived, relative};
 use super::lookups::method;
 use super::*;
@@ -24,6 +25,27 @@ fn closure(expression: &Expr) -> Result<&syn::ExprClosure, String> {
         return Err("record projection needs a plain one-parameter closure".into());
     }
     Ok(c)
+}
+
+fn option_payload(ty: &Type) -> Result<&Type, String> {
+    let Type::Path(option) = ty else {
+        return Err("projection needs Option slots".into());
+    };
+    if option.qself.is_some()
+        || option.path.leading_colon.is_some()
+        || option.path.segments.len() != 1
+        || option.path.segments[0].ident != "Option"
+    {
+        return Err("projection needs builtin Option slots".into());
+    }
+    let syn::PathArguments::AngleBracketed(arguments) = &option.path.segments[0].arguments else {
+        return Err("missing slot type".into());
+    };
+    let arguments: Vec<_> = arguments.args.iter().collect();
+    let [syn::GenericArgument::Type(payload)] = arguments.as_slice() else {
+        return Err("projection needs one slot payload".into());
+    };
+    Ok(payload)
 }
 
 impl Crate {
@@ -76,59 +98,81 @@ impl Crate {
         let syn::ReturnType::Type(_, output) = &sig.output else {
             return Err("missing iterator output".into());
         };
-        let Type::ImplTrait(output) = &**output else {
-            return Err("projection must return impl Iterator".into());
-        };
-        let mut iterator = None;
-        let mut lifetime = false;
-        for bound in &output.bounds {
-            match bound {
-                syn::TypeParamBound::Trait(t) if iterator.is_none() => iterator = Some(t),
-                syn::TypeParamBound::Lifetime(l) if l.ident == "_" && !lifetime => lifetime = true,
-                _ => {
-                    return Err(
+        let preserve_slots = matches!(&**output, Type::Array(_));
+        let output_type = if let Type::Array(array) = &**output {
+            let payload = option_payload(&array.elem)?;
+            if def
+                .impl_generics
+                .type_params()
+                .any(|p| p.ident == base_type(payload).unwrap_or_default())
+            {
+                return Err("generic projected values require resolved Copy bounds".into());
+            }
+            self.projection_value_type(&def.module, payload)?
+        } else {
+            let Type::ImplTrait(output) = &**output else {
+                return Err("projection must return impl Iterator".into());
+            };
+            let mut iterator = None;
+            let mut lifetime = false;
+            for bound in &output.bounds {
+                match bound {
+                    syn::TypeParamBound::Trait(t) if iterator.is_none() => iterator = Some(t),
+                    syn::TypeParamBound::Lifetime(l) if l.ident == "_" && !lifetime => {
+                        lifetime = true
+                    }
+                    _ => return Err(
                         "projection permits only Iterator and an optional elided capture lifetime"
                             .into(),
-                    )
+                    ),
                 }
             }
-        }
-        let iterator = iterator.ok_or("projection needs an Iterator bound")?;
-        if iterator.lifetimes.is_some()
-            || !matches!(iterator.modifier, syn::TraitBoundModifier::None)
-            || iterator.path.leading_colon.is_some()
-            || iterator.path.segments.len() != 1
-            || iterator.path.segments[0].ident != "Iterator"
-        {
-            return Err("projection must use the builtin Iterator trait".into());
-        }
-        let syn::PathArguments::AngleBracketed(arguments) = &iterator.path.segments[0].arguments
-        else {
-            return Err("projection needs its Item type".into());
+            let iterator = iterator.ok_or("projection needs an Iterator bound")?;
+            if iterator.lifetimes.is_some()
+                || !matches!(iterator.modifier, syn::TraitBoundModifier::None)
+                || iterator.path.leading_colon.is_some()
+                || iterator.path.segments.len() != 1
+                || iterator.path.segments[0].ident != "Iterator"
+            {
+                return Err("projection must use the builtin Iterator trait".into());
+            }
+            let syn::PathArguments::AngleBracketed(arguments) =
+                &iterator.path.segments[0].arguments
+            else {
+                return Err("projection needs its Item type".into());
+            };
+            let arguments: Vec<_> = arguments.args.iter().collect();
+            let [syn::GenericArgument::AssocType(item)] = arguments.as_slice() else {
+                return Err("projection needs one Item type".into());
+            };
+            if item.ident != "Item" || item.generics.is_some() {
+                return Err("unsupported iterator type binding".into());
+            }
+            if def
+                .impl_generics
+                .type_params()
+                .any(|p| p.ident == base_type(&item.ty).unwrap_or_default())
+            {
+                return Err("generic projected values require resolved Copy bounds".into());
+            }
+            self.projection_value_type(&def.module, &item.ty)?
         };
-        let arguments: Vec<_> = arguments.args.iter().collect();
-        let [syn::GenericArgument::AssocType(item)] = arguments.as_slice() else {
-            return Err("projection needs one Item type".into());
-        };
-        if item.ident != "Item" || item.generics.is_some() {
-            return Err("unsupported iterator type binding".into());
-        }
-        if def
-            .impl_generics
-            .type_params()
-            .any(|p| p.ident == base_type(&item.ty).unwrap_or_default())
-        {
-            return Err("generic projected values require resolved Copy bounds".into());
-        }
-        let output_type = self.projection_value_type(&def.module, &item.ty)?;
         let [syn::Stmt::Expr(expression, None)] = f.block.stmts.as_slice() else {
-            return Err("projection must retain its complete iterator expression".into());
+            return Err("projection must retain its complete expression".into());
         };
         let map = method(expression, "map", 1)?;
-        let filter = method(&map.receiver, "filter", 1)?;
-        let flatten = method(&filter.receiver, "flatten", 0)?;
-        let iter = method(&flatten.receiver, "iter", 0)?;
-        let field = path(&iter.receiver)?;
+        let filter = if preserve_slots {
+            None
+        } else {
+            Some(method(&map.receiver, "filter", 1)?)
+        };
+        let field = if let Some(filter) = filter {
+            let flatten = method(&filter.receiver, "flatten", 0)?;
+            let iter = method(&flatten.receiver, "iter", 0)?;
+            path(&iter.receiver)?
+        } else {
+            path(&map.receiver)?
+        };
         if field.len() != 1 {
             return Err("projection requires a direct array field".into());
         }
@@ -136,24 +180,12 @@ impl Crate {
         let Type::Array(array) = self.field_type(def, &field)? else {
             return Err("projection requires a builtin array".into());
         };
-        let Type::Path(option) = &*array.elem else {
-            return Err("projection needs Option<Record> slots".into());
-        };
-        if option.qself.is_some()
-            || option.path.leading_colon.is_some()
-            || option.path.segments.len() != 1
-            || option.path.segments[0].ident != "Option"
-        {
-            return Err("projection needs builtin Option slots".into());
+        if let Type::Array(output_array) = &**output {
+            if tokens(&output_array.len) != tokens(&array.len) {
+                return Err("array projection must preserve the source capacity".into());
+            }
         }
-        let syn::PathArguments::AngleBracketed(arguments) = &option.path.segments[0].arguments
-        else {
-            return Err("missing slot type".into());
-        };
-        let arguments: Vec<_> = arguments.args.iter().collect();
-        let [syn::GenericArgument::Type(record_type)] = arguments.as_slice() else {
-            return Err("projection needs one slot payload".into());
-        };
+        let record_type = option_payload(&array.elem)?;
         let record_name = base_type(record_type)?;
         if tokens(record_type) != record_name
             || def
@@ -171,6 +203,9 @@ impl Crate {
         if !slot_record.generics.params.is_empty() {
             return Err("generic record slots need substitution".into());
         }
+        if preserve_slots && (!copy_derived(slot_record) || self.drops.contains(&record)) {
+            return Err("by-value array projection requires Copy record slots".into());
+        }
         let record_def = Definition {
             module: self.struct_modules[&record].clone(),
             file: def.file.clone(),
@@ -179,10 +214,24 @@ impl Crate {
             impl_generics: syn::Generics::default(),
             self_type: None,
         };
-        let filter = closure(&filter.args[0])?;
-        let parameter = binding(&filter.inputs[0])?;
-        let predicate = self.condition(&record_def, &relative(&filter.body, &parameter))?;
-        let map = closure(&map.args[0])?;
+        let predicate = if let Some(filter) = filter {
+            let filter = closure(&filter.args[0])?;
+            let parameter = binding(&filter.inputs[0])?;
+            self.condition(&record_def, &relative(&filter.body, &parameter))?
+        } else {
+            Condition::Boolean(true)
+        };
+        let outer = closure(&map.args[0])?;
+        let map = if preserve_slots {
+            let slot = binding(&outer.inputs[0])?;
+            let nested = method(&outer.body, "map", 1)?;
+            if !super::arrays::named(&nested.receiver, &slot) {
+                return Err("optional projection must map its own slot".into());
+            }
+            closure(&nested.args[0])?
+        } else {
+            outer
+        };
         let parameter = binding(&map.inputs[0])?;
         let projected = path(&relative(&map.body, &parameter))?;
         if projected.is_empty() {
@@ -195,14 +244,46 @@ impl Crate {
         if actual != output_type {
             return Err("projected field and iterator Item types disagree".into());
         }
-        Ok(Method { name: name.into(), symbol: name.replace("::", "_"), source: def.file.clone(),
-            first_line: f.span().start().line, last_line: f.span().end().line, rust: tokens(f), writes: vec![], body: vec![],
-            iteration: None, last: None, truncation: None, installation: None, restoration: None, enum_projection: None,
-            validator: None, view: None, record_at: None, lookup: None, selection: None, relocation: None,
-            buffer: None, constructor: None, query: None,
-            array: Some(arrays::Shape { field: field[0].clone(), capacity: tokens(&array.len), record,
-                predicate: Some(predicate), projection: Some(projected), key: None, upsert: None, batch: None,
-                scope: "complete pure optional-record filter and copied-field iterator projection; ordered lazy value denotation; source/type/layout/lifetime refinement remains open" }),
+        Ok(Method {
+            name: name.into(),
+            symbol: name.replace("::", "_"),
+            source: def.file.clone(),
+            first_line: f.span().start().line,
+            last_line: f.span().end().line,
+            rust: tokens(f),
+            writes: vec![],
+            body: vec![],
+            iteration: None,
+            last: None,
+            truncation: None,
+            installation: None,
+            restoration: None,
+            enum_projection: None,
+            validator: None,
+            view: None,
+            record_at: None,
+            lookup: None,
+            selection: None,
+            relocation: None,
+            buffer: None,
+            constructor: None,
+            query: None,
+            array: Some(arrays::Shape {
+                field: field[0].clone(),
+                capacity: tokens(&array.len),
+                record,
+                predicate: Some(predicate),
+                projection: Some(projected),
+                preserve_slots,
+                key: None,
+                upsert: None,
+                batch: None,
+                scope: if preserve_slots {
+                    "complete Copy array/Option field mapping; slot positions preserved; source/type/layout/ownership refinement remains open"
+                } else {
+                    "complete pure optional-record filter and copied-field iterator projection; ordered lazy value denotation; source/type/layout/lifetime refinement remains open"
+                },
+            }),
         })
     }
 }

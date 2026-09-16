@@ -347,6 +347,32 @@ def projectSlot (program : RecordProjection) : Option (Store α) → Option (Cel
 def projectArray (program : RecordProjection) (entries : ArrayStore α) : List (Cell α) :=
   entries.filterMap (projectSlot program)
 
+-- By-value array.map followed by Option.map preserves empty slots and indices.
+-- Copy is checked by the frontend; memory/ownership refinement is separate.
+def mapArrayField (field : Path) (entries : ArrayStore α) : List (Option (Cell α)) :=
+  entries.map (fun entry => entry.map (fun state => state field))
+
+theorem mapArrayField_length (field : Path) (entries : ArrayStore α) :
+    (mapArrayField field entries).length = entries.length := by
+  simp [mapArrayField]
+
+theorem mapArrayField_at (field : Path) (entries : ArrayStore α) (index : Nat) :
+    (mapArrayField field entries)[index]? =
+      entries[index]?.map (fun entry => entry.map (fun state => state field)) := by
+  simp [mapArrayField]
+
+theorem mapArrayField_member (field : Path) (entries : ArrayStore α) (value : Cell α) :
+    some value ∈ mapArrayField field entries ↔
+      ∃ state, some state ∈ entries ∧ state field = value := by
+  simp only [mapArrayField, List.mem_map]
+  constructor
+  · rintro ⟨entry, member, equal⟩
+    cases entry with
+    | none => cases equal
+    | some state => exact ⟨state, member, Option.some.inj equal⟩
+  · rintro ⟨state, member, equal⟩
+    exact ⟨some state, member, congrArg some equal⟩
+
 theorem projectArray_member (program : RecordProjection) (entries : ArrayStore α) (value : Cell α) :
     value ∈ projectArray program entries ↔
       ∃ state, some state ∈ entries ∧ evalCondition program.predicate state = true ∧

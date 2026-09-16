@@ -906,3 +906,30 @@ membership mutations passed against the expanded project. Coverage/review and
 the discoverable format check passed. Lean checks used one process at a time
 with a 16384 MiB ceiling. A previously unformatted provider batch fixture was
 formatted as part of the format gate.
+
+## M1: peer array projection
+
+Provium translates Copy array mapping composed with Option mapping, retaining
+empty slots and exact positions. The frontend checks the complete expression,
+source/output capacities, concrete Copy record and projected value types, closure
+bindings, and standard-operation resolution. Unsupported effects, captures and
+unresolved generic output types are rejected. This shares field/type checking
+with lazy record projections while using a separate semantics that retains holes.
+
+Jarl's original `Membership::peers` now has five obligations: capacity, every slot's
+identity, exact identity membership, and composition with successful restore/new.
+These are C03/P02/P03/P05/R01 component contracts; source ownership/layout
+refinement, peer reconciliation and stale-response identity binding remain open.
+Jarl production Rust is unchanged. Remaining M1 membership work includes
+`with_learners`, `joint`, quorum helpers and reachable caller obligations; M1's
+semantic preservation/ownership requirements and M2's global election proof are
+not closed by this projection.
+
+Validation: the membership project checked 11 complete methods and 70 obligations
+on host and installed wasm32. All nine provider projection tests passed,
+including kernel field-mutation rejection and native slot/source preservation
+across capacities 0, 1, 5 and 8. The additional generic-output rejection case
+passed. The full ordinary provider suite, provider Clippy/rustdoc, Jarl Clippy,
+format checks and coverage/review check passed. Jarl's expanded native comparison
+and all 13 original-source membership mutations passed. Lean checks remained
+serialized with a 16384 MiB ceiling.

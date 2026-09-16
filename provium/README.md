@@ -181,6 +181,14 @@ layout and lifetime refinement remain open. Kernel contracts check output origin
 and length bounds; native comparisons check order and payload destruction, and
 source mutations must invalidate the proof.
 
+Copy optional-record arrays also support `array.map(|slot| slot.map(|row| row.field))`.
+This returns an array with the same capacity and preserves every empty slot and
+index. Both the record and projected value must be concrete Copy types; the
+closures must be pure field projections. Kernel contracts expose length, indexed
+values and identity origin. Native checks include holes and repeated identities;
+a changed projected field fails its independent contract. Source ownership and
+layout refinement remain open.
+
 Optional-record `any` queries also support a field equality against a concrete
 value argument, optionally followed by a boolean flag predicate. Equality is
 restricted to builtin scalars and Copy records deriving PartialEq over builtin

@@ -11,7 +11,8 @@
     "membership::Membership::is_voter",
     "membership::Membership::include",
     "membership::Membership::restore",
-    "membership::Membership::new"
+    "membership::Membership::new",
+    "membership::Membership::peers"
   ],
   "proofs": "Proofs.lean",
   "obligations": [
@@ -274,6 +275,26 @@
     {
       "theorem": "CapacityAcceptance.stable_rejects_iff",
       "function": "membership_Membership_new"
+    },
+    {
+      "theorem": "Peers.capacity_preserved",
+      "function": "membership_Membership_peers"
+    },
+    {
+      "theorem": "Peers.slot_identity",
+      "function": "membership_Membership_peers"
+    },
+    {
+      "theorem": "Peers.member_iff",
+      "function": "membership_Membership_peers"
+    },
+    {
+      "theorem": "Peers.restored_members",
+      "function": "membership_Membership_peers"
+    },
+    {
+      "theorem": "Peers.stable_members",
+      "function": "membership_Membership_peers"
     }
   ]
 }

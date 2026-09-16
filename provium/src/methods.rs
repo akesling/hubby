@@ -491,6 +491,10 @@ impl Crate {
             if slot_batches::candidate(&def.item) {
                 return self.lower_slot_batch(name);
             }
+            if matches!(&def.item.sig.output, syn::ReturnType::Type(_, ty) if matches!(&**ty, Type::Array(_)))
+            {
+                return self.lower_projection(name);
+            }
             if restorations::candidate(&def.item) {
                 return self.lower_restoration(name);
             }

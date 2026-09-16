@@ -39,11 +39,14 @@ fn original_membership_methods_agree_with_translation_across_array_capacities() 
     let krate = Crate::load(&root.join("src/lib.rs")).unwrap();
     let update = krate.lower("membership::Membership::finalized").unwrap();
     let query = krate.lower("membership::Membership::is_joint").unwrap();
+    let peers = krate.lower("membership::Membership::peers").unwrap();
+    assert!(peers.array.as_ref().unwrap().preserve_slots);
     let native = format!(
         r#"
+type Id = usize;
 #[derive(Clone,Copy)] struct Member {{id:usize,old:bool,voter:bool,learner:bool}}
 #[derive(Clone,Copy)] struct Membership<const MAX:usize>{{members:[Option<Member>;MAX]}}
-impl<const MAX:usize> Membership<MAX>{{{} {}}}
+impl<const MAX:usize> Membership<MAX>{{{} {} {}}}
 fn cases<const N:usize>(){{
  for code in 0..9usize.pow(N as u32) {{
   let mut rest=code;
@@ -51,12 +54,13 @@ fn cases<const N:usize>(){{
   let initial=Membership::<N>{{members}};let result=initial.finalized();
   print!("{{}} {{}}",initial.is_joint(),result.is_joint());
   for slot in result.members {{match slot {{None=>print!(" -"),Some(m)=>print!(" {{}}:{{}}:{{}}:{{}}",m.id,m.old,m.voter,m.learner)}}}}
+  for slot in initial.peers() {{match slot {{None=>print!(" p:-"),Some(id)=>print!(" p:{{}}",id)}}}}
   println!();
  }}
 }}
 fn main(){{cases::<0>();cases::<1>();cases::<2>();cases::<3>();}}
 "#,
-        update.rust, query.rust
+        update.rust, query.rust, peers.rust
     );
     let source = w.source(&native);
     let binary = w.0.join("native");
@@ -81,13 +85,16 @@ fn main(){{cases::<0>();cases::<1>();cases::<2>();cases::<3>();}}
             let mut before = false;
             let mut after = false;
             let mut slots = String::new();
+            let mut peer_slots = String::new();
             for id in 0..n {
                 let digit = code % 9;
                 code /= 9;
                 if digit == 0 {
+                    peer_slots.push_str(" p:-");
                     slots.push_str(" -");
                     continue;
                 }
+                peer_slots.push_str(&format!(" p:{id}"));
                 let bits = digit - 1;
                 let mut state = BTreeMap::from([
                     ("old".into(), bits & 1 != 0),
@@ -107,7 +114,7 @@ fn main(){{cases::<0>();cases::<1>();cases::<2>();cases::<3>();}}
                     slots.push_str(" -");
                 }
             }
-            expected.push_str(&format!("{before} {after}{slots}\n"));
+            expected.push_str(&format!("{before} {after}{slots}{peer_slots}\n"));
         }
     }
     assert_eq!(String::from_utf8(actual.stdout).unwrap(), expected);

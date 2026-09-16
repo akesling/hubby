@@ -4260,10 +4260,41 @@
         "S11",
         "S12"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open.",
+      "status": "component_evidence",
+      "note": "Complete original Copy array.map/Option.map body preserves capacity and every empty/present slot position, returns exactly the stored identities, and composes with successful restore/new to recover their input identity union. Reachable peer-slot reconciliation, stale-response identity binding and Rust source/ownership/layout refinement remain open.",
       "root_apis": [],
-      "contracts": [],
+      "contracts": [
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "Peers.capacity_preserved",
+          "function": "membership_Membership_peers",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "Peers.slot_identity",
+          "function": "membership_Membership_peers",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "Peers.member_iff",
+          "function": "membership_Membership_peers",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "Peers.restored_members",
+          "function": "membership_Membership_peers",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "Peers.stable_members",
+          "function": "membership_Membership_peers",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        }
+      ],
       "context": "production"
     },
     "crate::membership::<Membership < MAX >>::quorum": {

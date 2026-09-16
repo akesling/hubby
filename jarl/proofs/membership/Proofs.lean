@@ -948,3 +948,36 @@ theorem stable_rejects_iff [DecidableEq α] (capacity : Nat) (voters learners : 
   simpa only [List.append_nil] using restore_rejects_iff capacity voters [] learners
 
 end CapacityAcceptance
+
+
+namespace Peers
+open JarlMembership SetInterpretation
+
+theorem capacity_preserved (entries : ArrayStore α) :
+    (membership_Membership_peers entries).length = entries.length :=
+  mapArrayField_length membership_Membership_peers_ir entries
+
+theorem slot_identity (entries : ArrayStore α) (index : Nat) :
+    (membership_Membership_peers entries)[index]? =
+      entries[index]?.map (fun slot => slot.map (fun state => state ["id"])) :=
+  mapArrayField_at membership_Membership_peers_ir entries index
+
+theorem member_iff (entries : ArrayStore α) (query : Cell α) :
+    some query ∈ membership_Membership_peers entries ↔ HasIdentity entries query := by
+  rw [has_identity_iff]
+  exact mapArrayField_member membership_Membership_peers_ir entries query
+
+theorem restored_members [DecidableEq α] (capacity : Nat) (voters old learners : List (Cell α))
+    (result : ArrayStore α) (success : membership_Membership_restore capacity voters old learners = .ok result)
+    (query : Cell α) :
+    some query ∈ membership_Membership_peers result ↔ query ∈ voters ∨ query ∈ learners ∨ query ∈ old := by
+  rw [member_iff]
+  exact restore_identities capacity voters old learners result success query
+
+theorem stable_members [DecidableEq α] (capacity : Nat) (voters learners : List (Cell α))
+    (result : ArrayStore α) (success : membership_Membership_new capacity voters learners = .ok result)
+    (query : Cell α) :
+    some query ∈ membership_Membership_peers result ↔ query ∈ voters ∨ query ∈ learners := by
+  simpa using restored_members capacity voters [] learners result success query
+
+end Peers

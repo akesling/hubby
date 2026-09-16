@@ -270,3 +270,101 @@ open Provium.State
         assert!(!out.join("verified.json").exists());
     }
 }
+
+const SLOT_SOURCE: &str = r#"
+#[derive(Clone, Copy)] struct Key(u64);
+#[derive(Clone, Copy)] struct Row { key: Key, alternate: Key }
+struct Table<const N: usize> { rows: [Option<Row>; N] }
+impl<const N: usize> Table<N> {
+    fn keys(&self) -> [Option<Key>; N] {
+        self.rows.map(|slot| slot.map(|row| row.key))
+    }
+}
+"#;
+
+#[test]
+fn copied_array_projection_keeps_slots_and_rejects_unmodeled_effects() {
+    let shape = Work::new(SLOT_SOURCE).lower().unwrap().array.unwrap();
+    assert!(shape.preserve_slots);
+    assert_eq!(shape.projection.unwrap(), ["key"]);
+    for source in [
+        SLOT_SOURCE.replace("[Option<Key>; N]", "[Option<Key>; 2]"),
+        SLOT_SOURCE.replace("Option<Key>", "Option<u64>"),
+        SLOT_SOURCE.replace("impl<const N: usize>", "impl<const N: usize, Key>"),
+        SLOT_SOURCE.replace("self.rows.map", "panic!(); self.rows.map"),
+        SLOT_SOURCE.replace("slot.map", "self.rows[0].map"),
+        SLOT_SOURCE.replace("row.key", "row.key.clone()"),
+        SLOT_SOURCE.replace("row.key", "{ panic!(); row.key }"),
+        SLOT_SOURCE.replace("|row|", "move |row|"),
+        SLOT_SOURCE.replace("#[derive(Clone, Copy)] struct Row", "struct Row"),
+        format!("{SLOT_SOURCE}\ntrait Foreign {{ fn map(self); }}"),
+    ] {
+        assert_ne!(source, SLOT_SOURCE);
+        assert!(Work::new(&source).lower().is_err(), "accepted {source}");
+    }
+}
+
+#[test]
+#[ignore = "requires pinned Lean; scripts/verify.sh runs this"]
+fn copied_array_projection_kernel_checks_positions_and_rejects_wrong_field() {
+    let work = Work::new(SLOT_SOURCE);
+    fs::write(work.0.join("Proofs.lean"), r#"import Generated
+open Provium.State
+ theorem length (entries : ArrayStore α) : (Subject.Table_keys entries).length = entries.length :=
+  mapArrayField_length Subject.Table_keys_ir entries
+ theorem position (entries : ArrayStore α) (i : Nat) :
+    (Subject.Table_keys entries)[i]? = entries[i]?.map (fun slot => slot.map (fun row => row ["key"])) :=
+  mapArrayField_at Subject.Table_keys_ir entries i
+"#).unwrap();
+    let project = work.0.join("project.json");
+    fs::write(&project, r#"{"crate_root":"source.rs","namespace":"Subject","methods":["Table::keys"],"proofs":"Proofs.lean","obligations":[{"theorem":"length","function":"Table_keys"},{"theorem":"position","function":"Table_keys"}]}"#).unwrap();
+    let out = work.0.join("out");
+    provium::methods::verify(&project, &out).unwrap();
+    fs::write(
+        work.0.join("source.rs"),
+        SLOT_SOURCE.replace("row.key", "row.alternate"),
+    )
+    .unwrap();
+    let error = provium::methods::verify(&project, &out).unwrap_err();
+    assert!(error.contains("Lean rejected Proofs.lean"), "{error}");
+    assert!(!out.join("verified.json").exists());
+}
+
+#[test]
+fn native_copied_array_projection_preserves_holes_positions_and_source() {
+    let work = Work::new(SLOT_SOURCE);
+    let native = format!(
+        "{SLOT_SOURCE}\n{}",
+        r#"
+fn check<const N: usize>() {
+ for mask in 0..(1usize << N) {
+  let table = Table::<N> { rows: core::array::from_fn(|i| {
+   (mask & (1 << i) != 0).then_some(Row { key: Key((i % 3) as u64), alternate: Key(99) })
+  }) };
+  let result = table.keys();
+  for i in 0..N {
+   let expected = (mask & (1 << i) != 0).then_some((i % 3) as u64);
+   assert_eq!(result[i].map(|key| key.0), expected);
+   assert_eq!(table.rows[i].map(|row| row.key.0), expected);
+  }
+ }
+}
+fn main() { check::<0>(); check::<1>(); check::<5>(); check::<8>(); }
+"#
+    );
+    fs::write(work.0.join("native.rs"), native).unwrap();
+    let binary = work.0.join("native");
+    let built = Command::new("rustc")
+        .args(["--edition=2021", "-Adead_code"])
+        .arg(work.0.join("native.rs"))
+        .arg("-o")
+        .arg(&binary)
+        .output()
+        .unwrap();
+    assert!(
+        built.status.success(),
+        "{}",
+        String::from_utf8_lossy(&built.stderr)
+    );
+    assert!(Command::new(binary).status().unwrap().success());
+}
