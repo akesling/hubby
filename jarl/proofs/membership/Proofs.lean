@@ -1397,3 +1397,40 @@ theorem observation_complete (entries : ArrayStore α) (callback : σ)
   predicate_observation_complete _ _ (response_budget entries callback) call drop
 
 end Quorum
+
+namespace QuorumIndex
+open JarlMembership
+
+-- The first rank must complete before the gate is queried. Both passes retain
+-- callback state; even a zero first rank does not skip the old configuration.
+theorem execution (entries : ArrayStore α) (callback : σ) (abortOnPanic : Bool) :
+    membership_Membership_quorum_index entries callback abortOnPanic =
+      collectCallbacks (membership_Membership_voters entries) callback (fun values advanced =>
+        match numericRank values 2 with
+        | none => finishNumericPanic advanced abortOnPanic
+        | some first =>
+          if membership_Membership_is_joint entries then
+            collectCallbacks (membership_Membership_old_voters entries) advanced (fun values advanced =>
+              match numericRank values 2 with
+              | none => finishNumericPanic advanced abortOnPanic
+              | some second => finishCallback advanced (.value (min first second)))
+          else finishCallback advanced (.value first)) := rfl
+
+theorem stable_execution (entries : ArrayStore α) (callback : σ) (abortOnPanic : Bool)
+    (stable : membership_Membership_is_joint entries = false) :
+    membership_Membership_quorum_index entries callback abortOnPanic =
+      collectCallbacks (membership_Membership_voters entries) callback (fun values advanced =>
+        match numericRank values 2 with
+        | none => finishNumericPanic advanced abortOnPanic
+        | some first => finishCallback advanced (.value first)) := by
+  rw [execution]
+  simp only [stable, Bool.false_eq_true, ↓reduceIte]
+
+theorem empty_current (entries : ArrayStore α) (callback : σ) (abortOnPanic : Bool)
+    (empty : membership_Membership_voters entries = []) :
+    membership_Membership_quorum_index entries callback abortOnPanic =
+      finishNumericPanic callback abortOnPanic := by
+  rw [execution, empty]
+  rfl
+
+end QuorumIndex

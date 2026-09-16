@@ -1117,3 +1117,33 @@ rejected changed rank offsets, reversed sorting and a fabricated empty result.
 Provider ordinary tests, Clippy, formatting and rustdoc passed. The existing
 105 membership obligations replayed on host and installed wasm32 with the new
 bundled module. Lean checks remained serialized with a 16384 MiB ceiling.
+
+## M1: complete numeric quorum body lowering
+
+Provium now checks both original callback loops, zero-filled buffer and count,
+one write/increment per iteration, initialized-prefix sorting, both rank formulas,
+count reset, source-local early return and final minimum. Both projections and
+the gate retain their source bodies. The runtime uses bounded UInt64 replies,
+shared typed callback observations, and checked natural-rank conversion. Caller
+callbacks may change answers across repeated identities; a zero first rank does
+not skip the old pass.
+
+Three Jarl-owned interaction contracts cover `quorum_index`: complete two-round
+execution, stable execution and empty-current panic. The membership project now
+has 15 complete structural method translations and 108 obligations. This closes
+the remaining membership-body translation inventory, not its refinement or
+reachable-state obligations. Jarl production source remains unchanged.
+
+The initialized prefix is still represented by a logical list. Source-to-IR,
+Rust array/buffer/usize/sort_unstable/ownership refinement, source panic detail
+and build-to-panic-policy binding remain open. Numeric callback termination and
+caller membership/history assumptions also remain open. M1 and M2 are incomplete.
+
+Validation: the independent numeric fixture rejects hidden effects and changed
+loop/range/binding structure, checks normal and empty-panic source-derived traces,
+and rejects divisor/projection/gate mutations through Lean contract failure.
+All 23 original-Jarl membership mutants failed their Lean contracts and removed
+stale certificates. Shared Boolean/typed callback kernel regressions, native
+quorum tests, provider ordinary tests, provider/Jarl Clippy, formatting, rustdoc
+and coverage review passed. All 108 membership obligations replayed on host and
+installed wasm32. Lean checks remained serialized with a 16384 MiB ceiling.

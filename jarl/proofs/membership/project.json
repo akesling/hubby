@@ -15,7 +15,8 @@
     "membership::Membership::peers",
     "membership::Membership::with_learners",
     "membership::Membership::joint",
-    "membership::Membership::quorum"
+    "membership::Membership::quorum",
+    "membership::Membership::quorum_index"
   ],
   "proofs": "Proofs.lean",
   "obligations": [
@@ -438,6 +439,18 @@
     {
       "theorem": "Quorum.observation_complete",
       "function": "membership_Membership_quorum"
+    },
+    {
+      "theorem": "QuorumIndex.execution",
+      "function": "membership_Membership_quorum_index"
+    },
+    {
+      "theorem": "QuorumIndex.stable_execution",
+      "function": "membership_Membership_quorum_index"
+    },
+    {
+      "theorem": "QuorumIndex.empty_current",
+      "function": "membership_Membership_quorum_index"
     }
   ]
 }

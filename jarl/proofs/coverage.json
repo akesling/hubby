@@ -4443,10 +4443,29 @@
         "S11",
         "S12"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open.",
+      "status": "component_evidence",
+      "note": "Complete original callback loops, prefix sorts, rank expressions, early return and minimum lower to the numeric interaction model. Contracts connect both source projections, stable execution and empty-current panic. Numeric scalar rank contracts are reusable Provium evidence. Rust buffer/usize/sort_unstable/ownership/source refinement, build-to-panic-policy binding, panic detail and reachable caller invariants remain open.",
       "root_apis": [],
-      "contracts": [],
+      "contracts": [
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "QuorumIndex.execution",
+          "function": "membership_Membership_quorum_index",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "QuorumIndex.stable_execution",
+          "function": "membership_Membership_quorum_index",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "QuorumIndex.empty_current",
+          "function": "membership_Membership_quorum_index",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        }
+      ],
       "context": "production"
     },
     "crate::membership::<Membership < MAX >>::restore": {

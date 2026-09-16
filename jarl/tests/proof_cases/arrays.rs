@@ -149,6 +149,8 @@ fn original_membership_mutations_break_the_array_contracts() {
     let source = w.0.join("src/membership.rs");
     let original = fs::read_to_string(&source).unwrap();
     for (from, to) in [
+        ("count / 2 + 1", "count / 3 + 1"),
+        ("for id in self.old_voters()", "for id in self.voters()"),
         ("count > total / 2", "count >= total / 2"),
         ("count > total / 2", "count > total / 3"),
         (
