@@ -169,6 +169,12 @@ It assumes a related input heap. Source layout, pointer identity, exclusive
 access, reborrows, lifetimes, and destructor semantics remain separate obligations;
 this is not a source-level ownership proof or a refinement for other backends.
 
+Whole-array and shared-slice iterators support builtin `iter().flatten()` without
+a separate length field. Their denotation retains holes and both iterator ends.
+Borrowed-slice locations can be rebased to the source array and loaded without
+silently discarding invalid locations; these logical relations do not discharge
+physical reference/lifetime refinement.
+
 Shared suffix-view methods support a complete record construction with copied
 metadata, a boolean-filtered optional borrow, the original optional index, and a
 shared array slice. The offset pipeline preserves saturating subtraction,

@@ -675,3 +675,34 @@ host and installed wasm32 target. The source-coverage and M0 review-binding test
 passed after reviewing the single coverage-entry change and refreshing its hash;
 M0's claim/scope and requirement set were unchanged. Lean ran sequentially with
 a 16384 MiB limit. No production Jarl source or dependency changed.
+
+## Borrowed entry iteration and storage suffix composition (partial R05)
+
+`Write::entries` now lowers from its complete original body through Provium's
+whole-slice iterator support. The generic iterator semantics also accept whole
+arrays, retaining the existing checked-prefix variant. Empty slots and arbitrary
+slice lengths are preserved; the sequence denotes lazy borrowed locations,
+not a Rust allocation. Generic Lean lemmas rebase slice-local coordinates to
+their originating array and prove that loading the resulting valid locations
+returns exactly the original occupied payload sequence. Invalid locations fail
+instead of silently disappearing.
+
+`proofs/storage-view` now checks both original bodies, their correspondences,
+and seven Jarl-owned obligations. The composed theorems connect the result of
+`State::write` to the actual `Write::entries` iterator and loaded suffix. Appending
+that suffix to the correct retained prefix reconstructs the active logical log.
+The retained-prefix premise is explicit: callers must still prove that the
+specified snapshot discard and truncation leave exactly this prefix. This is
+not yet whole durable-checkpoint equivalence. Snapshot and hard-state coherence,
+dirty-index histories, retries/lost acknowledgments, source-to-IR preservation,
+and physical borrowing/layout/lifetime refinement remain open. M1/M2 remain open.
+
+Validation: all six iterator tests passed, including kernel checks, source
+mutations, borrowed-address comparisons, mixed-end consumption of whole arrays
+and slices, and non-Copy payload drop counters. Provider ordinary regressions,
+formatting, Clippy and rustdoc passed. Jarl's seven storage-view obligations
+passed for host and installed wasm32 builds; all twelve existing log-boundary
+obligations also passed. The ordinary source-lowering/coverage tests and M0
+review-binding test passed. The reviewed coverage changes classify the new
+iterator evidence under existing R05 without changing the correctness goal.
+Lean ran sequentially with a 16384 MiB limit. Production Jarl code is unchanged.

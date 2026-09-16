@@ -283,6 +283,13 @@ fn m1_write_suffix_offset_is_inspected_from_original_rust() {
         ["hard", "snapshot", "truncate_from", "entries"]
     );
     assert_eq!(view.slots, ["entries"]);
+    let entries = source
+        .lower("ready::Write::entries")
+        .unwrap()
+        .iteration
+        .unwrap();
+    assert!(entries.whole);
+    assert_eq!(entries.slots, ["entries"]);
     // A truncating cast at 2^32 would incorrectly select a prefix here.
     assert_eq!(
         offset.evaluate(32, 7, 0, Some((1u64 << 32) + 1)).unwrap(),

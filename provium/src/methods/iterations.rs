@@ -9,6 +9,7 @@ pub struct Iteration {
     pub length: Vec<String>,
     pub payload_type: String,
     pub inclusive: bool,
+    pub whole: bool,
     pub scope: &'static str,
 }
 #[derive(Debug, Serialize)]
@@ -149,35 +150,52 @@ impl Crate {
         }
         let flatten = method(tail(&f.block)?, "flatten", 0)?;
         let iter = method(&flatten.receiver, "iter", 0)?;
-        let Expr::Index(slice) = &*iter.receiver else {
-            return Err("iterator must borrow its complete prefix slice".into());
+        let (slots, length, inclusive, whole, element) = if let Expr::Index(slice) = &*iter.receiver
+        {
+            attrs(&slice.attrs)?;
+            let Expr::Range(range) = &*slice.index else {
+                return Err("iterator prefix must be an explicit range".into());
+            };
+            attrs(&range.attrs)?;
+            if range.start.is_some() {
+                return Err("iterator prefix must start at zero".into());
+            }
+            let length = path(
+                range
+                    .end
+                    .as_deref()
+                    .ok_or("iterator prefix needs a length field")?,
+            )?;
+            if tokens(self.field_type(def, &length)?) != "usize" {
+                return Err("iterator prefix length must be builtin usize".into());
+            }
+            let slots = path(&slice.expr)?;
+            let Type::Array(array) = self.field_type(def, &slots)? else {
+                return Err("iterator prefix requires a builtin optional array".into());
+            };
+            (
+                slots,
+                length,
+                matches!(range.limits, syn::RangeLimits::Closed(_)),
+                false,
+                &*array.elem,
+            )
+        } else {
+            let slots = path(&iter.receiver)?;
+            let element = match self.field_type(def, &slots)? {
+                Type::Array(array) => &*array.elem,
+                Type::Reference(borrow) if borrow.mutability.is_none() => match &*borrow.elem {
+                    Type::Slice(slice) => &*slice.elem,
+                    _ => return Err("whole iterator needs a builtin shared slice".into()),
+                },
+                _ => return Err("whole iterator needs a builtin array or shared slice".into()),
+            };
+            (slots, vec![], false, true, element)
         };
-        attrs(&slice.attrs)?;
-        let Expr::Range(range) = &*slice.index else {
-            return Err("iterator prefix must be an explicit range".into());
-        };
-        attrs(&range.attrs)?;
-        if range.start.is_some() {
-            return Err("iterator prefix must start at zero".into());
+        if tokens(element) != format!("Option < {} >", tokens(&reference.elem)) {
+            return Err("iterator Item and optional storage payload types must agree".into());
         }
-        let length = path(
-            range
-                .end
-                .as_deref()
-                .ok_or("iterator prefix needs a length field")?,
-        )?;
-        if tokens(self.field_type(def, &length)?) != "usize" {
-            return Err("iterator prefix length must be builtin usize".into());
-        }
-        let slots = path(&slice.expr)?;
-        let Type::Array(array) = self.field_type(def, &slots)? else {
-            return Err("iterator requires a builtin optional array".into());
-        };
-        if tokens(&array.elem) != format!("Option < {} >", tokens(&reference.elem)) {
-            return Err("iterator Item and optional array payload types must agree".into());
-        }
-        let inclusive = matches!(range.limits, syn::RangeLimits::Closed(_));
-        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],array:None,query:None,constructor:None,buffer:None,relocation:None,selection:None,lookup:None,record_at:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,view:None,iteration:Some(Iteration{slots,length,payload_type:tokens(&reference.elem),inclusive,scope:"complete builtin double-ended iterator construction; denotation is a lazy sequence of borrowed places, not eager Rust allocation; prefix bounds retained; source/layout/lifetime and panic-hook refinement remain open"})})
+        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],array:None,query:None,constructor:None,buffer:None,relocation:None,selection:None,lookup:None,record_at:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,view:None,iteration:Some(Iteration{slots,length,payload_type:tokens(&reference.elem),inclusive,whole,scope:"complete builtin double-ended iterator construction; denotation is a lazy sequence of borrowed places, not eager Rust allocation; prefix bounds and whole borrowed extents retained; source/layout/lifetime and panic-hook refinement remain open"})})
     }
     pub(super) fn lower_last(&self, name: &str) -> Result<Method, String> {
         let def = self.methods.get(name).ok_or("unknown last-record method")?;
@@ -286,10 +304,11 @@ impl Crate {
 }
 fn program(i: &Iteration) -> String {
     format!(
-        "⟨{}, {}, {}⟩",
+        "⟨{}, {}, {}, {}⟩",
         lean_path(&i.slots),
         lean_path(&i.length),
-        i.inclusive
+        i.inclusive,
+        i.whole
     )
 }
 pub(super) fn generate(method: &Method) -> String {
@@ -305,9 +324,13 @@ impl Iteration {
     /// The finite denotation of the returned builtin iterator. Constructing the
     /// original Rust iterator remains lazy and does not allocate this vector.
     pub fn locations<T>(&self, length: usize, slots: &[Option<T>]) -> Result<Vec<usize>, String> {
-        let count = length
-            .checked_add(usize::from(self.inclusive))
-            .ok_or("prefix bounds")?;
+        let count = if self.whole {
+            slots.len()
+        } else {
+            length
+                .checked_add(usize::from(self.inclusive))
+                .ok_or("prefix bounds")?
+        };
         let prefix = slots.get(..count).ok_or("prefix bounds")?;
         Ok(prefix
             .iter()

@@ -2,7 +2,8 @@
   "crate_root": "../../src/lib.rs",
   "namespace": "JarlView",
   "methods": [
-    "state::State::write"
+    "state::State::write",
+    "ready::Write::entries"
   ],
   "proofs": "Proofs.lean",
   "obligations": [
@@ -16,6 +17,22 @@
     },
     {
       "theorem": "StorageView.replacement_suffix",
+      "function": "state_State_write"
+    },
+    {
+      "theorem": "StorageView.entries_exact",
+      "function": "ready_Write_entries"
+    },
+    {
+      "theorem": "StorageView.returned_entries",
+      "function": "state_State_write"
+    },
+    {
+      "theorem": "StorageView.returned_payloads",
+      "function": "ready_Write_entries"
+    },
+    {
+      "theorem": "StorageView.retained_prefix_plus_returned_payloads",
       "function": "state_State_write"
     }
   ]

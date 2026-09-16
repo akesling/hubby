@@ -689,6 +689,7 @@ structure Iteration where
   slotsPath : Path
   lengthPath : Path
   inclusive : Bool
+  whole : Bool
 structure TraversalStore (α : Type) where
   lookups : LookupStore α
   lengths : Path → Nat
@@ -705,9 +706,102 @@ def presentPlaces (path : Path) : Nat → List (Option α) → List ReadPlace
 def iterateRecords (program : Iteration) (state : TraversalStore α) :
     Except TraversalFault (List ReadPlace) :=
   let slots := state.lookups.slots program.slotsPath
-  let count := state.lengths program.lengthPath + (if program.inclusive then 1 else 0)
+  let count := if program.whole then slots.length
+    else state.lengths program.lengthPath + (if program.inclusive then 1 else 0)
   if count ≤ slots.length then .ok (presentPlaces program.slotsPath 0 (slots.take count))
   else .error .bounds
+-- A borrowed slice has local iterator coordinates. Relating those coordinates
+-- to its originating array preserves holes and payload identity without copying
+-- payloads in Rust. Physical reference/lifetime refinement is still separate.
+def sliceContents (place : SlicePlace) (slots : List (Option α)) : List (Option α) :=
+  (slots.drop place.start).take (place.stop - place.start)
+
+def sliceTraversal (field : Path) (place : SlicePlace) (slots : List (Option α)) :
+    TraversalStore α :=
+  ⟨⟨fun _ => none, fun key => if key = field then sliceContents place slots else []⟩,
+    fun _ => 0⟩
+
+def rebasePlace (origin : SlicePlace) (relative : ReadPlace) : ReadPlace :=
+  ⟨origin.path, origin.start + relative.index⟩
+
+theorem sliceContents_length (lower : place.start ≤ place.stop)
+    (upper : place.stop ≤ slots.length) :
+    (sliceContents place slots).length = place.stop - place.start := by
+  simp only [sliceContents, List.length_take, List.length_drop]
+  omega
+
+theorem presentPlaces_rebase (origin : SlicePlace) (field : Path)
+    (slots : List (Option α)) (index : Nat) :
+    (presentPlaces field index slots).map (rebasePlace origin) =
+      presentPlaces origin.path (origin.start + index) slots := by
+  induction slots generalizing index with
+  | nil => rfl
+  | cons head tail ih =>
+    cases head <;> simp [presentPlaces, rebasePlace, ih, Nat.add_assoc]
+
+theorem iterateWholeSlice (field : Path) (place : SlicePlace) (slots : List (Option α)) :
+    iterateRecords ⟨field, [], false, true⟩ (sliceTraversal field place slots) =
+      .ok (presentPlaces field 0 (sliceContents place slots)) := by
+  simp [iterateRecords, sliceTraversal]
+
+theorem iterateWholeSlice_rebased (field : Path) (place : SlicePlace)
+    (slots : List (Option α)) :
+    (iterateRecords ⟨field, [], false, true⟩ (sliceTraversal field place slots)).map
+      (List.map (rebasePlace place)) =
+      .ok (presentPlaces place.path place.start (sliceContents place slots)) := by
+  rw [iterateWholeSlice]
+  change Except.ok ((presentPlaces field 0 (sliceContents place slots)).map (rebasePlace place)) = _
+  rw [presentPlaces_rebase]
+  simp
+
+def loadPlaces (load : ReadPlace → Option α) : List ReadPlace → Option (List α)
+  | [] => some []
+  | head :: tail => do
+    let value ← load head
+    let rest ← loadPlaces load tail
+    pure (value :: rest)
+
+-- Reading a sequence of valid borrowed locations yields exactly the original
+-- occupied payloads, in order; a bad location fails instead of disappearing.
+theorem load_presentPlaces (path : Path) (slots : List (Option α)) (start : Nat)
+    (load : ReadPlace → Option α)
+    (valid : ∀ i, i < slots.length → load ⟨path, start + i⟩ = slots[i]?.join) :
+    loadPlaces load (presentPlaces path start slots) = some (slots.filterMap id) := by
+  induction slots generalizing start with
+  | nil => rfl
+  | cons head tail ih =>
+    have restValid : ∀ i, i < tail.length → load ⟨path, start + 1 + i⟩ = tail[i]?.join := by
+      intro i bound
+      have h := valid (i + 1) (by simp; omega)
+      simpa [Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] using h
+    cases head with
+    | none =>
+      simpa [presentPlaces] using ih (start + 1) restValid
+    | some value =>
+      have first := valid 0 (by simp)
+      simp at first
+      simp only [presentPlaces, loadPlaces, first]
+      change (do let rest ← loadPlaces load (presentPlaces path (start + 1) tail)
+                 pure (value :: rest)) = _
+      rw [ih (start + 1) restValid]
+      rfl
+
+def loadFrom (path : Path) (slots : List (Option α)) (place : ReadPlace) : Option α :=
+  if place.path = path then slots[place.index]?.join else none
+
+theorem load_sliceContents (place : SlicePlace) (slots : List (Option α)) :
+    loadPlaces (loadFrom place.path slots)
+      (presentPlaces place.path place.start (sliceContents place slots)) =
+      some ((sliceContents place slots).filterMap id) := by
+  apply load_presentPlaces
+  intro i bound
+  have below : i < place.stop - place.start := by
+    simp only [sliceContents, List.length_take, List.length_drop] at bound
+    omega
+  simp only [loadFrom, sliceContents]
+  rw [List.getElem?_take_of_lt below, List.getElem?_drop]
+  simp
+
 structure LastRecord where
   iteration : Iteration
   base : RecordSelection

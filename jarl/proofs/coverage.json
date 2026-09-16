@@ -5421,14 +5421,28 @@
       "requirements": [
         "C11",
         "R08",
-        "R09"
+        "R09",
+        "R05"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open.",
+      "status": "component_evidence",
+      "note": "Complete original whole borrowed-slice iterator, with exact occupied-location sequence, rebasing to State storage, and loading original payloads. Source/layout/lifetime and host transaction/caller refinement remain open.",
       "root_apis": [
         "crate::ready::<Write < '_ , V , S >>::entries"
       ],
-      "contracts": [],
+      "contracts": [
+        {
+          "project": "proofs/storage-view/project.json",
+          "theorem": "StorageView.entries_exact",
+          "function": "ready_Write_entries",
+          "evidence": "artifacts/provium/proofs/storage-view/verified.json"
+        },
+        {
+          "project": "proofs/storage-view/project.json",
+          "theorem": "StorageView.returned_payloads",
+          "function": "ready_Write_entries",
+          "evidence": "artifacts/provium/proofs/storage-view/verified.json"
+        }
+      ],
       "context": "production"
     },
     "crate::ready::<item:0>": {
@@ -6181,7 +6195,7 @@
         "R05"
       ],
       "status": "component_evidence",
-      "note": "Complete original shared storage-view construction and base helper in proofs/storage-view: exact copied metadata, conditional snapshot borrow, truncation argument and checked suffix slice. Source/layout/lifetime refinement, Write::entries and durable transaction/caller composition remain open.",
+      "note": "Complete original shared storage view and base helper, composed with Write::entries: exact returned locations/payloads and reconstruction by appending them to the correct retained prefix. Source/layout/lifetime refinement and caller proof that snapshot discard/truncation leave that prefix remain open.",
       "root_apis": [
         "crate::state::<State < V , S , CAP >>::write"
       ],
@@ -6201,6 +6215,18 @@
         {
           "project": "proofs/storage-view/project.json",
           "theorem": "StorageView.replacement_suffix",
+          "function": "state_State_write",
+          "evidence": "artifacts/provium/proofs/storage-view/verified.json"
+        },
+        {
+          "project": "proofs/storage-view/project.json",
+          "theorem": "StorageView.returned_entries",
+          "function": "state_State_write",
+          "evidence": "artifacts/provium/proofs/storage-view/verified.json"
+        },
+        {
+          "project": "proofs/storage-view/project.json",
+          "theorem": "StorageView.retained_prefix_plus_returned_payloads",
           "function": "state_State_write",
           "evidence": "artifacts/provium/proofs/storage-view/verified.json"
         }
