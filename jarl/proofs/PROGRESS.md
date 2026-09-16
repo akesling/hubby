@@ -865,8 +865,44 @@ The Jarl native comparison and all 13 original-source membership mutations passe
 including changed constructor guards, exclusion tags and stable-forwarding inputs.
 Rejected source changes invalidate their stale certificates.
 
-Exact output-set correspondence and proof that every valid configuration whose
-union fits capacity is accepted remain open. So do remaining membership
-transformations/quorum helpers, reachable callers, and Rust source, ownership,
-index and equality refinement. This is C03/P02/P03/P05/R01 component progress under
+At this stage, exact output-set correspondence and proof that every valid
+configuration whose union fits capacity is accepted remained open (discharged
+as component contracts below). Membership transformations/quorum helpers,
+reachable callers, and Rust source, ownership, index and equality refinement
+remain open. This is C03/P02/P03/P05/R01 component progress under
 CORRECTNESS_PLAN.md; M1 and M2 remain incomplete.
+
+## M1: exact constructor sets and capacity acceptance
+
+The membership project now has 65 checked obligations over ten complete generated
+method bodies, on the host and installed wasm32 target. The 25 additional
+obligations establish exact voter, old-voter and learner sets, the exact identity
+union, and sufficient as well as necessary constructor acceptance. Acceptance
+holds iff voters are nonempty, each input list has distinct identities, target
+learners are disjoint from target voters, and the number of distinct identities
+across all inputs is at most capacity. All other inputs return Config. Successful
+stable construction has no old voters and is not joint; successful restoration
+has a positive voter count bounded by capacity and stores exactly the number of
+distinct input identities. The count specification permits overlap between old
+and new configurations and between old voters and target learners.
+
+Provium supplies reusable list-update observations, batch observation and
+acceptance inductions, and error-code preservation. Jarl supplies flag/set
+interpretation, unique-identity capacity arguments and constructor contracts.
+The distinct-key list is a Jarl specification, with checked membership and
+uniqueness lemmas; it does not replace the generated constructor implementation.
+Jarl production Rust is unchanged.
+
+This discharges constructor output-set and acceptance component work under
+C03/P02/P03/P05/R01. It does not close R01 or M1: remaining membership
+transformations and quorum helpers, reachable callers, and Rust source,
+ownership, indexing and equality refinement remain open. M2's full election
+transitions and global crash-aware historical uniqueness are still unproved.
+
+Validation: the host and wasm32 project checks passed with the axiom audit;
+Provium's four batch tests passed including kernel negative controls and native
+constructor comparisons; Jarl's native array comparisons and all 13 original
+membership mutations passed against the expanded project. Coverage/review and
+the discoverable format check passed. Lean checks used one process at a time
+with a 16384 MiB ceiling. A previously unformatted provider batch fixture was
+formatted as part of the format gate.

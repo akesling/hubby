@@ -3963,7 +3963,7 @@
         "S12"
       ],
       "status": "component_evidence",
-      "note": "Complete original existing-identity-first search, empty-slot fallback, eager unit error, indexed get_or_insert, initialization and tag dispatch. Checked capacity, search bounds, exact full error, other-slot frame, selected identity and exact existing/new record effects, unchanged full-error state and preservation of identity uniqueness. Complete constructor/caller contracts, Rust search/index/equality/ownership/layout/source refinement remain open.",
+      "note": "Complete original existing-identity-first search, empty-slot fallback, eager unit error, indexed get_or_insert, initialization and tag dispatch. Checked capacity, search bounds, exact full error, other-slot frame, selected identity and exact existing/new record effects, unchanged full-error state and preservation of identity uniqueness. Exact flag and identity observations and sufficient insertion capacity are checked and composed with constructors. Reachable caller contracts, Rust search/index/equality/ownership/layout/source refinement remain open.",
       "root_apis": [],
       "contracts": [
         {
@@ -4019,6 +4019,30 @@
           "theorem": "Inclusion.preserves_unique",
           "function": "membership_Membership_include",
           "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "SetInterpretation.include_flag",
+          "function": "membership_Membership_include",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "SetInterpretation.include_identity",
+          "function": "membership_Membership_include",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "CapacityAcceptance.include_available",
+          "function": "membership_Membership_include",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "CapacityAcceptance.include_covered",
+          "function": "membership_Membership_include",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
         }
       ],
       "context": "production"
@@ -4030,7 +4054,7 @@
         "S12"
       ],
       "status": "component_evidence",
-      "note": "Existing source-linked component contracts; see proofs/README.md for assumptions and scope. No global correctness claim.",
+      "note": "Complete source-derived query agrees with nonempty old-voter projection; successful stable construction is not joint. Source/value refinement and reachable configuration lifecycle remain open.",
       "root_apis": [
         "crate::membership::<Membership < MAX >>::is_joint"
       ],
@@ -4038,6 +4062,12 @@
         {
           "project": "proofs/membership/project.json",
           "theorem": "Finalization.no_longer_joint",
+          "function": "membership_Membership_is_joint",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "SetInterpretation.joint_iff_old_nonempty",
           "function": "membership_Membership_is_joint",
           "evidence": "artifacts/provium/proofs/membership/verified.json"
         }
@@ -4117,7 +4147,7 @@
         "S12"
       ],
       "status": "component_evidence",
-      "note": "Complete original checked slice batches and insertion callee; stable constructor forwards its exact input/empty-slice arguments. Successful results preserve capacity and establish identity uniqueness; necessary input conditions prove nonempty voters, distinct input sets and learner/target-voter disjointness, with rejection and single-voter witnesses. Exact output-set correspondence, sufficient acceptance/capacity-union criteria, reachable callers and Rust source/ownership/index/equality refinement remain open.",
+      "note": "Complete original checked slice batches and insertion callee; stable constructor forwards its exact input/empty-slice arguments. Successful results preserve capacity, establish identity uniqueness and exact voter/old-voter/learner sets and identity union. Acceptance holds iff voters are nonempty, each input is distinct, learners are disjoint from target voters, and the distinct identity union fits capacity; otherwise the result is Config. Stable results have no old voters and are not joint. Reachable callers, remaining membership transformations and Rust source/ownership/index/equality refinement remain open.",
       "root_apis": [
         "crate::membership::<Membership < MAX >>::new"
       ],
@@ -4143,6 +4173,48 @@
         {
           "project": "proofs/membership/project.json",
           "theorem": "StableConstruction.valid_inputs",
+          "function": "membership_Membership_new",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "SetInterpretation.stable_voters_exact",
+          "function": "membership_Membership_new",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "SetInterpretation.stable_learners_exact",
+          "function": "membership_Membership_new",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "SetInterpretation.stable_old_empty",
+          "function": "membership_Membership_new",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "SetInterpretation.stable_not_joint",
+          "function": "membership_Membership_new",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "CapacityAcceptance.stable_accepts_iff",
+          "function": "membership_Membership_new",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "CapacityAcceptance.stable_accepts_by_count",
+          "function": "membership_Membership_new",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "CapacityAcceptance.stable_rejects_iff",
           "function": "membership_Membership_new",
           "evidence": "artifacts/provium/proofs/membership/verified.json"
         }
@@ -4225,7 +4297,7 @@
         "S12"
       ],
       "status": "component_evidence",
-      "note": "Complete original checked slice batches and insertion callee; stable constructor forwards its exact input/empty-slice arguments. Successful results preserve capacity and establish identity uniqueness; necessary input conditions prove nonempty voters, distinct input sets and learner/target-voter disjointness, with rejection and single-voter witnesses. Exact output-set correspondence, sufficient acceptance/capacity-union criteria, reachable callers and Rust source/ownership/index/equality refinement remain open.",
+      "note": "Complete original checked slice batches and insertion callee; stable constructor forwards its exact input/empty-slice arguments. Successful results preserve capacity, establish identity uniqueness and exact voter/old-voter/learner sets and identity union. Acceptance holds iff voters are nonempty, each input is distinct, learners are disjoint from target voters, and the distinct identity union fits capacity; otherwise the result is Config. Stable results have no old voters and are not joint. Reachable callers, remaining membership transformations and Rust source/ownership/index/equality refinement remain open.",
       "root_apis": [
         "crate::membership::<Membership < MAX >>::restore"
       ],
@@ -4281,6 +4353,84 @@
         {
           "project": "proofs/membership/project.json",
           "theorem": "Restoration.learners_disjoint",
+          "function": "membership_Membership_restore",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "SetInterpretation.restore_flags",
+          "function": "membership_Membership_restore",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "SetInterpretation.voters_exact",
+          "function": "membership_Membership_restore",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "SetInterpretation.old_voters_exact",
+          "function": "membership_Membership_restore",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "SetInterpretation.learners_exact",
+          "function": "membership_Membership_restore",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "SetInterpretation.restore_identities",
+          "function": "membership_Membership_restore",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "SetInterpretation.restored_contains_exact",
+          "function": "membership_Membership_restore",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "SetInterpretation.voter_count_bounds",
+          "function": "membership_Membership_restore",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "CapacityAcceptance.restore_accepts",
+          "function": "membership_Membership_restore",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "CapacityAcceptance.restore_accepts_iff",
+          "function": "membership_Membership_restore",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "CapacityAcceptance.restore_accepts_by_count",
+          "function": "membership_Membership_restore",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "CapacityAcceptance.stored_identity_count",
+          "function": "membership_Membership_restore",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "CapacityAcceptance.restore_error_code",
+          "function": "membership_Membership_restore",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "CapacityAcceptance.restore_rejects_iff",
           "function": "membership_Membership_restore",
           "evidence": "artifacts/provium/proofs/membership/verified.json"
         }

@@ -463,3 +463,488 @@ theorem valid_inputs [DecidableEq α] (capacity : Nat) (voters learners : List (
   exact ⟨Restoration.nonempty_voters capacity voters [] learners result success,
     distinct.1, distinct.2.2, Restoration.learners_disjoint capacity voters [] learners result success⟩
 end StableConstruction
+
+namespace SetInterpretation
+open Provium.State JarlMembership Inclusion
+
+def SlotFlag (flag : Path) (key : Cell α) : Option (Store α) → Prop
+  | none => False
+  | some state => state ["id"] = key ∧ state flag = .boolean true
+
+def FlagMember (flag : Path) (entries : ArrayStore α) (key : Cell α) : Prop :=
+  ∃ slot ∈ entries, SlotFlag flag key slot
+
+def ValidFlag (flag : Path) : Prop := flag = ["voter"] ∨ flag = ["learner"] ∨ flag = ["old"]
+
+theorem selectedFlag_ne_id (tag : Nat) : selectedFlag tag ≠ ["id"] := by
+  by_cases zero : tag = 0
+  · simp [selectedFlag, zero]
+  · by_cases one : tag = 1 <;> simp [selectedFlag, zero, one]
+
+theorem emptyRecord_flag (flag : Path) (valid : ValidFlag flag) (key : Cell α) :
+    emptyRecord key flag = .boolean false := by
+  rcases valid with rfl | rfl | rfl <;> rfl
+
+theorem slot_flag_effect [DecidableEq α] (flag : Path) (valid : ValidFlag flag)
+    (query key : Cell α) (tag : Nat) (entry : Option (Store α))
+    (eligible : keySlot ["id"] key entry = true ∨ entry = none) :
+    SlotFlag flag query (some (put (entry.getD (emptyRecord key)) (selectedFlag tag) (.boolean true))) ↔
+      SlotFlag flag query entry ∨ (key = query ∧ flag = selectedFlag tag) := by
+  have noId := Ne.symm (selectedFlag_ne_id tag)
+  cases entry with
+  | none =>
+    have initial := emptyRecord_flag flag valid key
+    by_cases hit : flag = selectedFlag tag
+    · simp only [SlotFlag, Option.getD_none, put, if_neg noId, if_pos hit]
+      simp [hit, emptyRecord, put]
+    · simp only [SlotFlag, Option.getD_none, put, if_neg noId, if_neg hit, initial]
+      simp [hit]
+  | some state =>
+    have identity : state ["id"] = key := by
+      rcases eligible with same | impossible
+      · exact of_decide_eq_true same
+      · cases impossible
+    by_cases hit : flag = selectedFlag tag
+    · simp only [SlotFlag, Option.getD_some, put, if_neg noId, if_pos hit, identity]
+      simp [hit]
+      intro equal _
+      exact equal
+    · simp only [SlotFlag, Option.getD_some, put, if_neg noId, if_neg hit, identity]
+      simp [hit]
+
+theorem include_flag [DecidableEq α] (flag : Path) (valid : ValidFlag flag)
+    (entries : ArrayStore α) (query key : Cell α) (tag : Nat)
+    (success : (membership_Membership_include entries key tag).2 = none) :
+    FlagMember flag (membership_Membership_include entries key tag).1 query ↔
+      FlagMember flag entries query ∨ (key = query ∧ flag = selectedFlag tag) := by
+  cases selected : upsertIndex membership_Membership_include_ir entries key with
+  | none => simp [membership_Membership_include, runUpsert, selected] at success
+  | some index =>
+    obtain ⟨before, atBefore, eligible⟩ := upsertIndex_selected membership_Membership_include_ir entries key index selected
+    have result : membership_Membership_include entries key tag =
+        (entries.set index (some (put (before.getD (emptyRecord key)) (selectedFlag tag) (.boolean true))), none) := by
+      obtain ⟨entry, atEntry, result⟩ := selected_effect entries key tag index selected
+      rw [atBefore] at atEntry
+      cases atEntry
+      exact result
+    rw [result]
+    exact exists_set_observation entries index before _ (SlotFlag flag query) _ atBefore
+      (slot_flag_effect flag valid query key tag before eligible)
+theorem flag_member_iff (flag : Path) (entries : ArrayStore α) (query : Cell α) :
+    FlagMember flag entries query ↔
+      ∃ state, some state ∈ entries ∧ state flag = .boolean true ∧ state ["id"] = query := by
+  constructor
+  · rintro ⟨entry, member, flag⟩
+    cases entry with
+    | none => cases flag
+    | some state => exact ⟨state, member, flag.2, flag.1⟩
+  · rintro ⟨state, member, flag, identity⟩
+    exact ⟨some state, member, identity, flag⟩
+
+theorem restore_flags [DecidableEq α] (flag : Path) (valid : ValidFlag flag)
+    (capacity : Nat) (voters old learners : List (Cell α)) (result : ArrayStore α)
+    (success : membership_Membership_restore capacity voters old learners = .ok result) (query : Cell α) :
+    FlagMember flag result query ↔
+      (query ∈ voters ∧ flag = ["voter"]) ∨ (query ∈ learners ∧ flag = ["learner"]) ∨
+      (query ∈ old ∧ flag = ["old"]) := by
+  have initial : ¬FlagMember flag (List.replicate capacity (none : Option (Store α))) query := by
+    rintro ⟨entry, member, observed⟩
+    cases entry with
+    | none => exact observed
+    | some state => simp at member
+  have step : ∀ entries key tag, (runUpsert membership_Membership_restore_ir.insert entries key tag).2 = none →
+      (FlagMember flag (runUpsert membership_Membership_restore_ir.insert entries key tag).1 query ↔
+        FlagMember flag entries query ∨ (key = query ∧ flag = selectedFlag tag)) := by
+    intro entries key tag succeeded
+    exact include_flag flag valid entries query key tag succeeded
+  have relation := runSlotBatch_observes membership_Membership_restore_ir
+    (fun entries => FlagMember flag entries query) (fun key tag => key = query ∧ flag = selectedFlag tag)
+    step capacity [voters, old, learners] result success
+  simpa [membership_Membership_restore_ir, selectedFlag, initial, and_left_comm, and_assoc] using relation
+
+theorem voters_exact [DecidableEq α] (capacity : Nat) (voters old learners : List (Cell α))
+    (result : ArrayStore α) (success : membership_Membership_restore capacity voters old learners = .ok result)
+    (query : Cell α) : query ∈ membership_Membership_voters result ↔ query ∈ voters := by
+  rw [MembershipProjection.voters_member, ← flag_member_iff]
+  simpa using restore_flags ["voter"] (Or.inl rfl) capacity voters old learners result success query
+
+theorem old_voters_exact [DecidableEq α] (capacity : Nat) (voters old learners : List (Cell α))
+    (result : ArrayStore α) (success : membership_Membership_restore capacity voters old learners = .ok result)
+    (query : Cell α) : query ∈ membership_Membership_old_voters result ↔ query ∈ old := by
+  rw [MembershipProjection.old_voters_member, ← flag_member_iff]
+  simpa using restore_flags ["old"] (Or.inr (Or.inr rfl)) capacity voters old learners result success query
+
+theorem learners_exact [DecidableEq α] (capacity : Nat) (voters old learners : List (Cell α))
+    (result : ArrayStore α) (success : membership_Membership_restore capacity voters old learners = .ok result)
+    (query : Cell α) : query ∈ membership_Membership_learners result ↔ query ∈ learners := by
+  rw [MembershipProjection.learners_member, ← flag_member_iff]
+  simpa using restore_flags ["learner"] (Or.inr (Or.inl rfl)) capacity voters old learners result success query
+
+theorem stable_voters_exact [DecidableEq α] (capacity : Nat) (voters learners : List (Cell α))
+    (result : ArrayStore α) (success : membership_Membership_new capacity voters learners = .ok result)
+    (query : Cell α) : query ∈ membership_Membership_voters result ↔ query ∈ voters :=
+  voters_exact capacity voters [] learners result success query
+
+theorem stable_learners_exact [DecidableEq α] (capacity : Nat) (voters learners : List (Cell α))
+    (result : ArrayStore α) (success : membership_Membership_new capacity voters learners = .ok result)
+    (query : Cell α) : query ∈ membership_Membership_learners result ↔ query ∈ learners :=
+  learners_exact capacity voters [] learners result success query
+
+theorem stable_old_empty [DecidableEq α] (capacity : Nat) (voters learners : List (Cell α))
+    (result : ArrayStore α) (success : membership_Membership_new capacity voters learners = .ok result) :
+    membership_Membership_old_voters result = [] := by
+  cases old : membership_Membership_old_voters result with
+  | nil => rfl
+  | cons key rest =>
+    have present : key ∈ membership_Membership_old_voters result := by simp [old]
+    have impossible := (old_voters_exact capacity voters [] learners result success key).mp present
+    cases impossible
+
+def SlotKey (query : Cell α) : Option (Store α) → Prop
+  | none => False
+  | some state => state ["id"] = query
+
+def HasIdentity (entries : ArrayStore α) (query : Cell α) : Prop :=
+  ∃ entry ∈ entries, SlotKey query entry
+
+theorem include_identity [DecidableEq α] (entries : ArrayStore α) (query key : Cell α) (tag : Nat)
+    (success : (membership_Membership_include entries key tag).2 = none) :
+    HasIdentity (membership_Membership_include entries key tag).1 query ↔ HasIdentity entries query ∨ key = query := by
+  cases selected : upsertIndex membership_Membership_include_ir entries key with
+  | none => simp [membership_Membership_include, runUpsert, selected] at success
+  | some index =>
+    obtain ⟨before, atBefore, eligible⟩ := upsertIndex_selected membership_Membership_include_ir entries key index selected
+    have result : membership_Membership_include entries key tag =
+        (entries.set index (some (put (before.getD (emptyRecord key)) (selectedFlag tag) (.boolean true))), none) := by
+      obtain ⟨entry, atEntry, result⟩ := selected_effect entries key tag index selected
+      rw [atBefore] at atEntry
+      cases atEntry
+      exact result
+    have noId := Ne.symm (selectedFlag_ne_id tag)
+    have effect : SlotKey query (some (put (before.getD (emptyRecord key)) (selectedFlag tag) (.boolean true))) ↔
+        SlotKey query before ∨ key = query := by
+      cases before with
+      | none => simp [SlotKey, put, noId, emptyRecord]
+      | some state =>
+        have identity : state ["id"] = key := by
+          rcases eligible with equal | impossible
+          · exact of_decide_eq_true equal
+          · cases impossible
+        simp [SlotKey, put, noId, identity]
+    rw [result]
+    exact exists_set_observation entries index before _ (SlotKey query) _ atBefore effect
+
+theorem has_identity_iff (entries : ArrayStore α) (query : Cell α) :
+    HasIdentity entries query ↔ ∃ state, some state ∈ entries ∧ state ["id"] = query := by
+  constructor
+  · rintro ⟨entry, member, identity⟩
+    cases entry with
+    | none => cases identity
+    | some state => exact ⟨state, member, identity⟩
+  · rintro ⟨state, member, identity⟩
+    exact ⟨some state, member, identity⟩
+
+theorem restore_identities [DecidableEq α] (capacity : Nat) (voters old learners : List (Cell α))
+    (result : ArrayStore α) (success : membership_Membership_restore capacity voters old learners = .ok result)
+    (query : Cell α) : HasIdentity result query ↔ query ∈ voters ∨ query ∈ learners ∨ query ∈ old := by
+  have initial : ¬HasIdentity (List.replicate capacity (none : Option (Store α))) query := by
+    rintro ⟨entry, member, observed⟩
+    cases entry with
+    | none => exact observed
+    | some state => simp at member
+  have step : ∀ entries key tag, (runUpsert membership_Membership_restore_ir.insert entries key tag).2 = none →
+      (HasIdentity (runUpsert membership_Membership_restore_ir.insert entries key tag).1 query ↔
+        HasIdentity entries query ∨ key = query) := by
+    intro entries key tag succeeded
+    exact include_identity entries query key tag succeeded
+  have relation := runSlotBatch_observes membership_Membership_restore_ir
+    (fun entries => HasIdentity entries query) (fun key _ => key = query)
+    step capacity [voters, old, learners] result success
+  simpa [membership_Membership_restore_ir, initial] using relation
+
+theorem restored_contains_exact [DecidableEq α] (capacity : Nat) (voters old learners : List (Cell α))
+    (result : ArrayStore α) (success : membership_Membership_restore capacity voters old learners = .ok result)
+    (query : Cell α) : membership_Membership_contains result query = true ↔ query ∈ voters ∨ query ∈ learners ∨ query ∈ old := by
+  rw [IdentityQuery.contains_exact, ← has_identity_iff]
+  exact restore_identities capacity voters old learners result success query
+
+theorem joint_iff_old_nonempty (entries : ArrayStore α) :
+    membership_Membership_is_joint entries = true ↔ membership_Membership_old_voters entries ≠ [] := by
+  constructor
+  · intro joint empty
+    obtain ⟨entry, member, marked⟩ := List.any_eq_true.mp joint
+    cases entry with
+    | none => cases marked
+    | some state =>
+      have oldFlag := (evalCondition_field_true state ["old"]).mp marked
+      have present := (MembershipProjection.old_voters_member entries (state ["id"])).mpr ⟨state, member, oldFlag, rfl⟩
+      rw [empty] at present
+      cases present
+  · intro nonempty
+    cases old : membership_Membership_old_voters entries with
+    | nil => exact False.elim (nonempty old)
+    | cons query rest =>
+      have present : query ∈ membership_Membership_old_voters entries := by simp [old]
+      obtain ⟨state, member, marked, _⟩ := (MembershipProjection.old_voters_member entries query).mp present
+      exact List.any_eq_true.mpr ⟨some state, member, (evalCondition_field_true state ["old"]).mpr marked⟩
+
+theorem stable_not_joint [DecidableEq α] (capacity : Nat) (voters learners : List (Cell α))
+    (result : ArrayStore α) (success : membership_Membership_new capacity voters learners = .ok result) :
+    membership_Membership_is_joint result = false := by
+  cases joint : membership_Membership_is_joint result with
+  | false => rfl
+  | true => exact False.elim ((joint_iff_old_nonempty result).mp joint (stable_old_empty capacity voters learners result success))
+
+theorem voter_count_bounds [DecidableEq α] (capacity : Nat) (voters old learners : List (Cell α))
+    (result : ArrayStore α) (success : membership_Membership_restore capacity voters old learners = .ok result) :
+    0 < (membership_Membership_voters result).length ∧ (membership_Membership_voters result).length ≤ capacity := by
+  constructor
+  · have nonempty := Restoration.nonempty_voters capacity voters old learners result success
+    cases voters with
+    | nil => exact False.elim (nonempty rfl)
+    | cons key rest =>
+      have member := (voters_exact capacity (key :: rest) old learners result success key).mpr (by simp)
+      exact List.length_pos_of_mem member
+  · have bounded := projectArray_length membership_Membership_voters_ir result
+    change (projectArray membership_Membership_voters_ir result).length ≤ capacity
+    rw [← Restoration.capacity_preserved capacity voters old learners result success]
+    exact bounded
+
+end SetInterpretation
+
+namespace CapacityAcceptance
+open Provium.State JarlMembership Inclusion SetInterpretation
+
+def Keys (entries : ArrayStore α) : List (Cell α) :=
+  projectArray ⟨.boolean true, ["id"]⟩ entries
+
+theorem keys_member (entries : ArrayStore α) (query : Cell α) : query ∈ Keys entries ↔ HasIdentity entries query := by
+  rw [Keys, projectArray_member, has_identity_iff]
+  simp [evalCondition]
+
+theorem keys_nodup (entries : ArrayStore α) (unique : UniqueIdentities entries) : (Keys entries).Nodup := by
+  induction entries with
+  | nil => simp [Keys, projectArray]
+  | cons entry rest ih =>
+    have tailUnique : UniqueIdentities rest := by
+      intro i j left right leftAt rightAt equal
+      have same := unique (i + 1) (j + 1) left right (by simpa using leftAt) (by simpa using rightAt) equal
+      omega
+    cases entry with
+    | none => exact ih tailUnique
+    | some state =>
+      change (state ["id"] :: Keys rest).Nodup
+      apply List.nodup_cons.mpr
+      refine ⟨?_, ih tailUnique⟩
+      intro present
+      obtain ⟨other, member, same⟩ := (has_identity_iff rest (state ["id"])).mp ((keys_member rest _).mp present)
+      obtain ⟨index, atIndex⟩ := List.mem_iff_getElem?.mp member
+      have impossible := unique 0 (index + 1) state other rfl (by simpa using atIndex) same.symm
+      omega
+
+theorem keys_length_full (entries : ArrayStore α) (full : none ∉ entries) : (Keys entries).length = entries.length := by
+  induction entries with
+  | nil => rfl
+  | cons entry rest ih =>
+    have tailFull : none ∉ rest := fun member => full (List.mem_cons_of_mem _ member)
+    cases entry with
+    | none => exact False.elim (full (by simp))
+    | some state =>
+      change (Keys rest).length + 1 = rest.length + 1
+      rw [ih tailFull]
+
+-- A finite cover expresses that the union of requested identities fits. The
+-- cover may be chosen as the duplicate-free union; insertion does not require
+-- that old and target voter sets be disjoint.
+def Fits (capacity : Nat) (voters old learners : List (Cell α)) : Prop :=
+  ∃ domainKeys : List (Cell α), domainKeys.length ≤ capacity ∧
+    ∀ key, key ∈ voters ∨ key ∈ learners ∨ key ∈ old → key ∈ domainKeys
+
+def Covered (capacity : Nat) (domainKeys : List (Cell α)) (entries : ArrayStore α) : Prop :=
+  UniqueIdentities entries ∧ entries.length = capacity ∧ ∀ key, HasIdentity entries key → key ∈ domainKeys
+
+theorem include_available [DecidableEq α] (capacity : Nat) (domainKeys : List (Cell α))
+    (fits : domainKeys.length ≤ capacity) (entries : ArrayStore α) (covered : Covered capacity domainKeys entries)
+    (key : Cell α) (admitted : key ∈ domainKeys) (tag : Nat) :
+    ∃ result, membership_Membership_include entries key tag = (result, none) := by
+  cases selected : upsertIndex membership_Membership_include_ir entries key with
+  | some index =>
+    obtain ⟨entry, _, execution⟩ := selected_slot entries key tag index selected
+    exact ⟨_, execution⟩
+  | none =>
+    obtain ⟨absent, full⟩ := (upsertIndex_none membership_Membership_include_ir entries key).mp selected
+    have missing : key ∉ Keys entries := by
+      intro member
+      obtain ⟨state, member, equal⟩ := (has_identity_iff entries key).mp ((keys_member entries key).mp member)
+      exact absent state member equal
+    have distinct : (key :: Keys entries).Nodup := List.nodup_cons.mpr ⟨missing, keys_nodup entries covered.1⟩
+    have subset : key :: Keys entries ⊆ domainKeys := by
+      intro query member
+      rcases List.mem_cons.mp member with same | member
+      · simpa [same] using admitted
+      · exact covered.2.2 query ((keys_member entries query).mp member)
+    have bound := distinct.length_le_of_subset subset
+    have length := (keys_length_full entries full).trans covered.2.1
+    simp only [List.length_cons, length] at bound
+    omega
+
+theorem include_covered [DecidableEq α] (capacity : Nat) (domainKeys : List (Cell α))
+    (entries : ArrayStore α) (covered : Covered capacity domainKeys entries) (key : Cell α)
+    (admitted : key ∈ domainKeys) (tag : Nat) (success : (membership_Membership_include entries key tag).2 = none) :
+    Covered capacity domainKeys (membership_Membership_include entries key tag).1 := by
+  refine ⟨preserves_unique entries key tag covered.1,
+    (Inclusion.capacity_preserved entries key tag).trans covered.2.1, ?_⟩
+  intro query present
+  rcases (include_identity entries query key tag success).mp present with prior | same
+  · exact covered.2.2 query prior
+  · simpa [same] using admitted
+
+def ValidInputs (voters old learners : List (Cell α)) : Prop :=
+  voters ≠ [] ∧ voters.Nodup ∧ old.Nodup ∧ learners.Nodup ∧ ∀ key ∈ learners, key ∉ voters
+
+theorem restore_accepts [DecidableEq α] (capacity : Nat) (voters old learners : List (Cell α))
+    (valid : ValidInputs voters old learners) (fits : Fits capacity voters old learners) :
+    ∃ result, membership_Membership_restore capacity voters old learners = .ok result := by
+  obtain ⟨domainKeys, bound, covers⟩ := fits
+  have initial : Covered capacity domainKeys (List.replicate capacity none) := by
+    refine ⟨?_, by simp, ?_⟩
+    · intro i j left right leftAt _ _
+      have member := List.mem_of_getElem? leftAt
+      simp at member
+    · intro key present
+      obtain ⟨state, member, _⟩ := (has_identity_iff _ key).mp present
+      simp at member
+  have step : ∀ entries key tag, Covered capacity domainKeys entries → key ∈ domainKeys →
+      ∃ next, runUpsert membership_Membership_restore_ir.insert entries key tag = (next, none) ∧ Covered capacity domainKeys next := by
+    intro entries key tag covered admitted
+    obtain ⟨next, execution⟩ := include_available capacity domainKeys bound entries covered key admitted tag
+    refine ⟨next, execution, ?_⟩
+    have preserved := include_covered capacity domainKeys entries covered key admitted tag (by simp [execution])
+    simpa only [execution] using preserved
+  have passes : ∀ pass ∈ membership_Membership_restore_ir.passes,
+      ([voters, old, learners][pass.1]?.getD []).Nodup ∧
+      (pass.2 = membership_Membership_restore_ir.exclusionTag → ∀ key ∈ [voters, old, learners][pass.1]?.getD [],
+        key ∉ [voters, old, learners][membership_Membership_restore_ir.exclusionInput]?.getD []) ∧
+      ∀ key ∈ [voters, old, learners][pass.1]?.getD [], key ∈ domainKeys := by
+    intro pass member
+    simp only [membership_Membership_restore_ir, List.mem_cons, List.not_mem_nil, or_false] at member
+    rcases member with rfl | rfl | rfl
+    · exact ⟨valid.2.1, by simp [membership_Membership_restore_ir], fun key member => covers key (Or.inl member)⟩
+    · exact ⟨valid.2.2.2.1, fun _ => valid.2.2.2.2, fun key member => covers key (Or.inr (Or.inl member))⟩
+    · exact ⟨valid.2.2.1, by simp [membership_Membership_restore_ir], fun key member => covers key (Or.inr (Or.inr member))⟩
+  obtain ⟨result, success, _⟩ := runSlotBatch_accepts membership_Membership_restore_ir (Covered capacity domainKeys)
+    (fun key => key ∈ domainKeys) step capacity [voters, old, learners] initial valid.1 passes
+  exact ⟨result, success⟩
+
+theorem restore_accepts_iff [DecidableEq α] (capacity : Nat) (voters old learners : List (Cell α)) :
+    (∃ result, membership_Membership_restore capacity voters old learners = .ok result) ↔
+      ValidInputs voters old learners ∧ Fits capacity voters old learners := by
+  constructor
+  · rintro ⟨result, success⟩
+    have distinct := Restoration.distinct_inputs capacity voters old learners result success
+    refine ⟨⟨Restoration.nonempty_voters capacity voters old learners result success, distinct.1, distinct.2.1,
+      distinct.2.2, Restoration.learners_disjoint capacity voters old learners result success⟩, ?_⟩
+    refine ⟨Keys result, ?_, ?_⟩
+    · exact Nat.le_trans (projectArray_length ⟨.boolean true, ["id"]⟩ result) (Nat.le_of_eq (Restoration.capacity_preserved capacity voters old learners result success))
+    · intro key member
+      exact (keys_member result key).mpr ((restore_identities capacity voters old learners result success key).mpr member)
+  · rintro ⟨valid, fits⟩
+    exact restore_accepts capacity voters old learners valid fits
+
+theorem stable_accepts_iff [DecidableEq α] (capacity : Nat) (voters learners : List (Cell α)) :
+    (∃ result, membership_Membership_new capacity voters learners = .ok result) ↔
+      ValidInputs voters [] learners ∧ Fits capacity voters [] learners :=
+  restore_accepts_iff capacity voters [] learners
+-- Specification-only enumeration of the identity union. The implementation
+-- transition above is still generated from Rust; this defines its size criterion.
+def uniqueKeys [DecidableEq α] : List α → List α
+  | [] => []
+  | key :: rest => if key ∈ uniqueKeys rest then uniqueKeys rest else key :: uniqueKeys rest
+
+theorem uniqueKeys_member [DecidableEq α] (keys : List α) (query : α) :
+    query ∈ uniqueKeys keys ↔ query ∈ keys := by
+  induction keys with
+  | nil => rfl
+  | cons key rest ih =>
+    by_cases present : key ∈ uniqueKeys rest
+    · rw [uniqueKeys, if_pos present, ih]
+      constructor
+      · exact List.mem_cons_of_mem _
+      · intro member
+        rcases List.mem_cons.mp member with same | member
+        · subst query
+          exact (by simpa only [ih] using present)
+        · exact member
+    · simp only [uniqueKeys, if_neg present, List.mem_cons, ih]
+
+theorem uniqueKeys_nodup [DecidableEq α] (keys : List α) : (uniqueKeys keys).Nodup := by
+  induction keys with
+  | nil => simp [uniqueKeys]
+  | cons key rest ih =>
+    by_cases present : key ∈ uniqueKeys rest
+    · simpa only [uniqueKeys, if_pos present] using ih
+    · exact (by simpa only [uniqueKeys, if_neg present, List.nodup_cons] using And.intro present ih)
+
+theorem fits_iff_count [DecidableEq α] (capacity : Nat) (voters old learners : List (Cell α)) :
+    Fits capacity voters old learners ↔ (uniqueKeys (voters ++ learners ++ old)).length ≤ capacity := by
+  constructor
+  · rintro ⟨domainKeys, bound, covers⟩
+    have subset : uniqueKeys (voters ++ learners ++ old) ⊆ domainKeys := by
+      intro query member
+      have original := (uniqueKeys_member _ query).mp member
+      exact covers query (by simpa [List.mem_append, or_assoc] using original)
+    exact Nat.le_trans ((uniqueKeys_nodup _).length_le_of_subset subset) bound
+  · intro bound
+    refine ⟨uniqueKeys (voters ++ learners ++ old), bound, ?_⟩
+    intro query member
+    exact (uniqueKeys_member _ query).mpr (by simpa [List.mem_append, or_assoc] using member)
+
+theorem restore_accepts_by_count [DecidableEq α] (capacity : Nat) (voters old learners : List (Cell α)) :
+    (∃ result, membership_Membership_restore capacity voters old learners = .ok result) ↔
+      ValidInputs voters old learners ∧ (uniqueKeys (voters ++ learners ++ old)).length ≤ capacity := by
+  rw [restore_accepts_iff, fits_iff_count]
+
+theorem stable_accepts_by_count [DecidableEq α] (capacity : Nat) (voters learners : List (Cell α)) :
+    (∃ result, membership_Membership_new capacity voters learners = .ok result) ↔
+      ValidInputs voters [] learners ∧ (uniqueKeys (voters ++ learners)).length ≤ capacity := by
+  simp only [StableConstruction.delegates_to_restore]
+  simpa only [List.append_nil] using restore_accepts_by_count capacity voters [] learners
+
+theorem stored_identity_count [DecidableEq α] (capacity : Nat) (voters old learners : List (Cell α))
+    (result : ArrayStore α) (success : membership_Membership_restore capacity voters old learners = .ok result) :
+    (Keys result).length = (uniqueKeys (voters ++ learners ++ old)).length := by
+  have membership : ∀ query, query ∈ Keys result ↔ query ∈ uniqueKeys (voters ++ learners ++ old) := by
+    intro query
+    rw [keys_member, restore_identities capacity voters old learners result success query, uniqueKeys_member]
+    simp [List.mem_append]
+  apply Nat.le_antisymm
+  · exact (keys_nodup result (Restoration.unique_identities capacity voters old learners result success)).length_le_of_subset
+      (fun query member => (membership query).mp member)
+  · exact (uniqueKeys_nodup _).length_le_of_subset (fun query member => (membership query).mpr member)
+
+theorem restore_error_code [DecidableEq α] (capacity : Nat) (voters old learners : List (Cell α))
+    (error : String) (failure : membership_Membership_restore capacity voters old learners = .error error) :
+    error = "Config" := by
+  have allowed := runSlotBatch_error_codes membership_Membership_restore_ir capacity [voters, old, learners] error failure
+  simpa [membership_Membership_restore_ir, membership_Membership_restore_insert_ir] using allowed
+
+theorem restore_rejects_iff [DecidableEq α] (capacity : Nat) (voters old learners : List (Cell α)) :
+    membership_Membership_restore capacity voters old learners = .error "Config" ↔
+      ¬(ValidInputs voters old learners ∧ (uniqueKeys (voters ++ learners ++ old)).length ≤ capacity) := by
+  constructor
+  · intro failure valid
+    obtain ⟨result, success⟩ := (restore_accepts_by_count capacity voters old learners).mpr valid
+    rw [failure] at success
+    cases success
+  · intro invalid
+    cases outcome : membership_Membership_restore capacity voters old learners with
+    | ok result => exact False.elim (invalid ((restore_accepts_by_count capacity voters old learners).mp ⟨result, outcome⟩))
+    | error error => simp [restore_error_code capacity voters old learners error outcome]
+
+theorem stable_rejects_iff [DecidableEq α] (capacity : Nat) (voters learners : List (Cell α)) :
+    membership_Membership_new capacity voters learners = .error "Config" ↔
+      ¬(ValidInputs voters [] learners ∧ (uniqueKeys (voters ++ learners)).length ≤ capacity) := by
+  simp only [StableConstruction.delegates_to_restore]
+  simpa only [List.append_nil] using restore_rejects_iff capacity voters [] learners
+
+end CapacityAcceptance
