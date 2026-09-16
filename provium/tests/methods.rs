@@ -482,3 +482,93 @@ fn proof_libraries_are_hashed_audited_and_rebuilt_without_stale_imports() {
     assert!(error.contains("Lean build source changed"), "{error}");
     assert!(!out.join("verified.json").exists());
 }
+
+#[test]
+fn configured_methods_select_fields_bodies_modules_and_drop() {
+    use provium::cfg::Configuration;
+    let w = Work::new();
+    let root = w.source(
+        r#"
+        #[cfg(absent)] mod missing;
+        struct State {
+            #[cfg(wide)] flag: bool,
+            #[cfg(not(wide))] flag: Option<u64>,
+        }
+        impl State {
+            #[cfg_attr(wide, cfg(all()))]
+            #[cfg(wide)] fn clear(&mut self) { self.flag = false; }
+            #[cfg(not(wide))] fn clear(&mut self) { self.flag = None; }
+        }
+    "#,
+    );
+    for (flags, kind) in [("wide", "bool"), ("", "Option < u64 >")] {
+        let krate = Crate::load_configured(&root, Configuration::parse(flags).unwrap()).unwrap();
+        let method = krate.lower("State::clear").unwrap();
+        assert_eq!(method.writes.len(), 1);
+        assert_eq!(method.writes[0].rust_type, kind);
+        assert_eq!(method.first_line, if flags.is_empty() { 10 } else { 9 });
+    }
+    let root = w.source(&format!("{SOURCE} #[cfg(with_drop)] impl Drop for Ready<'_> {{ fn drop(&mut self) {{ self.node.unrelated = true; }} }}"));
+    assert!(
+        Crate::load_configured(&root, Configuration::parse("").unwrap())
+            .unwrap()
+            .lower("Ready::persisted")
+            .is_ok()
+    );
+    assert!(
+        Crate::load_configured(&root, Configuration::parse("with_drop").unwrap())
+            .unwrap()
+            .lower("Ready::persisted")
+            .is_err()
+    );
+    let root = w.source(&SOURCE.replace(
+        "self.node.dirty=false;",
+        "#[cfg(any())] self.node.dirty=false;",
+    ));
+    assert!(
+        Crate::load_configured(&root, Configuration::parse("").unwrap())
+            .err()
+            .unwrap()
+            .contains("nested location")
+    );
+}
+
+#[test]
+#[ignore = "requires pinned Lean; scripts/verify.sh runs this"]
+fn method_verification_selects_cfg_from_its_actual_rustc_profile() {
+    let w = Work::new();
+    let source = r#"
+        struct State { dirty: bool }
+        impl State {
+            #[cfg(debug_assertions)] fn clear(&mut self) { self.dirty = false; }
+            #[cfg(not(debug_assertions))] fn clear(&mut self) { self.dirty = true; }
+        }
+    "#;
+    w.source(source);
+    fs::write(w.0.join("Proofs.lean"), "import Generated\nopen Provium.State\ntheorem cleared (s : Store α) : Subject.State_clear s [\"dirty\"] = .boolean false := by simp [Subject.State_clear, put]\n").unwrap();
+    let config = serde_json::json!({"crate_root":"lib.rs","namespace":"Subject","methods":["State::clear"],"proofs":"Proofs.lean","obligations":[{"theorem":"cleared","function":"State_clear"}]});
+    let path = w.0.join("project.json");
+    fs::write(&path, config.to_string()).unwrap();
+    let out = w.0.join("out");
+    provium::methods::verify(&path, &out).unwrap();
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&fs::read(out.join("manifest.json")).unwrap()).unwrap();
+    assert!(manifest["rust_target_cfg"]
+        .as_str()
+        .unwrap()
+        .lines()
+        .any(|line| line == "debug_assertions"));
+    assert_eq!(
+        manifest["sources"][0]["sha256"],
+        provium::project::hash(source)
+    );
+    // Exchange the guards without changing either method body.
+    w.source(
+        &source
+            .replace("#[cfg(debug_assertions)]", "#[cfg(any())]")
+            .replace("#[cfg(not(debug_assertions))]", "#[cfg(all())]"),
+    );
+    let error = provium::methods::verify(&path, &out).unwrap_err();
+    assert!(error.contains("Lean rejected Proofs.lean"), "{error}");
+    assert!(!out.join("verified.json").exists());
+}

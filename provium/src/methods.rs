@@ -1,5 +1,7 @@
 //! Whole-body translation of typed field assignments and boolean control flow.
 //! No statement is sliced away or accepted as an opaque call.
+mod configured;
+
 use crate::project::{hash, Obligation, AUDIT, TOOLCHAIN};
 use quote::ToTokens;
 use serde::{Deserialize, Serialize};
@@ -113,6 +115,7 @@ struct Definition {
     self_type: Option<Type>,
 }
 pub struct Crate {
+    cfg: Option<crate::cfg::Configuration>,
     files: BTreeMap<PathBuf, String>,
     structs: BTreeMap<String, syn::ItemStruct>,
     enums: BTreeMap<String, syn::ItemEnum>,
@@ -171,7 +174,16 @@ fn path(e: &Expr) -> Result<Vec<String>, String> {
 }
 impl Crate {
     pub fn load(root: &Path) -> Result<Self, String> {
+        Self::load_inner(root, None)
+    }
+    /// Select declarations using an explicit compilation configuration. This
+    /// does not resolve expression cfg, macros or the complete call/type graph.
+    pub fn load_configured(root: &Path, cfg: crate::cfg::Configuration) -> Result<Self, String> {
+        Self::load_inner(root, Some(cfg))
+    }
+    fn load_inner(root: &Path, cfg: Option<crate::cfg::Configuration>) -> Result<Self, String> {
         let mut krate = Self {
+            cfg,
             files: BTreeMap::new(),
             structs: BTreeMap::new(),
             enums: BTreeMap::new(),
@@ -188,7 +200,19 @@ impl Crate {
     fn file(&mut self, path: &Path, module: &str, root: bool) -> Result<(), String> {
         let path = path.canonicalize().map_err(|e| e.to_string())?;
         let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
-        let file = syn::parse_file(&text).map_err(|e| e.to_string())?;
+        let mut file = syn::parse_file(&text).map_err(|e| e.to_string())?;
+        if let Some(cfg) = &self.cfg {
+            let Some(attributes) = cfg.attributes(&file.attrs)? else {
+                if self.files.insert(path, text).is_some() {
+                    return Err("duplicate/cyclic module file".into());
+                }
+                return Ok(());
+            };
+            file.attrs = attributes
+                .iter()
+                .map(|meta| syn::parse_quote!(#[#meta]))
+                .collect();
+        }
         for attr in &file.attrs {
             if !["no_std", "forbid", "deny", "warn", "allow", "doc"]
                 .iter()
@@ -206,6 +230,16 @@ impl Crate {
             path.with_extension("")
         };
         for item in file.items {
+            let item = if let Some(cfg) = &self.cfg {
+                let Some(item) =
+                    configured::item(cfg, item).map_err(|e| format!("{}: {e}", path.display()))?
+                else {
+                    continue;
+                };
+                item
+            } else {
+                item
+            };
             match item {
                 Item::Mod(m) if !test_only(&m.attrs) => {
                     attrs(&m.attrs)?;
@@ -1033,7 +1067,30 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
         return Err("valid namespace, selected methods, and obligations required".into());
     }
     let base = config.parent().unwrap_or(Path::new("."));
-    let krate = Crate::load(&base.join(&project.crate_root))?;
+    // Query the same target and scalar profile used by the actual source check.
+    // Cargo capture is separate evidence; this remains the explicit rustc build.
+    let mut cfg_command = Command::new("rustc");
+    cfg_command.args([
+        "--print",
+        "cfg",
+        "--edition=2021",
+        "-C",
+        "overflow-checks=yes",
+    ]);
+    if let Some(target) = &project.rust_target {
+        cfg_command.args(["--target", target]);
+    }
+    let cfg = cfg_command.output().map_err(|e| e.to_string())?;
+    if !cfg.status.success() {
+        return Err(format!(
+            "rustc target configuration unavailable: {}",
+            String::from_utf8_lossy(&cfg.stderr)
+        ));
+    }
+    let configuration = crate::cfg::Configuration::parse(
+        std::str::from_utf8(&cfg.stdout).map_err(|e| e.to_string())?,
+    )?;
+    let krate = Crate::load_configured(&base.join(&project.crate_root), configuration)?;
     let methods = project
         .methods
         .iter()
@@ -1236,18 +1293,6 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
         .map_err(|e| e.to_string())?;
     if !rustc.status.success() {
         return Err("rustc unavailable".into());
-    }
-    let mut cfg_command = Command::new("rustc");
-    cfg_command.args(["--print", "cfg", "-C", "overflow-checks=yes"]);
-    if let Some(target) = &project.rust_target {
-        cfg_command.args(["--target", target]);
-    }
-    let cfg = cfg_command.output().map_err(|e| e.to_string())?;
-    if !cfg.status.success() {
-        return Err(format!(
-            "rustc target configuration unavailable: {}",
-            String::from_utf8_lossy(&cfg.stderr)
-        ));
     }
     for object in [
         "Provium/State.olean",

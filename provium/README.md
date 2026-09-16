@@ -109,6 +109,15 @@ It currently requires a Rust 2021 crate buildable without external dependencies
 by its rustc invocation. This restriction applies to the *subject translation*,
 not to whether a consumer can depend on Provium through Cargo.
 
+Method verification queries cfg for that explicit rustc target/profile before
+loading source. It selects item/associated-item declarations, fields and enum
+variants using cfg/cfg_attr; disabled modules are not loaded. Original source
+snapshots and hashes remain unchanged by selection. Remaining nested conditional
+attributes reject verification, including expression and generic-parameter cfg.
+The standalone API is `methods::Crate::load_configured`; its caller supplies the
+configuration. Cargo capture remains separate from this explicit rustc build,
+and declaration selection remains trusted frontend work, not source preservation.
+
 Method projects can reuse consumer-owned Lean files without copying their proofs:
 
 ```json

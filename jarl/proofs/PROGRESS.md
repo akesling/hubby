@@ -1321,3 +1321,27 @@ changing an effective profile override switches enabled declarations without
 changing source inventory. Jarl host/wasm32 capture and existing coverage review,
 provider ordinary tests, provider/Jarl proof-test Clippy, formatting and provider
 rustdoc passed. No Lean or production Jarl Rust changed.
+
+### M1 P01/P03: configured declaration selection in method verification
+
+Method verification now queries its explicit rustc target/profile cfg before
+loading source, and uses that configuration to select declarations, associated
+items, fields and enum variants. Disabled modules are not loaded. Selected Drop
+implementations still participate in effect checks. Original file snapshots and
+hashes are retained, and method source locations survive selection. Unsupported
+nested conditional attributes, including expression and generic-parameter cfg,
+reject verification rather than silently disappearing.
+
+`Crate::load_configured` provides the reusable frontend entry point. This connects
+selection to the verifier's existing explicit rustc check; it does not yet consume
+the Cargo capture as the verified build, resolve the complete subject closure, or
+prove source interpretation/selection/lowering. Those P01/P10 requirements and
+M1/M2 remain open. Jarl production Rust is unchanged.
+
+Validation: all five provider method kernel tests passed, including a cfg-guard
+mutation that selects the opposite body and invalidates the proof. Ordinary
+loader tests cover selected field types/bodies, inactive modules, source lines,
+Drop effects and unsupported nested cfg. Jarl's complete existing consumer proof
+suite passed (166.71 seconds), and all 111 membership obligations replayed on
+installed wasm32. Provider ordinary tests, Clippy, formatting, rustdoc and Jarl
+coverage review passed. Lean checks were serialized with a 16384 MiB cap.
