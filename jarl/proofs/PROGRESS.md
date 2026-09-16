@@ -1002,3 +1002,39 @@ and 2. All 18 original-source membership mutations failed Lean contracts and
 invalidated stale certificates. Provider ordinary tests, provider/Jarl Clippy,
 provider rustdoc, formatting and coverage/review checks passed. Lean checks
 remained serialized with a 16384 MiB ceiling.
+
+
+## M1: quorum callback and destruction foundation
+
+The next untranslated membership primitives, `quorum` and `quorum_index`, accept
+FnMut callbacks. A model that memoizes answers by identity or ignores ownership
+would miss actual behavior. Native tests of the original `quorum` body confirm
+that identities shared between configurations are called again, later answers
+may differ, the old pass is skipped after a failed first majority, and stable
+membership runs only the first pass. The owned callback drops before return.
+Callback panic unwinds through that drop; a drop panic can prevent normal return.
+
+Provium now has a reusable predicate-fold interaction protocol with explicit
+callback handles, updated handles in replies, ordered call events and owned
+callback-drop events. It distinguishes normal values, unwind and abort, including
+abort on a second panic during cleanup. Kernel-checked examples cover those
+branches, and general induction bounds internal response steps by the two pass
+lengths plus drop and return. Completed responses are a premise; actual callback
+termination, source-level unwind behavior and Rust ownership are not inferred.
+An insufficient observation budget returns no result instead of fabricating one.
+The divisor is positive by construction.
+
+This is P04/P07 semantic groundwork, not a source-linked Jarl quorum theorem.
+The frontend must still derive the complete original closure, iterator clone/count,
+callback invocation and short-circuit structure, establish usize representation
+bounds, and connect callback ownership/drop behavior to Rust. The coverage entry
+for `Membership::quorum` remains planned. M1 and M2 remain incomplete.
+
+Validation: the provider kernel test passed audited trace, cleanup and response-
+bound theorems, and rejected an intentionally incorrect skipped-drop result.
+Original-Rust native scenarios passed for stateful answers, short circuit,
+stable and empty memberships, callback panic and drop panic. Existing membership
+proofs replayed on host and installed wasm32 with 100 obligations; their count
+has not increased because quorum lowering is still absent. Provider/Jarl Clippy,
+provider rustdoc, formatting and coverage/review checks passed. Lean checks ran
+one process at a time with a 16384 MiB ceiling.

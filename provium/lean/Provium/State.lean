@@ -1308,6 +1308,201 @@ theorem runArrayMerge_guard_error [DecidableEq α] (program : ArrayMerge)
     cases outcome : runInsertPass program.insert program.tag (projectArray program.projection source) target <;>
       simp [replaceInsertError, inactive.1, inactive.2, Ne.symm different]
 
+-- Owned FnMut predicate folds expose every call and the final callback drop.
+-- The opaque handle is replaced after each response: repeated keys need not
+-- receive equal answers. Unwinding and abort are distinct external outcomes.
+inductive PredicateExit where
+  | value (result : Bool)
+  | unwind
+  | abort
+  deriving DecidableEq, Repr
+
+inductive PredicateReply (σ : Type) where
+  | value (result : Bool) (callback : σ)
+  | unwind (callback : σ)
+  | abort
+  deriving DecidableEq, Repr
+
+inductive PredicateDropReply where
+  | returned
+  | unwind
+  | abort
+  deriving DecidableEq, Repr
+
+inductive PredicateRun (α σ : Type) where
+  | returned (result : PredicateExit)
+  | call (key : Cell α) (callback : σ) (resume : PredicateReply σ → PredicateRun α σ)
+  | drop (callback : σ) (resume : PredicateDropReply → PredicateRun α σ)
+
+-- A second panic while unwinding aborts. An abort does not run local drops.
+def finishPredicate (callback : σ) : PredicateExit → PredicateRun α σ
+  | .abort => .returned .abort
+  | .value result => .drop callback fun reply => .returned (match reply with
+    | .returned => .value result | .unwind => .unwind | .abort => .abort)
+  | .unwind => .drop callback fun reply => .returned (match reply with
+    | .returned => .unwind | .unwind => .abort | .abort => .abort)
+
+def countPredicates (keys : List (Cell α)) (callback : σ) (count : Nat)
+    (next : Nat → σ → PredicateRun α σ) : PredicateRun α σ :=
+  match keys with
+  | [] => next count callback
+  | key :: rest => .call key callback fun reply => match reply with
+    | .value answer advanced => countPredicates rest advanced (count + if answer then 1 else 0) next
+    | .unwind advanced => finishPredicate advanced .unwind
+    | .abort => .returned .abort
+
+-- General two-round predicate aggregation; this is not a Rust lowering claim.
+-- A source frontend must supply the projections, gate and comparison, and
+-- establish the usize bounds for total/count from the source array length.
+structure PredicateFold where
+  first : RecordProjection
+  second : RecordProjection
+  secondRequired : Condition
+  divisor : Nat
+  divisorPositive : 0 < divisor
+  inclusive : Bool
+
+def predicateThreshold (program : PredicateFold) (count total : Nat) : Bool :=
+  if program.inclusive then decide (count ≥ total / program.divisor)
+  else decide (count > total / program.divisor)
+
+def runPredicateFold (program : PredicateFold) (entries : ArrayStore α) (callback : σ) : PredicateRun α σ :=
+  let first := projectArray program.first entries
+  countPredicates first callback 0 fun count advanced =>
+    if predicateThreshold program count first.length then
+      if queryArray program.secondRequired entries then
+        let second := projectArray program.second entries
+        countPredicates second advanced 0 fun count advanced =>
+          finishPredicate advanced (.value (predicateThreshold program count second.length))
+      else finishPredicate advanced (.value true)
+    else finishPredicate advanced (.value false)
+
+inductive PredicateEvent (α σ : Type) where
+  | called (key : Cell α) (before : σ) (reply : PredicateReply σ)
+  | dropped (callback : σ) (reply : PredicateDropReply)
+  deriving DecidableEq
+
+-- Fuel is an observation bound, not an implementation limit or a proof of
+-- callback termination. None means the observation did not reach an outcome.
+def observePredicate (fuel : Nat) (call : Cell α → σ → PredicateReply σ)
+    (drop : σ → PredicateDropReply) (run : PredicateRun α σ) :
+    Option (PredicateExit × List (PredicateEvent α σ)) :=
+  match fuel with
+  | 0 => none
+  | fuel + 1 => match run with
+    | .returned result => some (result, [])
+    | .call key callback resume =>
+      let reply := call key callback
+      (observePredicate fuel call drop (resume reply)).map fun (result, trace) =>
+        (result, .called key callback reply :: trace)
+    | .drop callback resume =>
+      let reply := drop callback
+      (observePredicate fuel call drop (resume reply)).map fun (result, trace) =>
+        (result, .dropped callback reply :: trace)
+
+-- These equations expose normal return, unwind cleanup and double-panic abort
+-- without assuming the callback's implementation, responses or destructor.
+theorem predicate_count_head (key : Cell α) (rest : List (Cell α)) (callback : σ) (count : Nat)
+    (next : Nat → σ → PredicateRun α σ) :
+    countPredicates (key :: rest) callback count next =
+      .call key callback (fun reply => match reply with
+        | .value answer advanced => countPredicates rest advanced (count + if answer then 1 else 0) next
+        | .unwind advanced => finishPredicate advanced .unwind
+        | .abort => .returned .abort) := rfl
+
+theorem predicate_finish_normal (callback : σ) (value : Bool) :
+    finishPredicate callback (.value value) =
+      (.drop callback (fun reply => .returned (match reply with
+        | .returned => .value value | .unwind => .unwind | .abort => .abort)) : PredicateRun α σ) := rfl
+
+theorem predicate_finish_unwind (callback : σ) :
+    finishPredicate callback .unwind =
+      (.drop callback (fun reply => .returned (match reply with
+        | .returned => .unwind | .unwind => .abort | .abort => .abort)) : PredicateRun α σ) := rfl
+
+-- A structural response budget bounds internal execution for every sequence of
+-- completed callback/drop responses. It does not assume callbacks return in Rust.
+def predicateBudget (fuel : Nat) (run : PredicateRun α σ) : Prop :=
+  match fuel with
+  | 0 => False
+  | fuel + 1 => match run with
+    | .returned _ => True
+    | .call _ _ resume => ∀ reply, predicateBudget fuel (resume reply)
+    | .drop _ resume => ∀ reply, predicateBudget fuel (resume reply)
+
+theorem predicate_budget_succ (fuel : Nat) (run : PredicateRun α σ)
+    (bounded : predicateBudget fuel run) : predicateBudget (fuel + 1) run := by
+  induction fuel generalizing run with
+  | zero => cases bounded
+  | succ fuel ih =>
+    cases run with
+    | returned result => trivial
+    | call key callback resume => exact fun reply => ih _ (bounded reply)
+    | drop callback resume => exact fun reply => ih _ (bounded reply)
+
+theorem predicate_budget_add (fuel extra : Nat) (run : PredicateRun α σ)
+    (bounded : predicateBudget fuel run) : predicateBudget (fuel + extra) run := by
+  induction extra with
+  | zero => exact bounded
+  | succ extra ih => exact predicate_budget_succ _ run ih
+
+theorem predicate_finish_budget (callback : σ) (result : PredicateExit) :
+    predicateBudget 2 (finishPredicate callback result : PredicateRun α σ) := by
+  cases result <;> simp [predicateBudget, finishPredicate]
+
+theorem predicate_count_budget (keys : List (Cell α)) (callback : σ) (count : Nat)
+    (next : Nat → σ → PredicateRun α σ) (budget : Nat) (room : 2 ≤ budget)
+    (continuation : ∀ count callback, predicateBudget budget (next count callback)) :
+    predicateBudget (keys.length + budget) (countPredicates keys callback count next) := by
+  induction keys generalizing callback count with
+  | nil => simpa only [List.length_nil, Nat.zero_add, countPredicates] using continuation count callback
+  | cons key rest ih =>
+    rw [List.length_cons, Nat.succ_add]
+    change ∀ reply : PredicateReply σ, predicateBudget (rest.length + budget) (match reply with
+      | .value answer advanced => countPredicates rest advanced (count + if answer then 1 else 0) next
+      | .unwind advanced => finishPredicate advanced .unwind
+      | .abort => .returned .abort)
+    intro reply
+    cases reply with
+    | value answer advanced => exact ih advanced _
+    | unwind advanced =>
+      have space : 2 ≤ rest.length + budget := by omega
+      obtain ⟨extra, equal⟩ := Nat.exists_eq_add_of_le space
+      rw [equal]
+      exact predicate_budget_add 2 extra _ (predicate_finish_budget advanced .unwind)
+    | abort =>
+      cases h : rest.length + budget with
+      | zero => omega
+      | succ fuel => trivial
+
+theorem predicate_fold_budget (program : PredicateFold) (entries : ArrayStore α) (callback : σ) :
+    predicateBudget ((projectArray program.first entries).length + (projectArray program.second entries).length + 2)
+      (runPredicateFold program entries callback) := by
+  unfold runPredicateFold
+  rw [Nat.add_assoc]
+  apply predicate_count_budget _ _ _ _ _ (by omega)
+  intro count advanced
+  split
+  · split
+    · exact predicate_count_budget _ _ _ _ 2 (by omega) (fun _ callback => predicate_finish_budget callback _)
+    · simpa [Nat.add_comm] using predicate_budget_add 2 (projectArray program.second entries).length _ (predicate_finish_budget advanced (.value true))
+  · simpa [Nat.add_comm] using predicate_budget_add 2 (projectArray program.second entries).length _ (predicate_finish_budget advanced (.value false))
+
+theorem predicate_observation_complete (fuel : Nat) (run : PredicateRun α σ)
+    (bounded : predicateBudget fuel run) (call : Cell α → σ → PredicateReply σ)
+    (drop : σ → PredicateDropReply) : ∃ outcome, observePredicate fuel call drop run = some outcome := by
+  induction fuel generalizing run with
+  | zero => cases bounded
+  | succ fuel ih =>
+    cases run with
+    | returned result => exact ⟨(result, []), rfl⟩
+    | call key callback resume =>
+      obtain ⟨result, complete⟩ := ih _ (bounded (call key callback))
+      exact ⟨(result.1, .called key callback (call key callback) :: result.2), by simp only [observePredicate, complete, Option.map_some]⟩
+    | drop callback resume =>
+      obtain ⟨result, complete⟩ := ih _ (bounded (drop callback))
+      exact ⟨(result.1, .dropped callback (drop callback) :: result.2), by simp only [observePredicate, complete, Option.map_some]⟩
+
 -- Shared Result queries do not modify the store. The frontend checks the types
 -- of every accessed place. As above, malformed stores have a total extension;
 -- field-layout/source correspondence remains an explicit refinement obligation.

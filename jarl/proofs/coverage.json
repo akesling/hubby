@@ -4401,7 +4401,7 @@
         "S12"
       ],
       "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open.",
+      "note": "Complete source translation remains open. Native original-Rust regressions now record stateful/repeated-key callback order, first-majority short circuit, stable configurations, callback unwinding and callback-drop panic. Provium has a generic callback/drop protocol with kernel-checked traces and response bounds, but no lowering of this method to that model or caller/ownership/arithmetic refinement yet.",
       "root_apis": [],
       "contracts": [],
       "context": "production"

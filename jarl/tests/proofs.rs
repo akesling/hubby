@@ -301,3 +301,6 @@ fn m1_write_suffix_offset_is_inspected_from_original_rust() {
 
 #[path = "proof_cases/storage_view.rs"]
 mod storage_view;
+
+#[path = "proof_cases/quorum_callbacks.rs"]
+mod quorum_callbacks;
