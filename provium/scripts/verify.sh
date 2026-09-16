@@ -20,6 +20,7 @@ cargo test --locked --test predicate_runs -- --ignored
 cargo test --locked --test order_statistics -- --ignored
 cargo test --locked --test predicate_folds -- --ignored
 cargo test --locked --test numeric_folds -- --ignored
+cargo test --locked --test numeric_buffers -- --ignored
 cargo test --locked --test upserts -- --ignored
 cargo test --locked --test slot_batches -- --ignored
 cargo test --locked --test truncations -- --ignored

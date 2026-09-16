@@ -1147,3 +1147,33 @@ stale certificates. Shared Boolean/typed callback kernel regressions, native
 quorum tests, provider ordinary tests, provider/Jarl Clippy, formatting, rustdoc
 and coverage review passed. All 108 membership obligations replayed on host and
 installed wasm32. Lean checks remained serialized with a 16384 MiB ceiling.
+
+## M1: indexed numeric buffer refinement
+
+The numeric runtime now carries an explicit fixed-length buffer and count through
+both callback passes. Each normal reply writes the current index and increments
+count; index checking follows callback evaluation. A structural proof relates
+that execution to ordered collection for every callback response and handle.
+Supporting theorems establish buffer length, exact written contents, the
+initialized prefix and preserved unused slots. Continuation equivalence is
+restricted to reachable reply-list lengths, rather than assuming equality for
+unreachable lists of arbitrary length.
+
+The full numeric-fold refinement derives both passes' capacity from the source
+projections. It carries the first buffer into the second pass, resets the count,
+and proves the same observable callback/cleanup interaction as the earlier list
+model. Jarl's `QuorumIndex.execution` now invokes that theorem. The 108-obligation
+count is unchanged; its numeric execution evidence is stronger.
+
+This discharges the logical indexed-write-to-collection step. It does not prove
+Rust memory/ownership or usize representation, sort_unstable refinement, panic
+policy/detail binding, parsing/lowering preservation, or caller invariants.
+M1 and M2 remain incomplete.
+
+Validation: the buffer kernel test audited ten contracts/examples, including
+callback-before-bounds behavior, abort, indexed replacement and buffer reuse.
+Four corrupted write/count implementations failed kernel checking. Numeric
+source fixtures and their divisor/projection/gate mutants passed their expected
+checks. All 108 membership obligations replayed on host and installed wasm32.
+Provider ordinary tests, Clippy, formatting, rustdoc and Jarl coverage review
+passed. Lean checks remained serialized with a 16384 MiB ceiling.

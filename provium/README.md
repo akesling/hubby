@@ -212,7 +212,12 @@ collection, initialized-prefix sorting, matching rank formulas, a source-local
 early-return query, and the final minimum. Unsupported extra effects, changed
 loop/index structure and mismatched capacities fail closed. The panic-policy
 parameter remains an explicit model input; binding it to build profiles and
-refining Rust buffers, sort_unstable, ownership and panic detail remain open.
+refining Rust memory, sort_unstable, ownership and panic detail remain open.
+The numeric execution model carries a fixed-length buffer and write index through
+both passes. A checked refinement proves equivalence to ordered callback
+collection, including initialized-prefix contents and preserved unused slots.
+Bounds are derived from source projection lengths; callback replies precede
+index checking, including when an invalid buffer model triggers a panic.
 Method proof bundles include `Provium.OrderStatistics`: checked sorted-permutation,
 rank/support equivalence, maximality, input membership and scalar-bound contracts
 for arbitrary lists. Rank arithmetic has explicit nonempty and representability

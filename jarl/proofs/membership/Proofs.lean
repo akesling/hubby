@@ -1414,7 +1414,7 @@ theorem execution (entries : ArrayStore α) (callback : σ) (abortOnPanic : Bool
               match numericRank values 2 with
               | none => finishNumericPanic advanced abortOnPanic
               | some second => finishCallback advanced (.value (min first second)))
-          else finishCallback advanced (.value first)) := rfl
+          else finishCallback advanced (.value first)) := runNumericFold_refines _ entries callback abortOnPanic
 
 theorem stable_execution (entries : ArrayStore α) (callback : σ) (abortOnPanic : Bool)
     (stable : membership_Membership_is_joint entries = false) :

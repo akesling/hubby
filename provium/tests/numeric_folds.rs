@@ -112,7 +112,7 @@ open Provium.State
            match numericRank values 2 with
            | none => finishNumericPanic advanced abortOnPanic
            | some second => finishCallback advanced (.value (min first second)))
-       else finishCallback advanced (.value first)) := rfl
+       else finishCallback advanced (.value first)) := runNumericFold_refines _ entries callback abortOnPanic
  def only : Store Nat := fun field => if field=["active"] then .boolean true else if field=["key"] then .other 7 else .boolean false
  theorem singleton : observeCallback 3 (fun (_:Cell Nat) (state:Nat)=>.value (9:UInt64) (state+1)) (fun _=>.returned)
     (Subject.Table_threshold [some only] 0 false) =

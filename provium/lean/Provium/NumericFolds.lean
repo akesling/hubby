@@ -49,7 +49,119 @@ theorem numericRank_threshold (values : List UInt64) (divisor : Nat) (value x : 
 def finishNumericPanic (callback : σ) (abortOnPanic : Bool) : CallbackRun α σ UInt64 UInt64 :=
   finishCallback callback (if abortOnPanic then .abort else .unwind)
 
-def runNumericFold (program : NumericFold) (entries : ArrayStore α) (callback : σ)
+-- Indexed writes expose the initialized prefix and preserve the unused suffix.
+-- The guard is checked after the callback reply, matching RHS-before-place
+-- evaluation. This remains a logical buffer model, not a Rust memory theorem.
+def writeNumeric (buffer : List UInt64) (count : Nat) : List UInt64 → List UInt64
+  | [] => buffer
+  | value :: rest => writeNumeric (buffer.set count value) (count + 1) rest
+
+theorem writeNumeric_length (buffer : List UInt64) (count : Nat) (values : List UInt64) :
+    (writeNumeric buffer count values).length = buffer.length := by
+  induction values generalizing buffer count with
+  | nil => rfl
+  | cons value rest ih => simpa only [writeNumeric, List.length_set] using ih (buffer.set count value) (count + 1)
+
+theorem writeNumeric_cons (head : UInt64) (buffer : List UInt64) (count : Nat) (values : List UInt64) :
+    writeNumeric (head :: buffer) (count + 1) values = head :: writeNumeric buffer count values := by
+  induction values generalizing buffer count with
+  | nil => rfl
+  | cons value rest ih => simpa only [writeNumeric, List.set_cons_succ] using ih (buffer.set count value) (count + 1)
+
+theorem writeNumeric_contents (buffer : List UInt64) (count : Nat) (values : List UInt64)
+    (room : count + values.length ≤ buffer.length) :
+    writeNumeric buffer count values = buffer.take count ++ values ++ buffer.drop (count + values.length) := by
+  induction buffer generalizing count values with
+  | nil =>
+    have zero : count = 0 := by simp only [List.length_nil] at room; omega
+    have empty : values = [] := List.length_eq_zero_iff.mp (by simp only [List.length_nil] at room; omega)
+    subst count; subst values; rfl
+  | cons head tail ih =>
+    cases count with
+    | zero =>
+      cases values with
+      | nil => simp [writeNumeric]
+      | cons value rest =>
+        have space : 0 + rest.length ≤ tail.length := by simpa using room
+        simpa [writeNumeric, writeNumeric_cons] using congrArg (List.cons value) (ih 0 rest space)
+    | succ count =>
+      have space : count + values.length ≤ tail.length := by simp only [List.length_cons] at room; omega
+      simpa only [writeNumeric_cons, Nat.succ_add, List.take_succ_cons, List.drop_succ_cons, List.cons_append] using congrArg (List.cons head) (ih count values space)
+
+def fillNumericCallbacks (keys : List (Cell α)) (callback : σ) (buffer : List UInt64)
+    (count : Nat) (abortOnPanic : Bool)
+    (next : List UInt64 → Nat → σ → CallbackRun α σ UInt64 UInt64) : CallbackRun α σ UInt64 UInt64 :=
+  match keys with
+  | [] => next buffer count callback
+  | key :: rest => .call key callback fun reply => match reply with
+    | .value answer advanced =>
+      if count < buffer.length then
+        fillNumericCallbacks rest advanced (buffer.set count answer) (count + 1) abortOnPanic next
+      else finishNumericPanic advanced abortOnPanic
+    | .unwind advanced => finishCallback advanced .unwind
+    | .abort => .returned .abort
+
+theorem fillNumericCallbacks_refines (keys : List (Cell α)) (callback : σ) (buffer : List UInt64)
+    (count : Nat) (abortOnPanic : Bool)
+    (next : List UInt64 → Nat → σ → CallbackRun α σ UInt64 UInt64)
+    (room : count + keys.length ≤ buffer.length) :
+    fillNumericCallbacks keys callback buffer count abortOnPanic next =
+      collectCallbacks keys callback (fun values advanced => next (writeNumeric buffer count values) (count + values.length) advanced) := by
+  induction keys generalizing callback buffer count next with
+  | nil => simp [fillNumericCallbacks, collectCallbacks, writeNumeric]
+  | cons key rest ih =>
+    have within : count < buffer.length := by simp only [List.length_cons] at room; omega
+    simp only [fillNumericCallbacks, collectCallbacks]
+    congr 1
+    funext reply
+    cases reply with
+    | value answer advanced =>
+      simp only [within, ↓reduceIte]
+      rw [ih advanced (buffer.set count answer) (count + 1) next (by simpa [Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] using room)]
+      congr 1
+      funext values final
+      simp only [writeNumeric, List.length_cons]
+      congr 1 <;> omega
+    | unwind advanced => rfl
+    | abort => rfl
+
+theorem collectCallbacks_congr (keys : List (Cell α)) (callback : σ)
+    (left right : List β → σ → CallbackRun α σ β ρ)
+    (agree : ∀ values advanced, values.length = keys.length → left values advanced = right values advanced) :
+    collectCallbacks keys callback left = collectCallbacks keys callback right := by
+  induction keys generalizing callback left right with
+  | nil => exact agree [] callback rfl
+  | cons key rest ih =>
+    simp only [collectCallbacks]
+    congr 1
+    funext reply
+    cases reply with
+    | value answer advanced =>
+      apply ih
+      intro values final length
+      exact agree (answer :: values) final (by simp only [List.length_cons, length])
+    | unwind advanced => rfl
+    | abort => rfl
+
+theorem writeNumeric_prefix (buffer values : List UInt64) (room : values.length ≤ buffer.length) :
+    (writeNumeric buffer 0 values).take values.length = values := by
+  rw [writeNumeric_contents buffer 0 values (by simpa using room)]
+  simp
+
+-- Only continuations reached after exactly one normal reply per key matter.
+-- The theorem does not require equal answers for repeated keys.
+theorem fillNumericCallbacks_prefix (keys : List (Cell α)) (callback : σ) (buffer : List UInt64)
+    (abortOnPanic : Bool) (next : List UInt64 → σ → CallbackRun α σ UInt64 UInt64)
+    (room : keys.length ≤ buffer.length) :
+    fillNumericCallbacks keys callback buffer 0 abortOnPanic (fun buffer count advanced => next (buffer.take count) advanced) =
+      collectCallbacks keys callback next := by
+  rw [fillNumericCallbacks_refines keys callback buffer 0 abortOnPanic _ (by simpa using room)]
+  apply collectCallbacks_congr
+  intro values advanced length
+  simp only [Nat.zero_add]
+  rw [writeNumeric_prefix buffer values (by omega)]
+
+def runNumericFoldList (program : NumericFold) (entries : ArrayStore α) (callback : σ)
     (abortOnPanic : Bool) : CallbackRun α σ UInt64 UInt64 :=
   collectCallbacks (projectArray program.first entries) callback fun values advanced =>
     match numericRank values program.divisor with
@@ -61,5 +173,43 @@ def runNumericFold (program : NumericFold) (entries : ArrayStore α) (callback :
           | none => finishNumericPanic advanced abortOnPanic
           | some second => finishCallback advanced (.value (min first second))
       else finishCallback advanced (.value first)
+
+-- The executable model now carries the original fixed-capacity buffer and
+-- count through both passes. Sorting/rank remains the separate numeric model.
+def runNumericFold (program : NumericFold) (entries : ArrayStore α) (callback : σ)
+    (abortOnPanic : Bool) : CallbackRun α σ UInt64 UInt64 :=
+  fillNumericCallbacks (projectArray program.first entries) callback (List.replicate entries.length 0) 0 abortOnPanic
+    fun buffer count advanced =>
+      match numericRank (buffer.take count) program.divisor with
+      | none => finishNumericPanic advanced abortOnPanic
+      | some first =>
+        if queryArray program.secondRequired entries then
+          fillNumericCallbacks (projectArray program.second entries) advanced buffer 0 abortOnPanic
+            fun buffer count advanced =>
+              match numericRank (buffer.take count) program.divisor with
+              | none => finishNumericPanic advanced abortOnPanic
+              | some second => finishCallback advanced (.value (min first second))
+        else finishCallback advanced (.value first)
+
+theorem runNumericFold_refines (program : NumericFold) (entries : ArrayStore α) (callback : σ)
+    (abortOnPanic : Bool) :
+    runNumericFold program entries callback abortOnPanic = runNumericFoldList program entries callback abortOnPanic := by
+  unfold runNumericFold runNumericFoldList
+  rw [fillNumericCallbacks_refines _ _ _ _ _ _ (by simpa using projectArray_length program.first entries)]
+  apply collectCallbacks_congr
+  intro values advanced length
+  simp only [Nat.zero_add]
+  rw [writeNumeric_prefix _ values (by simpa [length] using projectArray_length program.first entries)]
+  cases ranked : numericRank values program.divisor with
+  | none => rfl
+  | some first =>
+    simp only []
+    split
+    · exact fillNumericCallbacks_prefix (projectArray program.second entries) advanced _ abortOnPanic
+        (fun values advanced => match numericRank values program.divisor with
+          | none => finishNumericPanic advanced abortOnPanic
+          | some second => finishCallback advanced (.value (min first second)))
+        (by simpa only [writeNumeric_length, List.length_replicate] using projectArray_length program.second entries)
+    · rfl
 
 end Provium.State
