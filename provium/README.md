@@ -188,6 +188,15 @@ scalar fields; custom equality and generic equality bounds require further
 contracts. The logical query is connected to membership in the corresponding
 projection sequence. Relating logical equality to actual Rust values remains
 part of source refinement.
+
+Optional Copy-record upserts retain existing-key search before empty-slot fallback,
+the full-array error, the selected indexed `get_or_insert`, every initializer and
+literal-tag flag assignment. Shared Lean contracts establish search bounds, exact
+failure, capacity preservation and the frame for other slots. Eager initializer
+and error destruction cannot be hidden: record payloads must be Copy and error
+variants must be unit variants without custom Drop. The current tag contract
+accepts u8 arguments; its Nat denotation extends beyond valid Rust inputs.
+Search/index/ownership and Rust equality refinement remain open.
 Borrowed-slice locations can be rebased to the source array and loaded without
 silently discarding invalid locations; these logical relations do not discharge
 physical reference/lifetime refinement.

@@ -12,6 +12,7 @@ pub struct Shape {
     pub predicate: Option<Condition>,
     pub projection: Option<Vec<String>>,
     pub key: Option<KeyQuery>,
+    pub upsert: Option<super::upserts::Upsert>,
 }
 pub(super) fn copy_derived(item: &syn::ItemStruct) -> bool {
     item.attrs.iter().any(|a| {
@@ -41,6 +42,11 @@ pub(super) fn relative(expr: &Expr, name: &str) -> Expr {
         fn visit_expr_mut(&mut self, e: &mut Expr) {
             if named(e, self.0) {
                 *e = syn::parse_quote!(self);
+            } else if named(e, "self") {
+                // The closure's captured receiver is not its record parameter.
+                // Preserve that distinction by making it ineligible as a
+                // record-store path after rebasing the parameter above.
+                *e = syn::parse_quote!(__provium_captured_receiver);
             } else {
                 syn::visit_mut::visit_expr_mut(self, e);
             }
@@ -170,7 +176,7 @@ impl Crate {
             )
         };
         Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],
-            iteration:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,view:None,record_at:None,lookup:None,selection:None,relocation:None,buffer:None,constructor:None,query:None,array:Some(Shape{field:p[0].clone(),capacity:tokens(&array.len),record,predicate:Some(predicate),projection:None,key,scope:"complete shared optional-record array iterator query; Rust layout/borrowing and frontend refinement remain trusted"})})
+            iteration:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,view:None,record_at:None,lookup:None,selection:None,relocation:None,buffer:None,constructor:None,query:None,array:Some(Shape{field:p[0].clone(),capacity:tokens(&array.len),record,predicate:Some(predicate),projection:None,key,upsert:None,scope:"complete shared optional-record array iterator query; Rust layout/borrowing and frontend refinement remain trusted"})})
     }
     pub(super) fn lower_array(&self, name: &str) -> Result<Method, String> {
         let def = self.methods.get(name).ok_or("unknown array method")?;
@@ -297,7 +303,7 @@ impl Crate {
             &mut writes,
         )?;
         Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes,body,
-            iteration:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,view:None,record_at:None,lookup:None,selection:None,relocation:None,buffer:None,constructor:None,query:None,array:Some(Shape{field:array_path[0].clone(),capacity:tokens(&array.len),record,predicate:None,projection:None,key:None,scope:"complete optional Copy-record array traversal; preserves length and visits each original slot exactly once; Rust layout/borrowing and frontend refinement remain trusted"})})
+            iteration:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,view:None,record_at:None,lookup:None,selection:None,relocation:None,buffer:None,constructor:None,query:None,array:Some(Shape{field:array_path[0].clone(),capacity:tokens(&array.len),record,predicate:None,projection:None,key:None,upsert:None,scope:"complete optional Copy-record array traversal; preserves length and visits each original slot exactly once; Rust layout/borrowing and frontend refinement remain trusted"})})
     }
     fn array_statements(
         &self,
@@ -378,6 +384,9 @@ impl Crate {
 }
 pub(super) fn generate(method: &Method) -> String {
     let name = &method.symbol;
+    if let Some(upsert) = method.array.as_ref().and_then(|s| s.upsert.as_ref()) {
+        return super::upserts::generate(name, upsert);
+    }
     if let Some(shape) = method.array.as_ref().filter(|s| s.key.is_some()) {
         let key = shape.key.as_ref().unwrap();
         let predicate = condition(shape.predicate.as_ref().unwrap());

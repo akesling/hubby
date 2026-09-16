@@ -8,7 +8,8 @@
     "membership::Membership::old_voters",
     "membership::Membership::learners",
     "membership::Membership::contains",
-    "membership::Membership::is_voter"
+    "membership::Membership::is_voter",
+    "membership::Membership::include"
   ],
   "proofs": "Proofs.lean",
   "obligations": [
@@ -83,6 +84,42 @@
     {
       "theorem": "IdentityQuery.voter_participates",
       "function": "membership_Membership_contains"
+    },
+    {
+      "theorem": "Inclusion.capacity_preserved",
+      "function": "membership_Membership_include"
+    },
+    {
+      "theorem": "Inclusion.selected_slot",
+      "function": "membership_Membership_include"
+    },
+    {
+      "theorem": "Inclusion.full_error",
+      "function": "membership_Membership_include"
+    },
+    {
+      "theorem": "Inclusion.full_exact",
+      "function": "membership_Membership_include"
+    },
+    {
+      "theorem": "Inclusion.other_slots_unchanged",
+      "function": "membership_Membership_include"
+    },
+    {
+      "theorem": "Inclusion.selected_identity",
+      "function": "membership_Membership_include"
+    },
+    {
+      "theorem": "Inclusion.selected_effect",
+      "function": "membership_Membership_include"
+    },
+    {
+      "theorem": "Inclusion.full_unchanged",
+      "function": "membership_Membership_include"
+    },
+    {
+      "theorem": "Inclusion.preserves_unique",
+      "function": "membership_Membership_include"
     }
   ]
 }

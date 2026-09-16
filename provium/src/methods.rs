@@ -479,6 +479,9 @@ impl Crate {
             if self.enums.contains_key(&def.receiver) {
                 return self.lower_enum_projection(name);
             }
+            if upserts::candidate(&def.item) {
+                return self.lower_upsert(name);
+            }
             if validators::candidate(&def.item) {
                 return self.lower_validator(name);
             }
@@ -1257,3 +1260,5 @@ pub mod views;
 mod projections;
 
 mod key_queries;
+
+mod upserts;

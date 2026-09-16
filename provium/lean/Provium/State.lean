@@ -394,6 +394,150 @@ theorem projectArray_length (program : RecordProjection) (entries : ArrayStore �
     (projectArray program entries).length ≤ entries.length :=
   List.length_filterMap_le _ _
 
+-- Existing identities take priority over empty slots, even earlier empty slots.
+structure Upsert where
+  key : Path
+  initial : List Write
+  cases : List (Nat × Write)
+  fallback : Write
+  error : String
+
+def firstSlot (predicate : Option (Store α) → Bool) : ArrayStore α → Option Nat
+  | [] => none
+  | entry :: rest => if predicate entry then some 0 else (firstSlot predicate rest).map Nat.succ
+
+def keySlot [DecidableEq α] (path : Path) (key : Cell α) : Option (Store α) → Bool
+  | none => false
+  | some state => decide (state path = key)
+
+def upsertIndex [DecidableEq α] (program : Upsert) (entries : ArrayStore α) (key : Cell α) : Option Nat :=
+  (firstSlot (keySlot program.key key) entries).orElse (fun _ => firstSlot Option.isNone entries)
+
+def upsertWrite (program : Upsert) (tag : Nat) : Write :=
+  ((program.cases.find? (fun c => c.1 == tag)).map Prod.snd).getD program.fallback
+
+def upsertRecord (program : Upsert) (key : Cell α) (tag : Nat) (entry : Option (Store α)) : Store α :=
+  let initial := put (run program.initial (fun _ => .absent)) program.key key
+  let selected := entry.getD initial
+  run [upsertWrite program tag] selected
+
+def runUpsert [DecidableEq α] (program : Upsert) (entries : ArrayStore α) (key : Cell α)
+    (tag : Nat) : ArrayStore α × Option String :=
+  match upsertIndex program entries key with
+  | none => (entries, some program.error)
+  | some index => match entries[index]? with
+    | none => (entries, some "$bounds")
+    | some entry => (entries.set index (some (upsertRecord program key tag entry)), none)
+
+theorem firstSlot_selected (predicate : Option (Store α) → Bool) (entries : ArrayStore α)
+    (index : Nat) (selected : firstSlot predicate entries = some index) :
+    ∃ entry, entries[index]? = some entry ∧ predicate entry = true := by
+  induction entries generalizing index with
+  | nil => simp [firstSlot] at selected
+  | cons entry rest ih =>
+    cases hp : predicate entry
+    · cases hs : firstSlot predicate rest with
+      | none => simp [firstSlot, hp, hs] at selected
+      | some j =>
+        simp only [firstSlot, hp, Bool.false_eq_true, ↓reduceIte, hs, Option.map_some,
+          Option.some.injEq] at selected
+        subst index
+        obtain ⟨value, found, passes⟩ := ih j hs
+        exact ⟨value, by simpa using found, passes⟩
+    · simp only [firstSlot, hp, ↓reduceIte, Option.some.injEq] at selected
+      subst index
+      exact ⟨entry, rfl, hp⟩
+
+theorem upsertIndex_selected [DecidableEq α] (program : Upsert) (entries : ArrayStore α)
+    (key : Cell α) (index : Nat) (selected : upsertIndex program entries key = some index) :
+    ∃ entry, entries[index]? = some entry ∧ (keySlot program.key key entry = true ∨ entry = none) := by
+  cases hk : firstSlot (keySlot program.key key) entries with
+  | some j =>
+    simp only [upsertIndex, hk, Option.orElse_some, Option.some.injEq] at selected
+    subst index
+    obtain ⟨entry, found, passes⟩ := firstSlot_selected _ _ j hk
+    exact ⟨entry, found, Or.inl passes⟩
+  | none =>
+    simp only [upsertIndex, hk, Option.orElse_none] at selected
+    obtain ⟨entry, found, empty⟩ := firstSlot_selected _ _ index selected
+    exact ⟨entry, found, Or.inr (by simpa using empty)⟩
+
+theorem firstSlot_none (predicate : Option (Store α) → Bool) (entries : ArrayStore α) :
+    firstSlot predicate entries = none ↔ ∀ entry ∈ entries, predicate entry = false := by
+  induction entries with
+  | nil => simp [firstSlot]
+  | cons entry rest ih =>
+    cases hp : predicate entry <;> simp [firstSlot, hp, ih]
+
+theorem upsertIndex_none [DecidableEq α] (program : Upsert) (entries : ArrayStore α) (key : Cell α) :
+    upsertIndex program entries key = none ↔
+      (∀ state, some state ∈ entries → state program.key ≠ key) ∧ none ∉ entries := by
+  have split : upsertIndex program entries key = none ↔
+      firstSlot (keySlot program.key key) entries = none ∧ firstSlot Option.isNone entries = none := by
+    cases h : firstSlot (keySlot program.key key) entries <;> simp [upsertIndex, h]
+  rw [split, firstSlot_none, firstSlot_none]
+  constructor
+  · rintro ⟨keys, slots⟩
+    constructor
+    · intro state member
+      simpa [keySlot] using keys (some state) member
+    · intro member
+      simpa using slots none member
+  · rintro ⟨keys, slots⟩
+    constructor
+    · intro entry member
+      cases entry with
+      | none => rfl
+      | some state => simpa [keySlot] using keys state member
+    · intro entry member
+      cases entry with
+      | none => exact False.elim (slots member)
+      | some state => rfl
+
+theorem upsertIndex_empty_no_match [DecidableEq α] (program : Upsert) (entries : ArrayStore α)
+    (key : Cell α) (index : Nat) (selected : upsertIndex program entries key = some index)
+    (empty : entries[index]? = some none) : firstSlot (keySlot program.key key) entries = none := by
+  cases found : firstSlot (keySlot program.key key) entries with
+  | none => rfl
+  | some j =>
+    have same : j = index := by simpa [upsertIndex, found] using selected
+    subst j
+    obtain ⟨entry, present, passes⟩ := firstSlot_selected _ _ index found
+    rw [empty] at present
+    cases present
+    contradiction
+
+theorem runUpsert_selected [DecidableEq α] (program : Upsert) (entries : ArrayStore α)
+    (key : Cell α) (tag index : Nat) (selected : upsertIndex program entries key = some index) :
+    ∃ entry, entries[index]? = some entry ∧
+      runUpsert program entries key tag =
+        (entries.set index (some (upsertRecord program key tag entry)), none) := by
+  obtain ⟨entry, found, _⟩ := upsertIndex_selected program entries key index selected
+  exact ⟨entry, found, by simp [runUpsert, selected, found]⟩
+
+theorem runUpsert_length [DecidableEq α] (program : Upsert) (entries : ArrayStore α)
+    (key : Cell α) (tag : Nat) : (runUpsert program entries key tag).1.length = entries.length := by
+  cases hi : upsertIndex program entries key with
+  | none => simp [runUpsert, hi]
+  | some index =>
+    obtain ⟨entry, _, result⟩ := runUpsert_selected program entries key tag index hi
+    simp [result]
+
+theorem runUpsert_error [DecidableEq α] (program : Upsert) (entries : ArrayStore α)
+    (key : Cell α) (tag : Nat) :
+    (runUpsert program entries key tag).2 = some program.error ↔ upsertIndex program entries key = none := by
+  cases hi : upsertIndex program entries key with
+  | none => simp [runUpsert, hi]
+  | some index =>
+    obtain ⟨entry, _, result⟩ := runUpsert_selected program entries key tag index hi
+    simp [result]
+
+theorem runUpsert_frame [DecidableEq α] (program : Upsert) (entries : ArrayStore α)
+    (key : Cell α) (tag index other : Nat) (selected : upsertIndex program entries key = some index)
+    (different : other ≠ index) : (runUpsert program entries key tag).1[other]? = entries[other]? := by
+  obtain ⟨entry, _, result⟩ := runUpsert_selected program entries key tag index selected
+  simp [result, Ne.symm different]
+
 -- Shared Result queries do not modify the store. The frontend checks the types
 -- of every accessed place. As above, malformed stores have a total extension;
 -- field-layout/source correspondence remains an explicit refinement obligation.

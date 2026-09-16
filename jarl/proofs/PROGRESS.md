@@ -803,3 +803,35 @@ This advances C03 and P02/P03/P05 component coverage; M1/M2 remain open.
 The Jarl native comparison and all eight source mutation checks also passed,
 including overly restrictive voter flags and identity presence limited to voters.
 Each rejected mutation invalidates the stale proof certificate.
+
+## M1: membership insertion and identity uniqueness
+
+Provium lowers the complete existing-key-first optional-record insertion used by
+`Membership::include`: key search, empty-slot fallback, eager unit error, indexed
+get_or_insert, all initializers and u8-tag flag dispatch. Copy records and
+non-dropping unit error variants exclude hidden eager destruction effects.
+Receiver captures in record closures are rejected instead of being confused with
+the closure's record parameter.
+
+Jarl owns nine new source-linked obligations: capacity, selected-index bounds and
+effect, exact full error and unchanged failure state, other-slot preservation,
+selected identity, and preservation of identity uniqueness. The uniqueness proof
+covers both existing and new identities and does not assume that capacity is
+available. The source-derived search establishes that a selected empty slot is
+used only when the identity was absent throughout the original array.
+
+The membership project checked eight complete methods and 27 obligations on host
+and installed wasm32. Provider ordinary tests, Clippy/rustdoc, 629,760 native
+insertion cases over capacities 0–3 and all 256 tags, and iterator/projection/upsert
+kernel regressions passed. Changed flag assignments, initial flags and error
+variants invalidate the provider proofs. Coverage/review and formatting checks
+passed. Lean runs were serialized with a 16384 MiB ceiling.
+
+The Jarl native comparison and all ten original-source membership mutations also
+passed, including changed insertion flag assignments and initial old-voter flags.
+Each rejected mutation removes the stale certificate.
+
+The constructor loops and their duplicate/learner-overlap/capacity rejection
+contracts remain open. So do Rust search/index/equality/ownership/layout refinement
+and source semantic preservation. This advances C03/P02/P03/P05 and R01 component
+evidence under CORRECTNESS_PLAN.md; M1 and M2 remain incomplete.

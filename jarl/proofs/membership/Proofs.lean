@@ -210,3 +210,171 @@ theorem voter_participates [DecidableEq α] (entries : ArrayStore α) (key : Cel
   · obtain ⟨state, member, _, value⟩ := (MembershipProjection.old_voters_member entries key).mp old
     exact ⟨state, member, value⟩
 end IdentityQuery
+
+namespace Inclusion
+open Provium.State JarlMembership
+
+theorem capacity_preserved [DecidableEq α] (entries : ArrayStore α) (key : Cell α) (tag : Nat) :
+    (membership_Membership_include entries key tag).1.length = entries.length :=
+  runUpsert_length membership_Membership_include_ir entries key tag
+
+theorem selected_slot [DecidableEq α] (entries : ArrayStore α) (key : Cell α) (tag index : Nat)
+    (selected : upsertIndex membership_Membership_include_ir entries key = some index) :
+    ∃ entry, entries[index]? = some entry ∧
+      membership_Membership_include entries key tag =
+        (entries.set index (some (upsertRecord membership_Membership_include_ir key tag entry)), none) :=
+  runUpsert_selected membership_Membership_include_ir entries key tag index selected
+
+theorem full_error [DecidableEq α] (entries : ArrayStore α) (key : Cell α) (tag : Nat) :
+    (membership_Membership_include entries key tag).2 = some "Config" ↔
+      upsertIndex membership_Membership_include_ir entries key = none :=
+  runUpsert_error membership_Membership_include_ir entries key tag
+
+theorem full_exact [DecidableEq α] (entries : ArrayStore α) (key : Cell α) (tag : Nat) :
+    (membership_Membership_include entries key tag).2 = some "Config" ↔
+      (∀ state, some state ∈ entries → state ["id"] ≠ key) ∧ none ∉ entries := by
+  rw [full_error]
+  exact upsertIndex_none membership_Membership_include_ir entries key
+
+theorem other_slots_unchanged [DecidableEq α] (entries : ArrayStore α) (key : Cell α)
+    (tag index other : Nat) (selected : upsertIndex membership_Membership_include_ir entries key = some index)
+    (different : other ≠ index) : (membership_Membership_include entries key tag).1[other]? = entries[other]? :=
+  runUpsert_frame membership_Membership_include_ir entries key tag index other selected different
+
+def selectedFlag (tag : Nat) : Path :=
+  if tag = 0 then ["voter"] else if tag = 1 then ["learner"] else ["old"]
+
+theorem existing_record (state : Store α) (key : Cell α) (tag : Nat) :
+    upsertRecord membership_Membership_include_ir key tag (some state) =
+      put state (selectedFlag tag) (.boolean true) := by
+  by_cases zero : tag = 0
+  · subst tag; rfl
+  · by_cases one : tag = 1
+    · subst tag; rfl
+    · simp [upsertRecord, upsertWrite, membership_Membership_include_ir, selectedFlag,
+        zero, one, run, value, beq_iff_eq, Ne.symm zero, Ne.symm one]
+
+theorem new_identity (key : Cell α) (tag : Nat) :
+    upsertRecord membership_Membership_include_ir key tag none ["id"] = key := by
+  by_cases zero : tag = 0
+  · subst tag; simp [upsertRecord, upsertWrite, membership_Membership_include_ir, run, put]
+  · by_cases one : tag = 1
+    · subst tag; simp [upsertRecord, upsertWrite, membership_Membership_include_ir, run, put]
+    · simp [upsertRecord, upsertWrite, membership_Membership_include_ir, run, put,
+        beq_iff_eq, Ne.symm zero, Ne.symm one]
+
+theorem selected_flag_set (entry : Option (Store α)) (key : Cell α) (tag : Nat) :
+    upsertRecord membership_Membership_include_ir key tag entry (selectedFlag tag) = .boolean true := by
+  by_cases zero : tag = 0
+  · subst tag; simp [upsertRecord, upsertWrite, membership_Membership_include_ir, selectedFlag, run, value, put]
+  · by_cases one : tag = 1
+    · subst tag; simp [upsertRecord, upsertWrite, membership_Membership_include_ir, selectedFlag, run, value, put]
+    · simp [upsertRecord, upsertWrite, membership_Membership_include_ir, selectedFlag, run, value, put,
+        zero, one, beq_iff_eq, Ne.symm zero, Ne.symm one]
+
+def emptyRecord (key : Cell α) : Store α :=
+  put (run [⟨["voter"], .boolean false⟩, ⟨["old"], .boolean false⟩,
+    ⟨["learner"], .boolean false⟩] (fun _ => .absent)) ["id"] key
+
+theorem new_record (key : Cell α) (tag : Nat) :
+    upsertRecord membership_Membership_include_ir key tag none =
+      put (emptyRecord key) (selectedFlag tag) (.boolean true) := by
+  by_cases zero : tag = 0
+  · subst tag; rfl
+  · by_cases one : tag = 1
+    · subst tag; rfl
+    · simp [upsertRecord, upsertWrite, membership_Membership_include_ir, selectedFlag,
+        emptyRecord, zero, one, run, value, beq_iff_eq, Ne.symm zero, Ne.symm one]
+
+theorem selected_identity [DecidableEq α] (entries : ArrayStore α) (key : Cell α)
+    (tag index : Nat) (selected : upsertIndex membership_Membership_include_ir entries key = some index) :
+    ∃ state, (membership_Membership_include entries key tag).1[index]? = some (some state) ∧
+      state ["id"] = key := by
+  obtain ⟨entry, found, eligible⟩ := upsertIndex_selected membership_Membership_include_ir entries key index selected
+  have result : membership_Membership_include entries key tag =
+      (entries.set index (some (upsertRecord membership_Membership_include_ir key tag entry)), none) := by
+    simp [membership_Membership_include, runUpsert, selected, found]
+  refine ⟨upsertRecord membership_Membership_include_ir key tag entry, ?_, ?_⟩
+  · have bound : index < entries.length := List.getElem?_eq_some_iff.mp found |>.1
+    simp [result, bound]
+  · cases entry with
+    | none => exact new_identity key tag
+    | some state =>
+      have identity : state ["id"] = key := by
+        rcases eligible with equal | impossible
+        · exact of_decide_eq_true equal
+        · cases impossible
+      rw [existing_record]
+      by_cases zero : tag = 0
+      · simp [put, selectedFlag, identity, zero]
+      · by_cases one : tag = 1 <;> simp [put, selectedFlag, identity, zero, one]
+
+theorem selected_effect [DecidableEq α] (entries : ArrayStore α) (key : Cell α)
+    (tag index : Nat) (selected : upsertIndex membership_Membership_include_ir entries key = some index) :
+    ∃ entry, entries[index]? = some entry ∧
+      membership_Membership_include entries key tag =
+        (entries.set index (some (put (entry.getD (emptyRecord key)) (selectedFlag tag) (.boolean true))), none) := by
+  obtain ⟨entry, found, result⟩ := selected_slot entries key tag index selected
+  refine ⟨entry, found, ?_⟩
+  cases entry with
+  | none => simpa only [new_record, Option.getD_none] using result
+  | some state => simpa only [existing_record, Option.getD_some] using result
+
+theorem full_unchanged [DecidableEq α] (entries : ArrayStore α) (key : Cell α) (tag : Nat)
+    (full : (membership_Membership_include entries key tag).2 = some "Config") :
+    (membership_Membership_include entries key tag).1 = entries := by
+  have missing := (full_error entries key tag).mp full
+  simp [membership_Membership_include, runUpsert, missing]
+
+-- The constructor must establish this invariant; include preserves it without
+-- assuming that the requested identity is new or that an empty slot exists.
+def UniqueIdentities (entries : ArrayStore α) : Prop :=
+  ∀ (i j : Nat) (left right : Store α), entries[i]? = some (some left) → entries[j]? = some (some right) →
+    left ["id"] = right ["id"] → i = j
+
+theorem preserves_unique [DecidableEq α] (entries : ArrayStore α) (key : Cell α) (tag : Nat)
+    (unique : UniqueIdentities entries) : UniqueIdentities (membership_Membership_include entries key tag).1 := by
+  cases selected : upsertIndex membership_Membership_include_ir entries key with
+  | none => simpa [membership_Membership_include, runUpsert, selected] using unique
+  | some index =>
+    obtain ⟨before, beforeAt, eligible⟩ := upsertIndex_selected membership_Membership_include_ir entries key index selected
+    obtain ⟨after, afterAt, afterKey⟩ := selected_identity entries key tag index selected
+    have only : ∀ j state, (membership_Membership_include entries key tag).1[j]? = some (some state) →
+        state ["id"] = key → j = index := by
+      intro j state atJ keyJ
+      by_cases same : j = index
+      · exact same
+      · have original : entries[j]? = some (some state) := by
+          rw [other_slots_unchanged entries key tag index j selected same] at atJ
+          exact atJ
+        cases before with
+        | none =>
+          have missing := upsertIndex_empty_no_match membership_Membership_include_ir entries key index selected beforeAt
+          have absent := (firstSlot_none _ _).mp missing (some state)
+          have member : some state ∈ entries := by
+            obtain ⟨bound, value⟩ := List.getElem?_eq_some_iff.mp original
+            exact List.mem_of_getElem value
+          have impossible := absent member
+          simp [keySlot, membership_Membership_include_ir, keyJ] at impossible
+        | some previous =>
+          have previousKey : previous ["id"] = key := by
+            rcases eligible with equality | impossible
+            · exact of_decide_eq_true equality
+            · cases impossible
+          exact unique j index state previous original beforeAt (keyJ.trans previousKey.symm)
+    intro i j left right leftAt rightAt equal
+    by_cases leftSelected : i = index
+    · subst i
+      have leftEq : left = after := by rw [afterAt] at leftAt; simpa using leftAt.symm
+      subst left
+      exact (only j right rightAt (equal.symm.trans afterKey)).symm
+    · by_cases rightSelected : j = index
+      · subst j
+        have rightEq : right = after := by rw [afterAt] at rightAt; simpa using rightAt.symm
+        subst right
+        exact only i left leftAt (equal.trans afterKey)
+      · rw [other_slots_unchanged entries key tag index i selected leftSelected] at leftAt
+        rw [other_slots_unchanged entries key tag index j selected rightSelected] at rightAt
+        exact unique i j left right leftAt rightAt equal
+
+end Inclusion

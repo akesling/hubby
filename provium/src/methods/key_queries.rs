@@ -10,7 +10,7 @@ pub struct KeyQuery {
 }
 
 impl Crate {
-    fn equality_value(&self, module: &str, ty: &Type) -> Result<String, String> {
+    pub(super) fn equality_value(&self, module: &str, ty: &Type) -> Result<String, String> {
         let name = self.projection_value_type(module, ty)?;
         if let Some(record) = self.structs.get(&name) {
             let derived =

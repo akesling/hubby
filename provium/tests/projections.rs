@@ -60,6 +60,15 @@ fn complete_projection_retains_filter_field_and_copy_type() {
             "impl Iterator<Item = Key> + Send + '_",
         ),
         format!("{SOURCE}\ntrait Foreign {{ fn filter(self); }}"),
+        SOURCE
+            .replace(
+                "rows: [Option<Row>; N]",
+                "rows: [Option<Row>; N], enabled: bool",
+            )
+            .replace("|r| r.enabled", "|r| self.enabled"),
+        SOURCE
+            .replace("rows: [Option<Row>; N]", "rows: [Option<Row>; N], key: Key")
+            .replace(".map(|r| r.key)", ".map(|r| self.key)"),
         SOURCE.replace(
             "struct Row { key: Key, alternate: Key, enabled: bool, retired: bool }",
             "enum Row { Empty }",

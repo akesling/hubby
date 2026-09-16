@@ -3962,10 +3962,65 @@
         "S11",
         "S12"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open.",
+      "status": "component_evidence",
+      "note": "Complete original existing-identity-first search, empty-slot fallback, eager unit error, indexed get_or_insert, initialization and tag dispatch. Checked capacity, search bounds, exact full error, other-slot frame, selected identity and exact existing/new record effects, unchanged full-error state and preservation of identity uniqueness. Constructor loops and reachable caller contracts, Rust search/index/equality/ownership/layout/source refinement remain open.",
       "root_apis": [],
-      "contracts": [],
+      "contracts": [
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "Inclusion.capacity_preserved",
+          "function": "membership_Membership_include",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "Inclusion.selected_slot",
+          "function": "membership_Membership_include",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "Inclusion.full_error",
+          "function": "membership_Membership_include",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "Inclusion.full_exact",
+          "function": "membership_Membership_include",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "Inclusion.other_slots_unchanged",
+          "function": "membership_Membership_include",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "Inclusion.selected_identity",
+          "function": "membership_Membership_include",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "Inclusion.selected_effect",
+          "function": "membership_Membership_include",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "Inclusion.full_unchanged",
+          "function": "membership_Membership_include",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "Inclusion.preserves_unique",
+          "function": "membership_Membership_include",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        }
+      ],
       "context": "production"
     },
     "crate::membership::<Membership < MAX >>::is_joint": {
