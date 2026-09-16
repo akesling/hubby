@@ -166,6 +166,7 @@ impl Crate {
             restoration: None,
             enum_projection: None,
             validator: None,
+            view: None,
             record_at: None,
             lookup: None,
             selection: None,

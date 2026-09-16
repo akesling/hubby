@@ -267,3 +267,27 @@ fn m1_actual_cargo_compilation_is_bound_to_original_sources() {
         .windows(2)
         .any(|pair| pair[0] == "--crate-name" && pair[1] == "jarl")));
 }
+
+#[test]
+fn m1_write_suffix_offset_is_inspected_from_original_rust() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let source = provium::methods::Crate::load(&root.join("src/lib.rs")).unwrap();
+    let offset = source.inspect_suffix_offset("state::State::write").unwrap();
+    assert_eq!(offset.length, ["len"]);
+    assert_eq!(offset.base_method, "state::State::base");
+    assert_eq!(offset.bias, 1);
+    let method = source.lower("state::State::write").unwrap();
+    let view = method.view.unwrap();
+    assert_eq!(
+        view.output_fields,
+        ["hard", "snapshot", "truncate_from", "entries"]
+    );
+    assert_eq!(view.slots, ["entries"]);
+    // A truncating cast at 2^32 would incorrectly select a prefix here.
+    assert_eq!(
+        offset.evaluate(32, 7, 0, Some((1u64 << 32) + 1)).unwrap(),
+        7
+    );
+    assert_eq!(offset.evaluate(64, 7, 10, Some(9)).unwrap(), 0);
+    assert_eq!(offset.evaluate(64, 7, 10, None).unwrap(), 7);
+}

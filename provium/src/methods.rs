@@ -97,6 +97,7 @@ pub struct Method {
     pub installation: Option<installations::Installation>,
     pub restoration: Option<restorations::Restoration>,
     pub validator: Option<validators::Validator>,
+    pub view: Option<views::SharedView>,
     pub enum_projection: Option<enum_projections::Projection>,
 }
 struct Definition {
@@ -481,6 +482,9 @@ impl Crate {
             if validators::candidate(&def.item) {
                 return self.lower_validator(name);
             }
+            if views::candidate(&def.item) {
+                return self.lower_shared_view(name);
+            }
             if restorations::candidate(&def.item) {
                 return self.lower_restoration(name);
             }
@@ -632,6 +636,7 @@ impl Crate {
             restoration: None,
             enum_projection: None,
             validator: None,
+            view: None,
         })
     }
     fn field_type<'a>(&'a self, def: &Definition, p: &[String]) -> Result<&'a Type, String> {
@@ -959,6 +964,10 @@ pub fn generate(methods: &[Method], namespace: &str) -> String {
             text.push_str(&constructors::generate(method));
             continue;
         }
+        if method.view.is_some() {
+            text.push_str(&views::generate(method));
+            continue;
+        }
         if method.query.is_some() {
             text.push_str(&queries::generate(method));
             continue;
@@ -1008,6 +1017,7 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
             format!("{}_ir", m.symbol),
             format!("{}_slot", m.symbol),
             format!("{}_correspondence", m.symbol),
+            format!("{}_offset", m.symbol),
             format!("{}_layout", m.symbol),
             format!("{}_well_typed", m.symbol),
             format!("{}_initialized_refinement", m.symbol),
@@ -1238,3 +1248,5 @@ pub mod restorations;
 pub mod enum_projections;
 
 pub mod validators;
+
+pub mod views;

@@ -238,7 +238,7 @@ impl Crate {
         {
             return Err("entry projection must resolve to the output record type".into());
         }
-        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],array:None,query:None,constructor:None,buffer:None,relocation:None,selection:None,lookup:None,iteration:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,record_at:Some(At{lookup,lookup_method,lookup_rust,equal,guard_field:base_member.to_string(),record_field:member.to_string(),scope:"complete optional record lookup composed with both complete source helpers; copied base/entry records and source paths retained; source/layout/borrow correspondence remains unproved"})})
+        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],array:None,query:None,constructor:None,buffer:None,relocation:None,selection:None,lookup:None,iteration:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,view:None,record_at:Some(At{lookup,lookup_method,lookup_rust,equal,guard_field:base_member.to_string(),record_field:member.to_string(),scope:"complete optional record lookup composed with both complete source helpers; copied base/entry records and source paths retained; source/layout/borrow correspondence remains unproved"})})
     }
 }
 pub(super) fn generate(method: &Method) -> String {

@@ -1,0 +1,22 @@
+{
+  "crate_root": "../../src/lib.rs",
+  "namespace": "JarlView",
+  "methods": [
+    "state::State::write"
+  ],
+  "proofs": "Proofs.lean",
+  "obligations": [
+    {
+      "theorem": "StorageView.metadata_only",
+      "function": "state_State_write"
+    },
+    {
+      "theorem": "StorageView.exact_view",
+      "function": "state_State_write"
+    },
+    {
+      "theorem": "StorageView.replacement_suffix",
+      "function": "state_State_write"
+    }
+  ]
+}

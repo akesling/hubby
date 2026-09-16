@@ -51,6 +51,7 @@ concrete host witnesses. It does not establish source-level protocol correctness
 | [capacity](capacity/Proofs.lean) | Complete `State::full`: exact equality against the original const-generic capacity; non-full implies room under the separate `len ≤ CAP` representation invariant |
 | [log-boundary](log-boundary/Proofs.lean) | Complete `State::base`, `get`, `id_at`, `entries` and `last`: snapshot boundary, checked borrowed lookup, ordered prefix iteration, and exact boundary/final-entry records |
 | [storage](storage/Proofs.lean) | Complete `State::push`, `new`, `grow`, `truncate`, `install` and `restore`: no-drop append/growth, occupied-prefix/capacity and metadata preservation, explicit destruction boundaries, and induction over histories with changing capacity |
+| [storage-view](storage-view/Proofs.lean) | Complete `State::write` in shared-view semantics: exact metadata and snapshot borrow, original truncation argument, checked suffix offset and borrowed slice; durable transaction equivalence remains open |
 | [initialization](initialization/Proofs.lean) | Complete `State::new`: initial hard-state fields, absent snapshot, all slots empty for arbitrary capacity, and initial `len ≤ CAP` |
 
 Each Rust project's `project.json` binds production Rust to explicit theorem

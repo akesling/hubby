@@ -639,3 +639,39 @@ formatting, Clippy, and rustdoc passed. Rechecking the original
 correspondence and three persistence obligations. Evidence is in
 `artifacts/provium/m1-initialized-persistence/`; the certificate retains
 `whole_program_proved=false`. Lean ran sequentially with a 16384 MiB limit.
+
+## Complete shared storage view (partial P02/P03/R05)
+
+Provium now lowers the complete original `State::write` body and its `base`
+helper. The reusable shared-view backend retains the `Option::map_or` closure,
+two saturating subtractions, checked target-width conversion, fallback/clamp,
+metadata copy, conditional optional borrow, original truncation argument, and
+half-open borrowed slice. Source-local additions or altered field expressions
+are rejected. A shared slice denotes locations in the original array; it does
+not allocate or copy the payloads. Invalid slice bounds remain an explicit
+fault. Scalar representation errors are separated from bounds faults.
+
+`proofs/storage-view` states the Jarl-specific returned-field contracts,
+metadata-only empty suffix, and exact replacement suffix. The offset-normalizing
+lemma is quantified over target word width and valid `usize` lengths; an
+out-of-range conversion uses the source's fallback rather than truncating the
+integer. Provider tests compare actual compiled Rust on boundary cases and
+compare complete returned borrowed locations, including the optional snapshot
+and bounds panic. Jarl's ordinary consumer test lowers its original method and
+checks the field-role mapping.
+
+The remaining R05 work is not discharged: connect these borrowed places to the
+logical entry sequence, translate `Write::entries`, prove applying the delta to
+the prior durable checkpoint yields the intended checkpoint, and establish
+caller dirty/truncation/snapshot coherence, retries and lost acknowledgments.
+Rust-to-IR preservation, physical reference/layout/lifetime refinement and
+panic-hook/abort behavior remain open. M1 and M2 remain incomplete.
+
+Validation: all six shared-view tests passed, including Lean and native Rust;
+the output-field rename mutation rejects the old theorem and removes stale
+success. The provider's ordinary regression suite, formatting, Clippy and rustdoc
+passed. Jarl's new correspondence and all three view obligations passed for the
+host and installed wasm32 target. The source-coverage and M0 review-binding tests
+passed after reviewing the single coverage-entry change and refreshing its hash;
+M0's claim/scope and requirement set were unchanged. Lean ran sequentially with
+a 16384 MiB limit. No production Jarl source or dependency changed.

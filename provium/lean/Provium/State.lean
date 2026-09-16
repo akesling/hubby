@@ -482,6 +482,158 @@ def selectRecord (program : RecordSelection) (state : SelectionStore) : InitStor
   match state program.optional with
   | none => initializeFields program.fallback (fun _ => 0)
   | some payload => payload program.recordField
+-- Target-width suffix offsets and borrowed slices. These primitives retain
+-- checked conversion failure separately from saturation. SlicePlace denotes a
+-- shared range of locations, never an eager Rust allocation or payload copy.
+structure SuffixOffsetProgram where
+  base : RecordSelection
+  baseField : Path
+  bias : Nat
+  lengthPath : Path
+
+structure SuffixViewStore where
+  records : SelectionStore
+  lengths : Path → Nat
+
+def suffixOffsetValue (bits length base bias index : Nat) : Nat :=
+  let relative := index - base - bias
+  min (if relative < 2^bits then relative else length) length
+
+theorem suffixOffsetValue_bounded (bits length base bias index : Nat) :
+    suffixOffsetValue bits length base bias index ≤ length := by
+  exact Nat.min_le_right _ _
+
+theorem suffixOffsetValue_conversion_failure (tooLarge : 2^bits ≤ index - base - bias) :
+    suffixOffsetValue bits length base bias index = length := by
+  simp [suffixOffsetValue, Nat.not_lt.mpr tooLarge]
+
+theorem suffixOffsetValue_normalize (word : length < 2^bits) :
+    suffixOffsetValue bits length base bias index = min (index - base - bias) length := by
+  dsimp only [suffixOffsetValue]
+  split
+  · rfl
+  · have bound : length ≤ index - base - bias := by omega
+    rw [Nat.min_self, Nat.min_eq_right bound]
+
+inductive ViewFault where
+  | input
+  | bounds
+  deriving DecidableEq
+
+def suffixOffset (program : SuffixOffsetProgram) (bits : Nat)
+    (state : SuffixViewStore) (first : Option Nat) : Except ViewFault Nat :=
+  let length := state.lengths program.lengthPath
+  if length ≥ 2^bits then .error .input
+  else match first with
+  | none => .ok length
+  | some index =>
+    match selectRecord program.base state.records program.baseField with
+    | .unsigned rustType base =>
+      if rustType ≠ "u64" ∨ index ≥ 2^64 ∨ base ≥ 2^64 ∨ program.bias ≥ 2^64 then
+        .error .input
+      else .ok (suffixOffsetValue bits length base program.bias index)
+    | _ => .error .input
+
+theorem suffixOffset_bounded (success : suffixOffset program bits state first = .ok offset) :
+    offset ≤ state.lengths program.lengthPath := by
+  dsimp only [suffixOffset] at success
+  split at success
+  · cases success
+  · split at success
+    · cases success
+      exact Nat.le_refl _
+    · split at success
+      · split at success
+        · cases success
+        · cases success
+          exact suffixOffsetValue_bounded _ _ _ _ _
+      · cases success
+
+theorem suffixOffset_none (program : SuffixOffsetProgram) (bits : Nat)
+    (state : SuffixViewStore) (word : state.lengths program.lengthPath < 2^bits) :
+    suffixOffset program bits state none = .ok (state.lengths program.lengthPath) := by
+  simp [suffixOffset, Nat.not_le.mpr word]
+
+theorem suffixOffset_some (program : SuffixOffsetProgram) (bits : Nat)
+    (state : SuffixViewStore) (index base : Nat)
+    (word : state.lengths program.lengthPath < 2^bits)
+    (selected : selectRecord program.base state.records program.baseField = .unsigned "u64" base)
+    (indexBound : index < 2^64) (baseBound : base < 2^64) (biasBound : program.bias < 2^64) :
+    suffixOffset program bits state (some index) =
+      .ok (min (index - base - program.bias) (state.lengths program.lengthPath)) := by
+  simp [suffixOffset, Nat.not_le.mpr word, selected, Nat.not_le.mpr indexBound,
+    Nat.not_le.mpr baseBound, Nat.not_le.mpr biasBound, suffixOffsetValue_normalize word]
+
+structure SlicePlace where
+  path : Path
+  start : Nat
+  stop : Nat
+  deriving DecidableEq
+
+def borrowSlice (path : Path) (capacity start stop : Nat) : Except ViewFault SlicePlace :=
+  if start ≤ stop ∧ stop ≤ capacity then .ok ⟨path, start, stop⟩ else .error .bounds
+
+theorem borrowSlice_bounds (success : borrowSlice path capacity start stop = .ok place) :
+    place.path = path ∧ place.start = start ∧ place.stop = stop ∧
+      start ≤ stop ∧ stop ≤ capacity := by
+  unfold borrowSlice at success
+  split at success
+  · cases success
+    exact ⟨rfl, rfl, rfl, by assumption⟩
+  · cases success
+
+theorem suffix_borrow_success
+    (offsetOk : suffixOffset program bits state first = .ok offset)
+    (lengthOk : state.lengths program.lengthPath ≤ capacity) :
+    borrowSlice path capacity offset (state.lengths program.lengthPath) =
+      .ok ⟨path, offset, state.lengths program.lengthPath⟩ := by
+  simp [borrowSlice, suffixOffset_bounded offsetOk, lengthOk]
+
+structure SharedSuffixProgram where
+  offset : SuffixOffsetProgram
+  copiedPath : Path
+  optionalPath : Path
+  slotsPath : Path
+  outputFields : List String
+
+structure SharedSuffixStore (α : Type) where
+  view : SuffixViewStore
+  copied : Path → α
+  capacities : Path → Nat
+
+structure SharedSuffixResult (α : Type) where
+  copied : α
+  optional : Option Path
+  first : Option Nat
+  slice : SlicePlace
+  outputFields : List String
+
+def sharedSuffix (program : SharedSuffixProgram) (bits : Nat)
+    (state : SharedSuffixStore α) (first : Option Nat) (changed : Bool) :
+    Except ViewFault (SharedSuffixResult α) := do
+  let start ← suffixOffset program.offset bits state.view first
+  let slice ← borrowSlice program.slotsPath (state.capacities program.slotsPath)
+    start (state.view.lengths program.offset.lengthPath)
+  pure ⟨state.copied program.copiedPath,
+    if changed && (state.view.records program.optionalPath).isSome then
+      some program.optionalPath else none,
+    first, slice, program.outputFields⟩
+
+theorem sharedSuffix_success
+    (offsetOk : suffixOffset program.offset bits state.view first = .ok start)
+    (capacityOk : state.view.lengths program.offset.lengthPath ≤ state.capacities program.slotsPath) :
+    sharedSuffix program bits state first changed = .ok
+      ⟨state.copied program.copiedPath,
+       if changed && (state.view.records program.optionalPath).isSome then some program.optionalPath else none,
+       first, ⟨program.slotsPath, start, state.view.lengths program.offset.lengthPath⟩, program.outputFields⟩ := by
+  simp only [sharedSuffix, offsetOk]
+  change (do
+    let slice ← borrowSlice program.slotsPath (state.capacities program.slotsPath)
+      start (state.view.lengths program.offset.lengthPath)
+    pure _) = _
+  rw [suffix_borrow_success offsetOk capacityOk]
+  rfl
+
 structure RecordLookup where
   slotsPath : Path
   base : RecordSelection

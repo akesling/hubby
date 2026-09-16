@@ -6180,10 +6180,31 @@
         "R03",
         "R05"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open.",
-      "root_apis": [],
-      "contracts": [],
+      "status": "component_evidence",
+      "note": "Complete original shared storage-view construction and base helper in proofs/storage-view: exact copied metadata, conditional snapshot borrow, truncation argument and checked suffix slice. Source/layout/lifetime refinement, Write::entries and durable transaction/caller composition remain open.",
+      "root_apis": [
+        "crate::state::<State < V , S , CAP >>::write"
+      ],
+      "contracts": [
+        {
+          "project": "proofs/storage-view/project.json",
+          "theorem": "StorageView.metadata_only",
+          "function": "state_State_write",
+          "evidence": "artifacts/provium/proofs/storage-view/verified.json"
+        },
+        {
+          "project": "proofs/storage-view/project.json",
+          "theorem": "StorageView.exact_view",
+          "function": "state_State_write",
+          "evidence": "artifacts/provium/proofs/storage-view/verified.json"
+        },
+        {
+          "project": "proofs/storage-view/project.json",
+          "theorem": "StorageView.replacement_suffix",
+          "function": "state_State_write",
+          "evidence": "artifacts/provium/proofs/storage-view/verified.json"
+        }
+      ],
       "context": "production"
     },
     "crate::state::<item:0>": {

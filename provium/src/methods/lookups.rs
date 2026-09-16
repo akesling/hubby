@@ -214,7 +214,7 @@ impl Crate {
         if tokens(&array.elem) != format!("Option < {} >", tokens(&reference.elem)) {
             return Err("lookup array slot and borrowed result types must agree".into());
         }
-        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],array:None,query:None,constructor:None,buffer:None,relocation:None,selection:None,iteration:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,record_at:None,lookup:Some(Lookup{slots,base_method,base_rust,base,base_field:base_member.to_string(),bias,scope:"complete shared checked lookup and source-resolved base helper; returns an abstract borrowed place; physical reference validity, Rust layout/borrow and frontend correspondence remain unproved"})})
+        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],array:None,query:None,constructor:None,buffer:None,relocation:None,selection:None,iteration:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,view:None,record_at:None,lookup:Some(Lookup{slots,base_method,base_rust,base,base_field:base_member.to_string(),bias,scope:"complete shared checked lookup and source-resolved base helper; returns an abstract borrowed place; physical reference validity, Rust layout/borrow and frontend correspondence remain unproved"})})
     }
 }
 pub(super) fn program(l: &Lookup) -> String {

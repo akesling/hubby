@@ -169,6 +169,15 @@ It assumes a related input heap. Source layout, pointer identity, exclusive
 access, reborrows, lifetimes, and destructor semantics remain separate obligations;
 this is not a source-level ownership proof or a refinement for other backends.
 
+Shared suffix-view methods support a complete record construction with copied
+metadata, a boolean-filtered optional borrow, the original optional index, and a
+shared array slice. The offset pipeline preserves saturating subtraction,
+checked `usize::try_from`, fallback, and clamping for 32/64-bit targets. The IR
+returns borrowed locations and retains bounds faults. It does not establish
+physical reference validity or implement a consumer's storage transaction.
+`Crate::inspect_suffix_offset` exposes the component analysis separately and
+never certifies the enclosing method.
+
 Optional-record array methods support a complete exclusive traversal with a
 `Some` binding, boolean field updates/branches, and slot deletion. Consumed
 receivers and records must derive builtin `Copy`; rustc checks that deletion

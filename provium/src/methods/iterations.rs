@@ -177,7 +177,7 @@ impl Crate {
             return Err("iterator Item and optional array payload types must agree".into());
         }
         let inclusive = matches!(range.limits, syn::RangeLimits::Closed(_));
-        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],array:None,query:None,constructor:None,buffer:None,relocation:None,selection:None,lookup:None,record_at:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,iteration:Some(Iteration{slots,length,payload_type:tokens(&reference.elem),inclusive,scope:"complete builtin double-ended iterator construction; denotation is a lazy sequence of borrowed places, not eager Rust allocation; prefix bounds retained; source/layout/lifetime and panic-hook refinement remain open"})})
+        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],array:None,query:None,constructor:None,buffer:None,relocation:None,selection:None,lookup:None,record_at:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,view:None,iteration:Some(Iteration{slots,length,payload_type:tokens(&reference.elem),inclusive,scope:"complete builtin double-ended iterator construction; denotation is a lazy sequence of borrowed places, not eager Rust allocation; prefix bounds retained; source/layout/lifetime and panic-hook refinement remain open"})})
     }
     pub(super) fn lower_last(&self, name: &str) -> Result<Method, String> {
         let def = self.methods.get(name).ok_or("unknown last-record method")?;
@@ -281,7 +281,7 @@ impl Crate {
         {
             return Err("last-entry field must resolve to the output record".into());
         }
-        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],array:None,query:None,constructor:None,buffer:None,relocation:None,selection:None,lookup:None,record_at:None,iteration:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,last:Some(Last{iteration,iterator_method,iterator_rust,base,base_method,base_rust,record_field:member.to_string(),from_back,scope:"complete last-record method with full iterator/base helpers; eager default and selected iterator end preserved in pure iterator denotation; source/layout/lifetime and panic-hook refinement remain open"})})
+        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],array:None,query:None,constructor:None,buffer:None,relocation:None,selection:None,lookup:None,record_at:None,iteration:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,view:None,last:Some(Last{iteration,iterator_method,iterator_rust,base,base_method,base_rust,record_field:member.to_string(),from_back,scope:"complete last-record method with full iterator/base helpers; eager default and selected iterator end preserved in pure iterator denotation; source/layout/lifetime and panic-hook refinement remain open"})})
     }
 }
 fn program(i: &Iteration) -> String {
