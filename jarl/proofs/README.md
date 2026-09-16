@@ -7,7 +7,8 @@ The runtime remains `no_std` and sans-I/O; Provium is not a runtime dependency.
 [CORRECTNESS_PLAN.md](CORRECTNESS_PLAN.md) specifies the complete source-level
 correctness goal, outstanding obligations, assumptions, milestones, and release
 gates. It is a plan, not evidence that those obligations have been proved.
-See [PROGRESS.md](PROGRESS.md) for implemented evidence and the remaining dependency frontier.
+See [M0.md](M0.md) for the completed claim/inventory audit and
+[PROGRESS.md](PROGRESS.md) for implemented evidence and the remaining dependency frontier.
 
 `coverage.json` records a reviewed syntactic inventory of every item in the
 production module tree. Ordinary tests reject source changes until that review is
@@ -28,15 +29,19 @@ From the repository root:
 ```sh
 cargo test -p jarl --test proofs --locked
 jarl/scripts/verify.sh
+jarl/scripts/verify-m0.sh
 ```
 
 The first command asserts the checked contracts and runs native comparisons.
 The script additionally runs slow source-mutation and 32-bit checks. Missing Lean
 fails verification; install elan and the version required by Provium first.
-CI runs both ordinary tests and the full proof gate.
+CI runs ordinary tests, the component proof gate and the M0 scope/witness gate.
+The M0 gate checks reviewed source/build accounting, model consistency and
+concrete host witnesses. It does not establish source-level protocol correctness.
 
 | Project | Contracts and scope |
 | --- | --- |
+| [specification](specification/Model.lean) | M0 handwritten specification only: genesis, host transaction/crash/cancellation, network provenance and external scheduling witnesses; no Rust correspondence claim |
 | [consensus](consensus/Proofs.lean) | Source-expression slices: strict majority, actual shared-voter intersection, stable/joint boundary overlap, quorum-position bounds, joint/follower minima, commit-prefix monotonicity, and current-term checks |
 | [message-dispatch](message-dispatch/Proofs.lean) | Complete `Message::term`: all eight variants read the durable/proposed term field specified by Rust; PreVoted reads term rather than campaign; explicit variant/field coverage |
 | [persistence](persistence/Proofs.lean) | Complete `Ready::persisted` field effects: clear flags, preserve other leaves, algebraic idempotence |
@@ -48,8 +53,9 @@ CI runs both ordinary tests and the full proof gate.
 | [storage](storage/Proofs.lean) | Complete `State::push`, `new`, `grow`, `truncate`, `install` and `restore`: no-drop append/growth, occupied-prefix/capacity and metadata preservation, explicit destruction boundaries, and induction over histories with changing capacity |
 | [initialization](initialization/Proofs.lean) | Complete `State::new`: initial hard-state fields, absent snapshot, all slots empty for arbitrary capacity, and initial `len ≤ CAP` |
 
-Each directory's `project.json` binds production Rust to explicit theorem
-obligations. Generated Lean, snapshots, hashes, and certificates are written to
+Each Rust project's `project.json` binds production Rust to explicit theorem
+obligations. The separately labelled specification project checks the handwritten
+model and records `source_correspondence_proved=false`. Generated Lean, snapshots, hashes, and certificates are written to
 `jarl/artifacts/provium/proofs/<project>/`. Proof-specific regression tests live in
 `jarl/tests/proof_cases/`; Provium's tests use independent compiler fixtures.
 

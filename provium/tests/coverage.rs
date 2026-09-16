@@ -41,12 +41,26 @@ impl Subject {
                         requirements: vec!["C01".into()],
                         status: Status::Planned,
                         note: "Not translated or proved".into(),
+                        root_apis: vec![item.id.clone()],
+                        context: "production".into(),
+                        contracts: vec![],
                     },
                 )
             })
             .collect();
         Ledger {
-            schema: 1,
+            schema: 2,
+            build_profiles: [("host".into(), "host default profile".into())].into(),
+            assumptions: Default::default(),
+            contexts: [(
+                "production".into(),
+                provium::coverage::Context {
+                    build_profiles: vec!["host".into()],
+                    assumptions: vec![],
+                    limitations: vec!["Call resolution and source preservation are open".into()],
+                },
+            )]
+            .into(),
             inventory,
             entries,
         }
@@ -158,4 +172,62 @@ fn ambiguous_modules_and_path_redirection_fail_explicitly() {
     assert!(inventory(&subject.0, Path::new("src/lib.rs"))
         .unwrap_err()
         .contains("#[path]"));
+}
+
+#[test]
+fn missing_public_root_and_unknown_build_or_assumption_fail_accounting() {
+    let subject = Subject::new();
+    for fault in 0..4 {
+        let mut ledger = subject.ledger();
+        let entry = ledger
+            .entries
+            .get_mut("crate::nested::<State>::clear")
+            .unwrap();
+        match fault {
+            0 => entry.root_apis.clear(),
+            1 => ledger
+                .contexts
+                .get_mut("production")
+                .unwrap()
+                .build_profiles
+                .push("unreviewed-target".into()),
+            2 => ledger
+                .contexts
+                .get_mut("production")
+                .unwrap()
+                .assumptions
+                .push("assume_safety".into()),
+            _ => ledger
+                .contexts
+                .get_mut("production")
+                .unwrap()
+                .limitations
+                .clear(),
+        }
+        let path = subject.save(&ledger);
+        assert!(audit(&subject.0, Path::new("src/lib.rs"), &path).is_err());
+    }
+}
+
+#[test]
+fn invented_contract_reference_cannot_pass_accounting() {
+    let subject = Subject::new();
+    fs::write(subject.0.join("project.json"), r#"{"obligations":[]}"#).unwrap();
+    let mut ledger = subject.ledger();
+    ledger
+        .entries
+        .values_mut()
+        .next()
+        .unwrap()
+        .contracts
+        .push(provium::coverage::Contract {
+            project: "project.json".into(),
+            evidence: "artifacts/verified.json".into(),
+            theorem: "invented".into(),
+            function: "clear".into(),
+        });
+    let path = subject.save(&ledger);
+    assert!(audit(&subject.0, Path::new("src/lib.rs"), &path)
+        .unwrap_err()
+        .contains("absent project obligation"));
 }

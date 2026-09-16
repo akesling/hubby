@@ -9,6 +9,20 @@ use std::{
     process::Command,
 };
 
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Profile {
+    #[default]
+    Dev,
+    Release,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Panic {
+    Abort,
+    Unwind,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Request {
@@ -18,12 +32,17 @@ pub struct Request {
     pub features: Vec<String>,
     #[serde(default)]
     pub no_default_features: bool,
+    #[serde(default)]
+    pub profile: Profile,
+    #[serde(default)]
+    pub panic: Option<Panic>,
 }
 
 #[derive(Debug, Serialize)]
 pub struct Package {
     pub name: String,
     pub version: String,
+    pub edition: String,
     pub id: String,
     pub source: Option<String>,
     pub manifest: PathBuf,
@@ -39,6 +58,9 @@ pub struct Report {
     pub request: Request,
     pub rustc_identity: String,
     pub target_cfg: String,
+    /// Requested semantics used for cfg inspection, not an attestation of Cargo's
+    /// effective invocation or of ambient profile overrides.
+    pub requested_rustc_options: Vec<String>,
     pub root: String,
     pub packages: Vec<Package>,
     pub workspace_inputs: BTreeMap<PathBuf, String>,
@@ -130,9 +152,40 @@ pub fn inspect(mut request: Request) -> Result<Report, String> {
             hash(fs::read(&file).map_err(|e| format!("{}: {e}", file.display()))?),
         );
     }
-    let target_cfg =
-        output(Command::new("rustc").args(["--print", "cfg", "--target", &request.target]))?;
-    Ok(Report {schema:1,request,rustc_identity,target_cfg,root,packages,workspace_inputs,metadata_sha256:hash(metadata),limitations:vec![
+    let mut requested_rustc_options = match request.profile {
+        Profile::Dev => vec![
+            "-C".into(),
+            "opt-level=0".into(),
+            "-C".into(),
+            "debug-assertions=yes".into(),
+            "-C".into(),
+            "overflow-checks=yes".into(),
+        ],
+        Profile::Release => vec![
+            "-C".into(),
+            "opt-level=3".into(),
+            "-C".into(),
+            "debug-assertions=no".into(),
+            "-C".into(),
+            "overflow-checks=no".into(),
+        ],
+    };
+    if let Some(panic) = &request.panic {
+        requested_rustc_options.extend([
+            "-C".into(),
+            match panic {
+                Panic::Abort => "panic=abort",
+                Panic::Unwind => "panic=unwind",
+            }
+            .into(),
+        ]);
+    }
+    let target_cfg = output(
+        Command::new("rustc")
+            .args(["--print", "cfg", "--target", &request.target])
+            .args(&requested_rustc_options),
+    )?;
+    Ok(Report {schema:1,request,rustc_identity,target_cfg,requested_rustc_options,root,packages,workspace_inputs,metadata_sha256:hash(metadata),limitations:vec![
         "Cargo metadata feature resolution is recorded; this is not a captured compiler invocation".into(),
         "build scripts, proc macros, cfg expansion and source/type/call closure still require checking".into(),
         "ambient Cargo configuration/environment and dependency source files are not fully attested".into(),
@@ -188,6 +241,7 @@ fn resolve(value: &serde_json::Value, manifest: &Path) -> Result<(String, Vec<Pa
         result.push(Package {
             name: string(p, "name")?.into(),
             version: string(p, "version")?.into(),
+            edition: string(p, "edition")?.into(),
             id,
             source,
             manifest: manifest.clone(),

@@ -396,3 +396,24 @@ it does not change the semantics or add an axiom. The step rule requires a
 nonzero fuel budget and a non-loop expression; loops still need the existing
 compositional invariant rules. See the symbolic optional-record regression in
 `tests/validators.rs` for a complete generated-method proof.
+
+Specification witnesses can accompany source-linked projects using
+`{"kind":"specification","schema":1,"proofs":"Model.lean","obligations":[{"theorem":"witness","definition":"initial"}]}`.
+The proof file contains self-contained Lean declarations; Provium supplies the
+pinned Lean library. Additional module imports are deliberately unsupported in
+this project kind. Each theorem must mention its designated definition and pass
+the transitive axiom audit. `assert_proofs!` discovers these projects alongside
+Rust projects, but their evidence is explicitly `specification_only`, with both
+source correspondence and whole-program proof set to false. This supports
+checking that a proposed model has admissible initial states or host schedules;
+it cannot replace compilation of the implementation.
+
+Coverage schema 2 records complete source ranges, known root associations and
+project/theorem references. Named review contexts share build scope, assumption
+IDs and unresolved limitations across items. These associations express reviewed
+scope, not proof that every associated assumption is necessary or every build is
+verified. The auditor rejects unknown roots/profiles/assumptions, missing public
+roots, absent project obligations and stale source. Status labels remain review
+metadata and cannot authorize a complete-proof claim. To migrate schema 1,
+regenerate the inventory and review the new contexts, roots and evidence fields;
+changing only the version number is rejected.

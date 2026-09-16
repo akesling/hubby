@@ -1,0 +1,101 @@
+{
+  "schema": 1,
+  "profiles": [
+    {
+      "id": "host-dev-unwind",
+      "usize_bits": 64,
+      "subject": {
+        "manifest": "../Cargo.toml",
+        "target": "host",
+        "features": [],
+        "no_default_features": true,
+        "profile": "dev",
+        "panic": "unwind"
+      }
+    },
+    {
+      "id": "host-dev-abort",
+      "usize_bits": 64,
+      "subject": {
+        "manifest": "../Cargo.toml",
+        "target": "host",
+        "features": [],
+        "no_default_features": true,
+        "profile": "dev",
+        "panic": "abort"
+      }
+    },
+    {
+      "id": "host-release-unwind",
+      "usize_bits": 64,
+      "subject": {
+        "manifest": "../Cargo.toml",
+        "target": "host",
+        "features": [],
+        "no_default_features": true,
+        "profile": "release",
+        "panic": "unwind"
+      }
+    },
+    {
+      "id": "host-release-abort",
+      "usize_bits": 64,
+      "subject": {
+        "manifest": "../Cargo.toml",
+        "target": "host",
+        "features": [],
+        "no_default_features": true,
+        "profile": "release",
+        "panic": "abort"
+      }
+    },
+    {
+      "id": "wasm32-unknown-unknown-dev-abort",
+      "usize_bits": 32,
+      "subject": {
+        "manifest": "../Cargo.toml",
+        "target": "wasm32-unknown-unknown",
+        "features": [],
+        "no_default_features": true,
+        "profile": "dev",
+        "panic": "abort"
+      }
+    },
+    {
+      "id": "wasm32-unknown-unknown-release-abort",
+      "usize_bits": 32,
+      "subject": {
+        "manifest": "../Cargo.toml",
+        "target": "wasm32-unknown-unknown",
+        "features": [],
+        "no_default_features": true,
+        "profile": "release",
+        "panic": "abort"
+      }
+    },
+    {
+      "id": "thumbv7em-none-eabi-dev-abort",
+      "usize_bits": 32,
+      "subject": {
+        "manifest": "../Cargo.toml",
+        "target": "thumbv7em-none-eabi",
+        "features": [],
+        "no_default_features": true,
+        "profile": "dev",
+        "panic": "abort"
+      }
+    },
+    {
+      "id": "thumbv7em-none-eabi-release-abort",
+      "usize_bits": 32,
+      "subject": {
+        "manifest": "../Cargo.toml",
+        "target": "thumbv7em-none-eabi",
+        "features": [],
+        "no_default_features": true,
+        "profile": "release",
+        "panic": "abort"
+      }
+    }
+  ]
+}

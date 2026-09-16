@@ -22,6 +22,9 @@ pub struct Item {
     pub kind: String,
     pub source: String,
     pub line: usize,
+    pub column: usize,
+    pub end_line: usize,
+    pub end_column: usize,
     pub public: bool,
     pub syntax_sha256: String,
     pub calls: Vec<String>,
@@ -39,10 +42,34 @@ pub struct Inventory {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct Contract {
+    pub project: String,
+    /// Expected certificate location; accounting does not certify its contents.
+    pub evidence: String,
+    pub theorem: String,
+    pub function: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Entry {
     pub requirements: Vec<String>,
     pub status: Status,
     pub note: String,
+    /// Known root associations, not a claim of complete transitive resolution.
+    pub root_apis: Vec<String>,
+    /// Shared reviewed scope; expanded by the auditor for every item.
+    pub context: String,
+    pub contracts: Vec<Contract>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Context {
+    pub build_profiles: Vec<String>,
+    pub assumptions: Vec<String>,
+    /// Explicitly record missing resolution, semantics or composition evidence.
+    pub limitations: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -50,6 +77,11 @@ pub struct Entry {
 pub enum Status {
     Planned,
     ComponentEvidence,
+    Translated,
+    ComponentProved,
+    Composed,
+    Excluded,
+    Blocked,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -57,6 +89,9 @@ pub enum Status {
 pub struct Ledger {
     pub schema: u32,
     pub inventory: Inventory,
+    pub build_profiles: BTreeMap<String, String>,
+    pub assumptions: BTreeMap<String, String>,
+    pub contexts: BTreeMap<String, Context>,
     pub entries: BTreeMap<String, Entry>,
 }
 
@@ -107,6 +142,9 @@ impl Collector<'_> {
             kind: kind.into(),
             source: source.into(),
             line: node.span().start().line,
+            column: node.span().start().column,
+            end_line: node.span().end().line,
+            end_column: node.span().end().column,
             public,
             syntax_sha256: hash(tokens(node)),
             calls,
@@ -198,7 +236,7 @@ impl Collector<'_> {
                             syn::ImplItem::Fn(f) => (
                                 &f.sig.ident,
                                 "method",
-                                matches!(f.vis, syn::Visibility::Public(_)),
+                                matches!(f.vis, syn::Visibility::Public(_)) || i.trait_.is_some(),
                             ),
                             syn::ImplItem::Const(c) => (
                                 &c.ident,
@@ -294,7 +332,7 @@ pub fn inventory(crate_root: &Path, library: &Path) -> Result<Inventory, String>
     let mut collector = Collector {
         root: &root,
         inventory: Inventory {
-            schema: 1,
+            schema: 2,
             sources: vec![],
             items: vec![],
             limitations: vec![
@@ -330,11 +368,22 @@ pub fn audit(crate_root: &Path, library: &Path, ledger: &Path) -> Result<Report,
     let actual = inventory(crate_root, library)?;
     let ledger: Ledger = serde_json::from_slice(&fs::read(ledger).map_err(|e| e.to_string())?)
         .map_err(|e| e.to_string())?;
-    if ledger.schema != 1 || ledger.inventory != actual {
+    if ledger.schema != 2 || ledger.inventory != actual {
         return Err("coverage inventory is stale or unsupported; review the changed source before updating the ledger".into());
     }
     if ledger.entries.len() != actual.items.len() {
         return Err("coverage ledger must classify exactly every inventoried item".into());
+    }
+    if ledger.build_profiles.is_empty()
+        || ledger
+            .build_profiles
+            .iter()
+            .chain(&ledger.assumptions)
+            .any(|(id, description)| id.trim().is_empty() || description.trim().is_empty())
+    {
+        return Err(
+            "coverage requires named build profiles and nonempty contract descriptions".into(),
+        );
     }
     let mut component_items = 0;
     for item in &actual.items {
@@ -351,7 +400,71 @@ pub fn audit(crate_root: &Path, library: &Path, ledger: &Path) -> Result<Report,
                 item.id
             ));
         }
-        component_items += usize::from(matches!(entry.status, Status::ComponentEvidence));
+        let context = ledger
+            .contexts
+            .get(&entry.context)
+            .ok_or_else(|| format!("{} references an unknown review context", item.id))?;
+        if context.build_profiles.is_empty()
+            || context
+                .build_profiles
+                .iter()
+                .any(|p| !ledger.build_profiles.contains_key(p))
+            || context
+                .assumptions
+                .iter()
+                .any(|a| !ledger.assumptions.contains_key(a))
+            || entry
+                .root_apis
+                .iter()
+                .any(|root| !actual.items.iter().any(|i| &i.id == root))
+            || context.limitations.is_empty()
+            || context.limitations.iter().any(|s| s.trim().is_empty())
+        {
+            return Err(format!(
+                "{} has unknown roots/profiles/assumptions or missing limitations",
+                item.id
+            ));
+        }
+        if item.public && !entry.root_apis.contains(&item.id) {
+            return Err(format!(
+                "public API {} must account for itself as a root",
+                item.id
+            ));
+        }
+        for contract in &entry.contracts {
+            if contract.evidence.is_empty()
+                || Path::new(&contract.evidence).components().any(
+                    |part| !matches!(part, std::path::Component::Normal(name) if name != "target"),
+                )
+            {
+                return Err(
+                    "coverage evidence needs a consumer-relative path outside target".into(),
+                );
+            }
+            let path = crate_root
+                .join(&contract.project)
+                .canonicalize()
+                .map_err(|e| e.to_string())?;
+            if !path.starts_with(crate_root.canonicalize().map_err(|e| e.to_string())?) {
+                return Err("coverage evidence must belong to the consumer".into());
+            }
+            let project: serde_json::Value =
+                serde_json::from_slice(&fs::read(&path).map_err(|e| e.to_string())?)
+                    .map_err(|e| e.to_string())?;
+            if !project["obligations"].as_array().is_some_and(|list| {
+                list.iter()
+                    .any(|o| o["theorem"] == contract.theorem && o["function"] == contract.function)
+            }) {
+                return Err(format!(
+                    "{} references an absent project obligation",
+                    item.id
+                ));
+            }
+        }
+        component_items += usize::from(matches!(
+            entry.status,
+            Status::ComponentEvidence | Status::ComponentProved
+        ));
     }
     Ok(Report {
         items: actual.items.len(),

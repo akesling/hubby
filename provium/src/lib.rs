@@ -9,6 +9,7 @@ pub mod lean;
 pub mod methods;
 pub mod project;
 
+pub mod specification;
 pub mod suite;
 pub use suite::{verify_project, verify_suite, ProjectReport};
 

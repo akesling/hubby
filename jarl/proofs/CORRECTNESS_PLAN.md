@@ -6,9 +6,10 @@ Owner: Jarl owns the protocol specification and assertions; Provium owns reusabl
 Rust semantics, translation, checking, and evidence tooling.
 
 This document defines the work required to justify a source-level correctness
-claim for both public Jarl engines. Every requirement below is outstanding unless
-the baseline section explicitly identifies existing evidence. A written obligation
-is not a discharged obligation. Proposed files, commands, manifest fields, and
+claim for both public Jarl engines. Checked milestone evidence is recorded in
+[M0.md](M0.md) and [PROGRESS.md](PROGRESS.md); M0 accounts for the claim and
+inventory, while M1–M8 remain open. A written obligation is not a discharged
+obligation. M0 completion is not a source-level correctness claim. Proposed files, commands, manifest fields, and
 theorem names below are design requirements, not claims that those APIs exist.
 
 ## 1. Claim and non-negotiable boundaries

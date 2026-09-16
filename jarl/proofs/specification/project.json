@@ -1,0 +1,79 @@
+{
+  "kind": "specification",
+  "schema": 1,
+  "proofs": "Model.lean",
+  "obligations": [
+    {
+      "theorem": "Jarl.Specification.genesis_witness",
+      "definition": "Jarl.Specification.Initial"
+    },
+    {
+      "theorem": "Jarl.Specification.genesis_owners",
+      "definition": "Jarl.Specification.initialWorld"
+    },
+    {
+      "theorem": "Jarl.Specification.concrete_genesis_witness",
+      "definition": "Jarl.Specification.Initial"
+    },
+    {
+      "theorem": "Jarl.Specification.save_witness",
+      "definition": "Jarl.Specification.HostTrace"
+    },
+    {
+      "theorem": "Jarl.Specification.pending_witness",
+      "definition": "Jarl.Specification.HostTrace"
+    },
+    {
+      "theorem": "Jarl.Specification.ambiguous_crash_witness",
+      "definition": "Jarl.Specification.HostTrace"
+    },
+    {
+      "theorem": "Jarl.Specification.cancellation_witness",
+      "definition": "Jarl.Specification.HostTrace"
+    },
+    {
+      "theorem": "Jarl.Specification.ack_requires_durable",
+      "definition": "Jarl.Specification.HostStep"
+    },
+    {
+      "theorem": "Jarl.Specification.crash_preserves_durable",
+      "definition": "Jarl.Specification.HostStep"
+    },
+    {
+      "theorem": "Jarl.Specification.fixed_minimum_capacity_witness",
+      "definition": "Jarl.Specification.Initial"
+    },
+    {
+      "theorem": "Jarl.Specification.dynamic_minimum_capacity_rejection",
+      "definition": "Jarl.Specification.Admissible"
+    },
+    {
+      "theorem": "Jarl.Specification.delivery_has_emission",
+      "definition": "Jarl.Specification.NetworkStep"
+    },
+    {
+      "theorem": "Jarl.Specification.replay_has_emission",
+      "definition": "Jarl.Specification.NetworkStep"
+    },
+    {
+      "theorem": "Jarl.Specification.network_keeps_local_state",
+      "definition": "Jarl.Specification.NetworkStep"
+    },
+    {
+      "theorem": "Jarl.Specification.timely_schedule_witness",
+      "definition": "Jarl.Specification.TimelyServices"
+    },
+    {
+      "theorem": "Jarl.Specification.candidate_schedule_witness",
+      "definition": "Jarl.Specification.singletonCandidate"
+    },
+    {
+      "theorem": "Jarl.Specification.initial_unique_owners",
+      "definition": "Jarl.Specification.Initial"
+    },
+    {
+      "theorem": "Jarl.Specification.empty_voters_rejected",
+      "definition": "Jarl.Specification.Membership.Valid"
+    }
+  ]
+}

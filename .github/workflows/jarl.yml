@@ -36,6 +36,9 @@ jobs:
           RUSTDOCFLAGS: -D warnings
       - run: cargo +stable check -p jarl --target wasm32-unknown-unknown --locked --offline
       - run: cargo +stable check -p jarl --target thumbv7em-none-eabi --locked --offline
+      - run: jarl/scripts/verify-m0.sh
+        env:
+          RUSTUP_TOOLCHAIN: stable
       - run: jarl/scripts/verify.sh
         env:
           RUSTUP_TOOLCHAIN: stable

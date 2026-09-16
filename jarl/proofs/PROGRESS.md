@@ -1,14 +1,18 @@
 # Correctness proof implementation progress
 
 This records implemented evidence against [CORRECTNESS_PLAN.md](CORRECTNESS_PLAN.md).
-It is not a completion certificate. No full-correctness milestone is closed yet.
+It is not a full-correctness certificate. M0 claim/inventory is complete under
+the exit-criterion audit in `M0.md`; M1–M8 remain open.
 
 Execution rule: a checked commit is a checkpoint, not the stopping condition.
 Continue with the next open source-linked obligation under the existing toolchain,
 dependency, no_std/sans-I/O and approval constraints. Only the full specification's
 verified completion can close this work; a green component suite cannot.
 
-Immediate frontier: discharge append/truncation/installation preconditions in
+M0 has been audited against `CORRECTNESS_PLAN.md`; its reviewed inputs and
+reproducible gate are recorded in `M0.md` and `m0-review.json`.
+
+Protocol frontier: discharge append/truncation/installation preconditions in
 complete protocol callers and durable histories, including snapshot provenance
 and hard-state transitions. Branch contracts for installation are checked below. Recovery, growth and truncation preserve the
 logical log representation under the contracts below. Buffer-shape induction alone
@@ -524,9 +528,9 @@ Resource correction: overlapping symbolic optional-record experiments exhausted
 host memory. Those runs were stopped and the expensive experiment was removed
 from the verification gate; that attempt established no universal claim. At
 that checkpoint the optional-record evidence was the 50-case native comparison
-and changed-operand rejection. Provium now defaults to a configurable 2 GiB
-Lean memory limit, one Lean worker thread, and a per-process execution lock. Both projects' proof scripts
-run tests serially.
+and changed-operand rejection. Provium now defaults to a configurable 2 GiB Lean
+memory limit, one Lean worker thread, and a per-process execution lock. Both
+projects' proof scripts run tests serially.
 Do not run separate proof gates concurrently: their memory budgets are separate.
 
 The authorized working budget is 16 GB total. Current verification uses
@@ -558,3 +562,35 @@ an audit reference). The seven new generic rules passed the axiom audit. Runs
 used the requested 16 GiB limit, serially. Format, Clippy, documentation, and
 ordinary Rust tests also passed. The unchanged Jarl proof projects were not
 rerun for this additive Provium proof-library change.
+
+
+## M0 specification and accounting foundation
+
+M0 completion is tracked in `M0.md` with a requirement-by-requirement audit. Coverage
+schema 2 accounts for the same 184 source items with source ranges, known public
+roots, shared build/assumption scope, explicit unresolved limits and references
+to declared component obligations. These are review associations, not resolved
+Rust call edges or promoted proof claims.
+
+`specification/Model.lean` supplies eighteen kernel-checked specification obligations:
+admissible genesis for either engine, exact owner enumeration, nonvacuous
+initialization, successful/pending saves, crash after durability, cancellation
+and retry, acknowledgment's durability premise, crash preservation, initial owner
+uniqueness, network emission provenance, and bounded external service scheduling. Its
+population/capacity/timer parameters are not fixed to the concrete witness.
+Fixed capacity 1 remains in scope; dynamic initialization requires capacity 4.
+The generic Provium specification project explicitly reports no source
+correspondence. Production Jarl Rust is unchanged.
+
+`build-matrix.json` declares eight host/32-bit/bare-metal debug/release and
+panic profiles; reports capture the installed rustc identity, target cfg,
+requested flags, Cargo metadata/lock and edition. No target is installed. This
+is requested-build accounting, not a captured effective Cargo invocation or
+proof that the CI bare-metal library is locally installed.
+
+`jarl/scripts/verify-m0.sh` checks source/build accounting, model witnesses and
+the existing fixed/dynamic/sync/async executable host witnesses, serially with
+the authorized 16 GiB Lean limit. M0 closes claim/inventory accounting and
+specification/host witness existence. Effective compiler invocation and expanded
+call closure are P01 work in M1, not established by requested-build accounting.
+Later milestones and full protocol correctness remain open.

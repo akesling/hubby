@@ -82,3 +82,37 @@ fn consumer_suite_discovers_both_backends_and_owns_its_evidence() {
         assert!(!report.output.join("verified.json").exists());
     }
 }
+
+#[test]
+#[ignore = "requires pinned Lean; scripts/verify.sh runs this"]
+fn specification_evidence_cannot_claim_source_correspondence_or_hide_axioms() {
+    let consumer = Consumer::new();
+    let directory = consumer.0.join("proofs");
+    let project = directory.join("project.json");
+    let proofs = directory.join("Model.lean");
+    fs::write(&project, r#"{"kind":"specification","schema":1,"proofs":"Model.lean","obligations":[{"theorem":"witness","definition":"initial"}]}"#).unwrap();
+    fs::write(
+        &proofs,
+        "def initial : Nat := 0\ntheorem witness : initial = 0 := rfl\n",
+    )
+    .unwrap();
+    let reports = verify_suite(&consumer.0, Path::new("proofs")).unwrap();
+    let out = &reports[0].output;
+    let certificate: serde_json::Value =
+        serde_json::from_slice(&fs::read(out.join("verified.json")).unwrap()).unwrap();
+    assert_eq!(certificate["kind"], "specification_only");
+    assert_eq!(certificate["whole_program_proved"], false);
+    assert_eq!(certificate["source_correspondence_proved"], false);
+    for bad in [
+        "def initial : Nat := 1\ntheorem witness : initial = 0 := rfl\n",
+        "def initial : Nat := 0\naxiom hidden : initial = 0\ntheorem witness : initial = 0 := hidden\n",
+        "def initial : Nat := 0\nopaque hidden : initial = 0 := by sorry\ntheorem witness : initial = 0 := hidden\n",
+        "def initial : Nat := 0\ntheorem witness : True := True.intro\n",
+        "import Other\ndef initial : Nat := 0\ntheorem witness : initial = 0 := rfl\n",
+    ] {
+        fs::write(out.join("verified.json"), "stale").unwrap();
+        fs::write(&proofs, bad).unwrap();
+        assert!(verify_project(&project, out).is_err(), "accepted {bad}");
+        assert!(!out.join("verified.json").exists());
+    }
+}

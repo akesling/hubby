@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "review_kind": "implementation_self_review",
+  "whole_program_proved": false,
+  "inputs": {
+    "proofs/CORRECTNESS_PLAN.md": "c44373cc666e40fc10d8f8e99543b4a5ac5c186716fe5487f10b424e48d3fe0f",
+    "proofs/M0.md": "a5ee7c0beebd505c4775c35bfd7869a6260afec980dd9bb5ff2abbea0b4a7a38",
+    "proofs/coverage.json": "8535c16ca05a15f27922bf72774572e8a1064cbe829301483d92c8ff34327d99",
+    "proofs/build-matrix.json": "2349382e9b4c6e6a6d66f719403693d256904ac639e8837fdd4b94092d510bee",
+    "proofs/specification/project.json": "9096092733883fa61520a225c3577f67536bee32077fb98d0aad6aa306f2bcf4",
+    "proofs/specification/Model.lean": "aff1161e96237705d832a99ce43082fd3b097d2f756fe75db37d41a32f8cca42",
+    "scripts/verify-m0.sh": "08ce3d599366dfbbcdd6ae55722f39a8ca17ea715ba72b71e6c8df04419f1013",
+    "Cargo.toml": "c4a32b53a8e3ae4cf475289f8852a2f0d0aff0cc8d512d30035f7ab3427f2d16",
+    "../Cargo.toml": "d6f3d7ad940108d0c6e47a3de5bb7b10ea36b10b98f6dcff4b0b41f066eebd0d",
+    "../Cargo.lock": "763027e606e55ac5a4c0da95f9c8ea951e13df51ec7df80c8b7f5458f971d64a"
+  }
+}

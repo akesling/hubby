@@ -8,6 +8,8 @@ fn independent_provider_dependency_graph_is_resolved_offline() {
         target: "host".into(),
         features: vec![],
         no_default_features: false,
+        profile: Default::default(),
+        panic: None,
     })
     .unwrap();
     assert_ne!(report.request.target, "host");

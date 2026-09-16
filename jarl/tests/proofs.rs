@@ -109,3 +109,139 @@ mod message_validation;
 
 #[path = "proof_cases/replication_contract.rs"]
 mod replication_contract;
+
+#[test]
+fn specification_witnesses_are_kernel_checked() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let report = provium::verify_project(
+        &root.join("proofs/specification/project.json"),
+        &root.join("artifacts/provium/m0-specification"),
+    )
+    .unwrap();
+    assert!(report.details.contains("no source correspondence claim"));
+}
+
+#[test]
+fn m0_build_profiles_account_for_host_32_bit_and_bare_metal() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let matrix_bytes = fs::read(root.join("proofs/build-matrix.json")).unwrap();
+    let matrix: serde_json::Value = serde_json::from_slice(&matrix_bytes).unwrap();
+    assert_eq!(matrix["schema"], 1);
+    let profiles = matrix["profiles"].as_array().unwrap();
+    assert_eq!(profiles.len(), 8);
+    let coverage: provium::coverage::Ledger =
+        serde_json::from_slice(&fs::read(root.join("proofs/coverage.json")).unwrap()).unwrap();
+    let mut ids = std::collections::BTreeSet::new();
+    for profile in profiles {
+        let id = profile["id"].as_str().unwrap();
+        assert!(ids.insert(id));
+        assert!(coverage.build_profiles.contains_key(id));
+        let mut request: provium::cargo_subject::Request =
+            serde_json::from_value(profile["subject"].clone()).unwrap();
+        assert_eq!(
+            id,
+            format!(
+                "{}-{}-{}",
+                request.target,
+                profile["subject"]["profile"].as_str().unwrap(),
+                profile["subject"]["panic"].as_str().unwrap()
+            )
+        );
+        request.manifest = root.join("proofs").join(request.manifest);
+        let output = root.join("artifacts/provium/m0-builds").join(id);
+        let report = provium::cargo_subject::write(request, &output).unwrap();
+        let width = profile["usize_bits"].as_u64().unwrap();
+        assert!(report
+            .target_cfg
+            .lines()
+            .any(|l| l == format!("target_pointer_width=\"{width}\"")));
+        let panic = profile["subject"]["panic"].as_str().unwrap();
+        assert!(report
+            .target_cfg
+            .lines()
+            .any(|l| l == format!("panic=\"{panic}\"")));
+        let debug = profile["subject"]["profile"] == "dev";
+        assert_eq!(
+            report.target_cfg.lines().any(|l| l == "debug_assertions"),
+            debug
+        );
+        assert_eq!(report.packages.len(), 1);
+        assert_eq!(report.packages[0].edition, "2021");
+        assert_eq!(report.packages[0].name, "jarl");
+        assert!(report.packages[0].normal_dependencies.is_empty());
+        assert!(report.packages[0].build_dependencies.is_empty());
+        fs::write(output.join("scope.json"), serde_json::to_vec_pretty(&serde_json::json!({
+            "kind":"requested_build_accounting", "compiled":false,
+            "matrix_sha256":provium::project::hash(&matrix_bytes),
+            "coverage_sha256":provium::project::hash(fs::read(root.join("proofs/coverage.json")).unwrap()),
+            "limitation":"Target cfg inspection does not require an installed target library and is not build or proof evidence. Effective Cargo invocations and ambient configuration remain P01."
+        })).unwrap()).unwrap();
+    }
+    assert_eq!(ids.len(), coverage.build_profiles.len());
+    for target in ["host", "wasm32-unknown-unknown", "thumbv7em-none-eabi"] {
+        assert!(profiles.iter().any(|p| p["subject"]["target"] == target));
+    }
+    let assumptions: std::collections::BTreeSet<_> = coverage.assumptions.keys().cloned().collect();
+    assert_eq!(assumptions, (1..=10).map(|i| format!("A{i:02}")).collect());
+}
+
+#[test]
+fn m0_native_genesis_witnesses_match_the_engine_capacity_boundary() {
+    use jarl::{Cluster, ClusterState, Config, Error, Id, Membership, Node, Settings, State};
+    let fixed = Node::<u64, u64, 1, 1>::new(Config::new(Id(0), [Id(0)]), State::new());
+    assert!(fixed.is_ok(), "fixed-engine safety includes capacity one");
+    let membership = Membership::<1>::new(&[Id(0)], &[]).unwrap();
+    let dynamic = Cluster::<u64, u64, 1, 4>::new(
+        Settings::default(),
+        ClusterState::new(Id(0), membership).unwrap(),
+    );
+    assert!(dynamic.is_ok());
+    let too_small = Cluster::<u64, u64, 1, 1>::new(
+        Settings::default(),
+        ClusterState::new(Id(0), membership).unwrap(),
+    );
+    assert!(matches!(too_small, Err(Error::Config)));
+    assert!(matches!(Membership::<1>::new(&[], &[]), Err(Error::Config)));
+    assert!(matches!(
+        Membership::<2>::new(&[Id(0), Id(0)], &[]),
+        Err(Error::Config)
+    ));
+}
+
+#[test]
+fn m0_review_binding_matches_the_specification_and_scope() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let review: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join("proofs/m0-review.json")).unwrap()).unwrap();
+    assert_eq!(review["schema"], 1);
+    assert_eq!(review["review_kind"], "implementation_self_review");
+    assert_eq!(review["whole_program_proved"], false);
+    let inputs = review["inputs"].as_object().unwrap();
+    let required = [
+        "Cargo.toml",
+        "../Cargo.toml",
+        "../Cargo.lock",
+        "proofs/CORRECTNESS_PLAN.md",
+        "proofs/M0.md",
+        "proofs/coverage.json",
+        "proofs/build-matrix.json",
+        "proofs/specification/project.json",
+        "proofs/specification/Model.lean",
+        "scripts/verify-m0.sh",
+    ];
+    assert_eq!(inputs.len(), required.len());
+    for path in required {
+        assert_eq!(inputs[path], provium::project::hash(fs::read(root.join(path)).unwrap()),
+            "{path} changed: review its M0 scope and theorem statements before updating m0-review.json");
+    }
+    let ledger: provium::coverage::Ledger =
+        serde_json::from_slice(&fs::read(root.join("proofs/coverage.json")).unwrap()).unwrap();
+    let coverage_ids: std::collections::BTreeSet<_> = ledger
+        .entries
+        .values()
+        .flat_map(|entry| &entry.requirements)
+        .filter(|id| id.starts_with('C'))
+        .cloned()
+        .collect();
+    assert_eq!(coverage_ids, (1..=12).map(|i| format!("C{i:02}")).collect());
+}
