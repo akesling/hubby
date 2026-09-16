@@ -397,4 +397,37 @@ theorem runNumericWords_refines (program : NumericFold) (entries : ArrayStore α
         (by simpa only [sortNumericBuffer_length, writeNumeric_length, List.length_replicate] using projectArray_length program.second entries)
     · rfl
 
+-- A bound on completed interactions, conditional on callback/drop responses.
+-- This does not discharge Rust source, library or callback termination contracts.
+theorem numeric_fold_budget (program : NumericFold) (entries : ArrayStore α)
+    (callback : σ) (abortOnPanic : Bool) :
+    callbackBudget ((projectArray program.first entries).length + (projectArray program.second entries).length + 2)
+      (runNumericFold program entries callback abortOnPanic) := by
+  rw [runNumericFold_refines]
+  unfold runNumericFoldList
+  rw [Nat.add_assoc]
+  apply callback_collect_budget _ _ _ _ (by omega)
+  intro values advanced
+  have finish (result : CallbackExit UInt64) :
+      callbackBudget ((projectArray program.second entries).length + 2)
+        (finishCallback advanced result : CallbackRun α σ UInt64 UInt64) := by
+    simpa [Nat.add_comm] using callback_budget_add 2 (projectArray program.second entries).length _
+      (callback_finish_budget advanced result)
+  split
+  · exact finish _
+  · split
+    · apply callback_collect_budget _ _ _ 2 (by omega)
+      intro values final
+      split <;> exact callback_finish_budget final _
+    · exact finish _
+
+theorem numeric_words_budget (program : NumericFold) (entries : ArrayStore α)
+    (callback : σ) (bits : Nat) (checked abortOnPanic : Bool)
+    (width : Provium.validWidth bits = true) (capacity : entries.length < 2^bits)
+    (divisor_fits : program.divisor < 2^bits) :
+    callbackBudget ((projectArray program.first entries).length + (projectArray program.second entries).length + 2)
+      (runNumericWords program entries callback bits checked abortOnPanic) := by
+  rw [runNumericWords_refines _ _ _ _ _ _ width capacity divisor_fits]
+  exact numeric_fold_budget program entries callback abortOnPanic
+
 end Provium.State

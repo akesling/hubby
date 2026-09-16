@@ -1457,16 +1457,16 @@ theorem predicate_finish_unwind (callback : σ) :
 
 -- A structural response budget bounds internal execution for every sequence of
 -- completed callback/drop responses. It does not assume callbacks return in Rust.
-def predicateBudget (fuel : Nat) (run : PredicateRun α σ) : Prop :=
+def callbackBudget (fuel : Nat) (run : CallbackRun α σ β ρ) : Prop :=
   match fuel with
   | 0 => False
   | fuel + 1 => match run with
     | .returned _ => True
-    | .call _ _ resume => ∀ reply, predicateBudget fuel (resume reply)
-    | .drop _ resume => ∀ reply, predicateBudget fuel (resume reply)
+    | .call _ _ resume => ∀ reply, callbackBudget fuel (resume reply)
+    | .drop _ resume => ∀ reply, callbackBudget fuel (resume reply)
 
-theorem predicate_budget_succ (fuel : Nat) (run : PredicateRun α σ)
-    (bounded : predicateBudget fuel run) : predicateBudget (fuel + 1) run := by
+theorem callback_budget_succ (fuel : Nat) (run : CallbackRun α σ β ρ)
+    (bounded : callbackBudget fuel run) : callbackBudget (fuel + 1) run := by
   induction fuel generalizing run with
   | zero => cases bounded
   | succ fuel ih =>
@@ -1475,15 +1475,54 @@ theorem predicate_budget_succ (fuel : Nat) (run : PredicateRun α σ)
     | call key callback resume => exact fun reply => ih _ (bounded reply)
     | drop callback resume => exact fun reply => ih _ (bounded reply)
 
-theorem predicate_budget_add (fuel extra : Nat) (run : PredicateRun α σ)
-    (bounded : predicateBudget fuel run) : predicateBudget (fuel + extra) run := by
+theorem callback_budget_add (fuel extra : Nat) (run : CallbackRun α σ β ρ)
+    (bounded : callbackBudget fuel run) : callbackBudget (fuel + extra) run := by
   induction extra with
   | zero => exact bounded
-  | succ extra ih => exact predicate_budget_succ _ run ih
+  | succ extra ih => exact callback_budget_succ _ run ih
+
+theorem callback_finish_budget (callback : σ) (result : CallbackExit ρ) :
+    callbackBudget 2 (finishCallback callback result : CallbackRun α σ β ρ) := by
+  cases result <;> simp [callbackBudget, finishCallback]
+
+theorem callback_collect_budget (keys : List (Cell α)) (callback : σ)
+    (next : List β → σ → CallbackRun α σ β ρ) (budget : Nat) (room : 2 ≤ budget)
+    (continuation : ∀ values callback, callbackBudget budget (next values callback)) :
+    callbackBudget (keys.length + budget) (collectCallbacks keys callback next) := by
+  induction keys generalizing callback next with
+  | nil => simpa only [List.length_nil, Nat.zero_add, collectCallbacks] using continuation [] callback
+  | cons key rest ih =>
+    rw [List.length_cons, Nat.succ_add]
+    change ∀ reply : CallbackReply β σ, callbackBudget (rest.length + budget) (match reply with
+      | .value answer advanced => collectCallbacks rest advanced (fun values final => next (answer :: values) final)
+      | .unwind advanced => finishCallback advanced .unwind
+      | .abort => .returned .abort)
+    intro reply
+    cases reply with
+    | value answer advanced => exact ih advanced _ (fun values final => continuation (answer :: values) final)
+    | unwind advanced =>
+      have space : 2 ≤ rest.length + budget := by omega
+      obtain ⟨extra, equal⟩ := Nat.exists_eq_add_of_le space
+      rw [equal]
+      exact callback_budget_add 2 extra _ (callback_finish_budget advanced .unwind)
+    | abort =>
+      cases h : rest.length + budget with
+      | zero => omega
+      | succ fuel => trivial
+
+abbrev predicateBudget (fuel : Nat) (run : PredicateRun α σ) : Prop := callbackBudget fuel run
+
+theorem predicate_budget_succ (fuel : Nat) (run : PredicateRun α σ)
+    (bounded : predicateBudget fuel run) : predicateBudget (fuel + 1) run :=
+  callback_budget_succ fuel run bounded
+
+theorem predicate_budget_add (fuel extra : Nat) (run : PredicateRun α σ)
+    (bounded : predicateBudget fuel run) : predicateBudget (fuel + extra) run :=
+  callback_budget_add fuel extra run bounded
 
 theorem predicate_finish_budget (callback : σ) (result : PredicateExit) :
-    predicateBudget 2 (finishPredicate callback result : PredicateRun α σ) := by
-  cases result <;> simp [predicateBudget, finishPredicate, finishCallback]
+    predicateBudget 2 (finishPredicate callback result : PredicateRun α σ) :=
+  callback_finish_budget callback result
 
 theorem predicate_count_budget (keys : List (Cell α)) (callback : σ) (count : Nat)
     (next : Nat → σ → PredicateRun α σ) (budget : Nat) (room : 2 ≤ budget)
@@ -1523,9 +1562,9 @@ theorem predicate_fold_budget (program : PredicateFold) (entries : ArrayStore α
     · simpa [Nat.add_comm] using predicate_budget_add 2 (projectArray program.second entries).length _ (predicate_finish_budget advanced (.value true))
   · simpa [Nat.add_comm] using predicate_budget_add 2 (projectArray program.second entries).length _ (predicate_finish_budget advanced (.value false))
 
-theorem predicate_observation_complete (fuel : Nat) (run : PredicateRun α σ)
-    (bounded : predicateBudget fuel run) (call : Cell α → σ → PredicateReply σ)
-    (drop : σ → PredicateDropReply) : ∃ outcome, observePredicate fuel call drop run = some outcome := by
+theorem callback_observation_complete (fuel : Nat) (run : CallbackRun α σ β ρ)
+    (bounded : callbackBudget fuel run) (call : Cell α → σ → CallbackReply β σ)
+    (drop : σ → PredicateDropReply) : ∃ outcome, observeCallback fuel call drop run = some outcome := by
   induction fuel generalizing run with
   | zero => cases bounded
   | succ fuel ih =>
@@ -1533,10 +1572,15 @@ theorem predicate_observation_complete (fuel : Nat) (run : PredicateRun α σ)
     | returned result => exact ⟨(result, []), rfl⟩
     | call key callback resume =>
       obtain ⟨result, complete⟩ := ih _ (bounded (call key callback))
-      exact ⟨(result.1, .called key callback (call key callback) :: result.2), by simp only [observePredicate, observeCallback, complete, Option.map_some]⟩
+      exact ⟨(result.1, .called key callback (call key callback) :: result.2), by simp only [observeCallback, complete, Option.map_some]⟩
     | drop callback resume =>
       obtain ⟨result, complete⟩ := ih _ (bounded (drop callback))
-      exact ⟨(result.1, .dropped callback (drop callback) :: result.2), by simp only [observePredicate, observeCallback, complete, Option.map_some]⟩
+      exact ⟨(result.1, .dropped callback (drop callback) :: result.2), by simp only [observeCallback, complete, Option.map_some]⟩
+
+theorem predicate_observation_complete (fuel : Nat) (run : PredicateRun α σ)
+    (bounded : predicateBudget fuel run) (call : Cell α → σ → PredicateReply σ)
+    (drop : σ → PredicateDropReply) : ∃ outcome, observePredicate fuel call drop run = some outcome :=
+  callback_observation_complete fuel run bounded call drop
 
 -- Shared Result queries do not modify the store. The frontend checks the types
 -- of every accessed place. As above, malformed stores have a total extension;

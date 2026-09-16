@@ -84,6 +84,19 @@ open Provium.State
  theorem invalid_width : Provium.RankArithmetic.offset 7 2 2 true = .error .typeMismatch := rfl
  theorem zero_divisor : Provium.RankArithmetic.offset 32 2 0 true = .error .divisionByZero := rfl
  theorem invalid_count : Provium.RankArithmetic.offset 32 4294967296 2 true = .error .overflow := rfl
+ theorem insufficient_budget :
+   ¬ callbackBudget 1 (finishCallback 0 (.value (9 : UInt64)) : CallbackRun Nat Nat UInt64 UInt64) := by
+   intro bounded
+   exact bounded .returned
+ theorem insufficient_fuel :
+   observeCallback 1 (fun (_ : Cell Nat) (state : Nat) => .value (9 : UInt64) state) (fun _ => .returned)
+     (finishCallback 0 (.value (9 : UInt64))) = none := rfl
+#provium_check insufficient_budget references Provium.State.callbackBudget
+#provium_check insufficient_fuel references Provium.State.observeCallback
+#provium_check Provium.State.callback_collect_budget references Provium.State.collectCallbacks
+#provium_check Provium.State.callback_observation_complete references Provium.State.observeCallback
+#provium_check Provium.State.numeric_fold_budget references Provium.State.runNumericFold
+#provium_check Provium.State.numeric_words_budget references Provium.State.runNumericWords
 #provium_check rank32 references Provium.RankArithmetic.offset
 #provium_check empty32 references Provium.RankArithmetic.offset
 #provium_check empty64 references Provium.RankArithmetic.offset

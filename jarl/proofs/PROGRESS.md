@@ -1254,3 +1254,25 @@ corrupted runtime definitions failed kernel checking, including lost and shifted
 word increments. All 109 Jarl membership obligations replayed on host and
 installed wasm32. Provider ordinary tests, Clippy, formatting, rustdoc and
 coverage review passed. Lean checks stayed serialized with a 16384 MiB ceiling.
+
+### M1 P06: numeric callback response bounds
+
+Generalized Provium's callback budget and observation-completion proofs over
+callback and result types, preserving the predicate API through specialization.
+Ordered collection composes continuation budgets for every normal, unwind and
+abort response. Numeric folds now have a checked observer-fuel bound of current
+plus old projection lengths plus two, covering both passes and cleanup. The bound
+also transfers through the complete typed-word refinement under its explicit
+width/capacity premises.
+
+Jarl owns `QuorumIndex.response_budget` and `QuorumIndex.observation_complete`;
+the membership project now checks 111 obligations across the same 15 methods.
+These establish finite model observation given external responses, not termination
+of actual Rust callbacks, destructors or sorting. Source preservation, library
+semantics, ownership and caller composition remain required. M1/M2 remain open.
+
+Validation: all 111 obligations replayed on host and installed wasm32 with axiom
+audits. The numeric-buffer kernel suite checked 35 contracts/examples and rejected
+12 runtime mutations; insufficient cleanup fuel is explicitly exercised. Existing
+predicate protocol kernel checks, provider ordinary tests, Clippy, formatting and
+Jarl coverage review passed. Lean ran one process at a time with a 16384 MiB cap.

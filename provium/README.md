@@ -230,6 +230,11 @@ explicit supported-width and representable-capacity premises; empty input retain
 distinct overflow and bounds faults. Build/profile binding remains separate.
 The typed-word execution model composes those operations through both callback
 loops and rank reads, with a checked refinement to the numeric-fold model.
+Generic callback budgets and observation completeness also cover numeric folds:
+the two projection lengths plus two units of observer fuel suffice for every
+completed callback/drop response sequence. The bound transfers to typed-word
+execution under its width/capacity premises. It is not a Rust callback or library
+termination proof.
 
 Guarded by-value Copy-array merges support pure queries on both inputs, a pure
 source projection, and source-local target insertion with a constant `map_err`

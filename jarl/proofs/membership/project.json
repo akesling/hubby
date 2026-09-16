@@ -455,6 +455,14 @@
     {
       "theorem": "QuorumIndex.word_execution",
       "function": "membership_Membership_quorum_index"
+    },
+    {
+      "theorem": "QuorumIndex.response_budget",
+      "function": "membership_Membership_quorum_index"
+    },
+    {
+      "theorem": "QuorumIndex.observation_complete",
+      "function": "membership_Membership_quorum_index"
     }
   ]
 }
