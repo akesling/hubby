@@ -1406,28 +1406,34 @@ def runPredicateFold (program : PredicateFold) (entries : ArrayStore α) (callba
       else finishPredicate advanced (.value true)
     else finishPredicate advanced (.value false)
 
-inductive PredicateEvent (α σ : Type) where
-  | called (key : Cell α) (before : σ) (reply : PredicateReply σ)
+inductive CallbackEvent (α σ β : Type) where
+  | called (key : Cell α) (before : σ) (reply : CallbackReply β σ)
   | dropped (callback : σ) (reply : PredicateDropReply)
   deriving DecidableEq
 
+abbrev PredicateEvent (α σ : Type) := CallbackEvent α σ Bool
+
 -- Fuel is an observation bound, not an implementation limit or a proof of
 -- callback termination. None means the observation did not reach an outcome.
-def observePredicate (fuel : Nat) (call : Cell α → σ → PredicateReply σ)
-    (drop : σ → PredicateDropReply) (run : PredicateRun α σ) :
-    Option (PredicateExit × List (PredicateEvent α σ)) :=
+def observeCallback (fuel : Nat) (call : Cell α → σ → CallbackReply β σ)
+    (drop : σ → PredicateDropReply) (run : CallbackRun α σ β ρ) :
+    Option (CallbackExit ρ × List (CallbackEvent α σ β)) :=
   match fuel with
   | 0 => none
   | fuel + 1 => match run with
     | .returned result => some (result, [])
     | .call key callback resume =>
       let reply := call key callback
-      (observePredicate fuel call drop (resume reply)).map fun (result, trace) =>
+      (observeCallback fuel call drop (resume reply)).map fun (result, trace) =>
         (result, .called key callback reply :: trace)
     | .drop callback resume =>
       let reply := drop callback
-      (observePredicate fuel call drop (resume reply)).map fun (result, trace) =>
+      (observeCallback fuel call drop (resume reply)).map fun (result, trace) =>
         (result, .dropped callback reply :: trace)
+
+abbrev observePredicate (fuel : Nat) (call : Cell α → σ → PredicateReply σ)
+    (drop : σ → PredicateDropReply) (run : PredicateRun α σ) :
+    Option (PredicateExit × List (PredicateEvent α σ)) := observeCallback fuel call drop run
 
 -- These equations expose normal return, unwind cleanup and double-panic abort
 -- without assuming the callback's implementation, responses or destructor.
@@ -1527,10 +1533,10 @@ theorem predicate_observation_complete (fuel : Nat) (run : PredicateRun α σ)
     | returned result => exact ⟨(result, []), rfl⟩
     | call key callback resume =>
       obtain ⟨result, complete⟩ := ih _ (bounded (call key callback))
-      exact ⟨(result.1, .called key callback (call key callback) :: result.2), by simp only [observePredicate, complete, Option.map_some]⟩
+      exact ⟨(result.1, .called key callback (call key callback) :: result.2), by simp only [observePredicate, observeCallback, complete, Option.map_some]⟩
     | drop callback resume =>
       obtain ⟨result, complete⟩ := ih _ (bounded (drop callback))
-      exact ⟨(result.1, .dropped callback (drop callback) :: result.2), by simp only [observePredicate, complete, Option.map_some]⟩
+      exact ⟨(result.1, .dropped callback (drop callback) :: result.2), by simp only [observePredicate, observeCallback, complete, Option.map_some]⟩
 
 -- Shared Result queries do not modify the store. The frontend checks the types
 -- of every accessed place. As above, malformed stores have a total extension;

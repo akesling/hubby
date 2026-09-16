@@ -468,7 +468,7 @@ impl Crate {
             insert_rust: helper.rust,
             insert: shape.upsert.ok_or("missing insertion IR")?,
         };
-        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],iteration:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,view:None,record_at:None,lookup:None,selection:None,relocation:None,buffer:None,constructor:None,query:None,array:Some(arrays::Shape{field:field_name,capacity:tokens(&array.len),record:shape.record,predicate:None,projection:None,preserve_slots:false,key:None,upsert:None,batch:Some(batch),rebuild:None,merge:None,fold:None,scope:"complete checked slice batches and insertion callee; prefix enumeration, early errors and pass order retained; Rust source/ownership/layout refinement remains open"})})
+        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],iteration:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,view:None,record_at:None,lookup:None,selection:None,relocation:None,buffer:None,constructor:None,query:None,array:Some(arrays::Shape{field:field_name,capacity:tokens(&array.len),record:shape.record,predicate:None,projection:None,preserve_slots:false,key:None,upsert:None,batch:Some(batch),rebuild:None,merge:None,fold:None,numeric:None,scope:"complete checked slice batches and insertion callee; prefix enumeration, early errors and pass order retained; Rust source/ownership/layout refinement remains open"})})
     }
 }
 impl Crate {

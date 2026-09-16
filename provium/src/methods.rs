@@ -11,6 +11,7 @@ use std::{
 };
 use syn::{spanned::Spanned, Expr, Item, Type};
 const SEMANTICS: &str = include_str!("../lean/Provium/State.lean");
+const NUMERIC_FOLDS: &str = include_str!("../lean/Provium/NumericFolds.lean");
 const ORDER_STATISTICS: &str = include_str!("../lean/Provium/OrderStatistics.lean");
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -489,6 +490,9 @@ impl Crate {
             if views::candidate(&def.item) {
                 return self.lower_shared_view(name);
             }
+            if numeric_folds::candidate(&def.item) {
+                return self.lower_numeric_fold(name);
+            }
             if predicate_folds::candidate(&def.item) {
                 return self.lower_predicate_fold(name);
             }
@@ -936,7 +940,7 @@ fn executable(body: &[Statement], indent: usize) -> String {
     text
 }
 pub fn generate(methods: &[Method], namespace: &str) -> String {
-    let mut text=format!("-- Generated from complete Rust method bodies; no sliced statements.\nimport Provium.State\nnamespace {namespace}\nopen Provium.State\n");
+    let mut text=format!("-- Generated from complete Rust method bodies; no sliced statements.\nimport Provium.State\nimport Provium.NumericFolds\nnamespace {namespace}\nopen Provium.State\n");
     for method in methods {
         let name = &method.symbol;
         if method.validator.is_some() {
@@ -1143,6 +1147,7 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
         ("lean-toolchain", toolchain_file.as_str()),
         ("Provium/State.lean", SEMANTICS),
         ("Provium/OrderStatistics.lean", ORDER_STATISTICS),
+        ("Provium/NumericFolds.lean", NUMERIC_FOLDS),
         ("Provium/Audit.lean", AUDIT),
         ("Generated.lean", &generated),
         ("Proofs.lean", &proofs),
@@ -1166,6 +1171,10 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
         (
             "Provium/OrderStatistics.lean",
             Some("Provium/OrderStatistics.olean"),
+        ),
+        (
+            "Provium/NumericFolds.lean",
+            Some("Provium/NumericFolds.olean"),
         ),
         ("Provium/Audit.lean", Some("Provium/Audit.olean")),
         ("Generated.lean", Some("Generated.olean")),
@@ -1280,6 +1289,7 @@ pub mod validators;
 pub mod views;
 
 mod merges;
+mod numeric_folds;
 mod predicate_folds;
 mod projections;
 mod rebuilds;

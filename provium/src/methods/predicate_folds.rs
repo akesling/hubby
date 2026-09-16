@@ -18,7 +18,11 @@ pub struct Fold {
 pub(super) fn candidate(item: &syn::ImplItemFn) -> bool {
     matches!(&item.sig.output,syn::ReturnType::Type(_,ty) if tokens(ty)=="bool") && item.sig.inputs.iter().any(|arg|matches!(arg,syn::FnArg::Typed(a) if matches!(&*a.ty,Type::ImplTrait(t) if t.bounds.iter().any(|b|matches!(b,syn::TypeParamBound::Trait(t) if t.path.segments.last().is_some_and(|s|s.ident=="FnMut"))))))
 }
-fn callback_type(ty: &Type, dynamic: bool) -> Result<&Type, String> {
+pub(super) fn callback_type<'a>(
+    ty: &'a Type,
+    dynamic: bool,
+    output: &str,
+) -> Result<&'a Type, String> {
     let bounds = if dynamic {
         let Type::Reference(r) = ty else {
             return Err("local callback must be &mut dyn FnMut".into());
@@ -52,11 +56,11 @@ fn callback_type(ty: &Type, dynamic: bool) -> Result<&Type, String> {
         return Err("callback needs builtin FnMut".into());
     }
     let syn::PathArguments::Parenthesized(a) = &t.path.segments[0].arguments else {
-        return Err("callback needs a concrete argument and bool output".into());
+        return Err("callback needs a concrete argument and explicit output".into());
     };
-    if a.inputs.len() != 1 || !matches!(&a.output,syn::ReturnType::Type(_,ty) if tokens(ty)=="bool")
+    if a.inputs.len() != 1 || !matches!(&a.output,syn::ReturnType::Type(_,ty) if tokens(ty)==output)
     {
-        return Err("callback must take one key and return bool".into());
+        return Err(format!("callback must take one key and return {output}"));
     }
     Ok(&a.inputs[0])
 }
@@ -109,7 +113,7 @@ fn round_call(expr: &Expr, round: &str, callback: &str, selector: bool) -> Resul
     Ok(())
 }
 impl Crate {
-    fn predicate_namespaces(&self) -> Result<(), String> {
+    pub(super) fn predicate_namespaces(&self) -> Result<(), String> {
         self.iterator_traits()?;
         for ((_, name), path) in &self.imports {
             if ["FnMut", "Clone"].contains(&name.as_str()) {
@@ -175,7 +179,7 @@ impl Crate {
         }
         let callback_name = cb.ident.to_string();
         let key_type =
-            self.projection_value_type(&def.module, callback_type(&callback.ty, false)?)?;
+            self.projection_value_type(&def.module, callback_type(&callback.ty, false, "bool")?)?;
         let [round, syn::Stmt::Expr(result, None)] = f.block.stmts.as_slice() else {
             return Err("predicate fold must retain local closure and final expression".into());
         };
@@ -201,8 +205,10 @@ impl Crate {
         let (local_callback, local_callback_type) = typed_binding(&round.inputs[1])?;
         if tokens(selector_type) != "bool"
             || selector == local_callback
-            || self.projection_value_type(&def.module, callback_type(local_callback_type, true)?)?
-                != key_type
+            || self.projection_value_type(
+                &def.module,
+                callback_type(local_callback_type, true, "bool")?,
+            )? != key_type
         {
             return Err("predicate round selector or callback types disagree".into());
         }
@@ -395,7 +401,7 @@ impl Crate {
             key_type,
             guard: Box::new(guard),
         };
-        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],iteration:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,view:None,record_at:None,lookup:None,selection:None,relocation:None,buffer:None,constructor:None,query:None,array:Some(arrays::Shape{field:field[0].clone(),capacity:tokens(&array.len),record,predicate:None,projection:None,preserve_slots:false,key:None,upsert:None,batch:None,rebuild:None,merge:None,fold:Some(Box::new(fold)),scope:"complete owned FnMut predicate fold with cloned total, ordered calls, shared reborrows and drop/unwind/abort protocol; Rust ownership, target-width and source refinement remain open"})})
+        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],iteration:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,view:None,record_at:None,lookup:None,selection:None,relocation:None,buffer:None,constructor:None,query:None,array:Some(arrays::Shape{field:field[0].clone(),capacity:tokens(&array.len),record,predicate:None,projection:None,preserve_slots:false,key:None,upsert:None,batch:None,rebuild:None,merge:None,fold:Some(Box::new(fold)),numeric:None,scope:"complete owned FnMut predicate fold with cloned total, ordered calls, shared reborrows and drop/unwind/abort protocol; Rust ownership, target-width and source refinement remain open"})})
     }
 }
 pub(super) fn generate(name: &str, fold: &Fold) -> String {

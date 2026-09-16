@@ -207,7 +207,12 @@ requires completed external responses; it does not prove callback termination,
 Rust ownership/unwind refinement, or source-to-IR semantic preservation.
 The underlying callback protocol also supports typed callback and enclosing return
 values. Ordered collection of numeric replies shares the same state and cleanup
-semantics; numeric rank-selection Rust lowering is not yet implemented.
+semantics. Numeric folds now lower two source-local projections into u64 callback
+collection, initialized-prefix sorting, matching rank formulas, a source-local
+early-return query, and the final minimum. Unsupported extra effects, changed
+loop/index structure and mismatched capacities fail closed. The panic-policy
+parameter remains an explicit model input; binding it to build profiles and
+refining Rust buffers, sort_unstable, ownership and panic detail remain open.
 Method proof bundles include `Provium.OrderStatistics`: checked sorted-permutation,
 rank/support equivalence, maximality, input membership and scalar-bound contracts
 for arbitrary lists. Rank arithmetic has explicit nonempty and representability
