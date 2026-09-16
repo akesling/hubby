@@ -835,3 +835,38 @@ The constructor loops and their duplicate/learner-overlap/capacity rejection
 contracts remain open. So do Rust search/index/equality/ownership/layout refinement
 and source semantic preservation. This advances C03/P02/P03/P05 and R01 component
 evidence under CORRECTNESS_PLAN.md; M1 and M2 remain incomplete.
+
+## M1: configuration constructor loops and stable forwarding
+
+Provium now translates the complete checked slice-batch construction used by
+`Membership::restore`, including its original pass order, enumerated-prefix
+duplicate checks, tag-dependent exclusion, early errors and complete `include`
+callee. Generic induction lemmas preserve state invariants and derive necessary
+input conditions from successful execution. `Membership::new` retains its exact
+forwarding call and borrowed empty old-voter slice; the full constructor and
+insertion bodies remain in its lowering evidence.
+
+Jarl owns 13 new obligations. Successful constructors preserve capacity and
+establish identity uniqueness from empty slots. Success requires nonempty target
+voters, distinct identities within each supplied set, and target learners disjoint
+from target voters. The stable constructor inherits these results through its
+source-derived delegation equality. Single-voter and rejection witnesses check
+concrete outcomes without claiming those witnesses prove the general contracts.
+
+The membership project checked ten complete methods and 40 obligations on host
+and installed wasm32. Provider ordinary tests and all 19 iterator, projection,
+insertion and batch regressions passed, including kernel mutation rejection.
+Native comparison covers 256,000 constructor cases across capacities 0, 1, 3 and
+5, plus 6,400 stable-forwarding comparisons and explicit early-error ordering.
+Provider Clippy/rustdoc, Jarl Clippy, formatting and coverage/review checks passed.
+Lean runs remain serialized with a 16384 MiB ceiling.
+
+The Jarl native comparison and all 13 original-source membership mutations passed,
+including changed constructor guards, exclusion tags and stable-forwarding inputs.
+Rejected source changes invalidate their stale certificates.
+
+Exact output-set correspondence and proof that every valid configuration whose
+union fits capacity is accepted remain open. So do remaining membership
+transformations/quorum helpers, reachable callers, and Rust source, ownership,
+index and equality refinement. This is C03/P02/P03/P05/R01 component progress under
+CORRECTNESS_PLAN.md; M1 and M2 remain incomplete.

@@ -197,6 +197,15 @@ and error destruction cannot be hidden: record payloads must be Copy and error
 variants must be unit variants without custom Drop. The current tag contract
 accepts u8 arguments; its Nat denotation extends beyond valid Rust inputs.
 Search/index/ownership and Rust equality refinement remain open.
+
+Checked slice-batch constructors retain nested enumeration, prefix duplicate
+checks, tag-dependent exclusions, pass order, early errors and the complete
+insertion helper. A constructor may forward input slices and borrowed empty
+arrays to a complete batch body. Shared induction lemmas carry invariants through
+successful batches and derive necessary duplicate/exclusion conditions. The
+current frontend requires Copy output records and concrete structural-equality
+keys; arbitrary callbacks, destructor effects and recursive forwarding remain
+unsupported. Lists denote the source slices and prefixes, not Rust allocations.
 Borrowed-slice locations can be rebased to the source array and loaded without
 silently discarding invalid locations; these logical relations do not discharge
 physical reference/lifetime refinement.

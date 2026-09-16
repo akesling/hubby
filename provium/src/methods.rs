@@ -488,6 +488,9 @@ impl Crate {
             if views::candidate(&def.item) {
                 return self.lower_shared_view(name);
             }
+            if slot_batches::candidate(&def.item) {
+                return self.lower_slot_batch(name);
+            }
             if restorations::candidate(&def.item) {
                 return self.lower_restoration(name);
             }
@@ -1262,3 +1265,5 @@ mod projections;
 mod key_queries;
 
 mod upserts;
+
+mod slot_batches;

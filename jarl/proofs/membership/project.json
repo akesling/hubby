@@ -9,7 +9,9 @@
     "membership::Membership::learners",
     "membership::Membership::contains",
     "membership::Membership::is_voter",
-    "membership::Membership::include"
+    "membership::Membership::include",
+    "membership::Membership::restore",
+    "membership::Membership::new"
   ],
   "proofs": "Proofs.lean",
   "obligations": [
@@ -120,6 +122,58 @@
     {
       "theorem": "Inclusion.preserves_unique",
       "function": "membership_Membership_include"
+    },
+    {
+      "theorem": "Restoration.capacity_preserved",
+      "function": "membership_Membership_restore"
+    },
+    {
+      "theorem": "Restoration.unique_identities",
+      "function": "membership_Membership_restore"
+    },
+    {
+      "theorem": "Restoration.empty_voters",
+      "function": "membership_Membership_restore"
+    },
+    {
+      "theorem": "Restoration.single_voter",
+      "function": "membership_Membership_restore"
+    },
+    {
+      "theorem": "Restoration.duplicate_voter",
+      "function": "membership_Membership_restore"
+    },
+    {
+      "theorem": "Restoration.learner_overlap",
+      "function": "membership_Membership_restore"
+    },
+    {
+      "theorem": "Restoration.nonempty_voters",
+      "function": "membership_Membership_restore"
+    },
+    {
+      "theorem": "Restoration.distinct_inputs",
+      "function": "membership_Membership_restore"
+    },
+    {
+      "theorem": "Restoration.learners_disjoint",
+      "function": "membership_Membership_restore"
+    },
+    {
+      "theorem": "StableConstruction.delegates_to_restore",
+      "function": "membership_Membership_new"
+    },
+    {
+      "theorem": "StableConstruction.capacity_preserved",
+      "function": "membership_Membership_new"
+    },
+    {
+      "theorem": "StableConstruction.unique_identities",
+      "function": "membership_Membership_new"
+    },
+    {
+      "theorem": "StableConstruction.valid_inputs",
+      "function": "membership_Membership_new"
     }
   ]
 }

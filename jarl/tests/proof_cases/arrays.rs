@@ -155,6 +155,15 @@ fn original_membership_mutations_break_the_array_contracts() {
         ("any(|m| m.id == id)", "any(|m| m.id == id && m.voter)"),
         ("0 => member.voter = true", "0 => member.voter = false"),
         ("old: false,", "old: true,"),
+        ("if voters.is_empty()", "if old_voters.is_empty()"),
+        (
+            "kind == 1 && voters.contains(id)",
+            "kind == 2 && voters.contains(id)",
+        ),
+        (
+            "Self::restore(voters, &[], learners)",
+            "Self::restore(learners, &[], voters)",
+        ),
     ] {
         assert!(original.contains(from));
         fs::write(&source, original.replace(from, to)).unwrap();

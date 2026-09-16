@@ -538,6 +538,163 @@ theorem runUpsert_frame [DecidableEq α] (program : Upsert) (entries : ArrayStor
   obtain ⟨entry, _, result⟩ := runUpsert_selected program entries key tag index selected
   simp [result, Ne.symm different]
 
+-- Checked nested slice batches. Lists denote source slices and their traversed
+-- prefixes; the Rust constructor does not allocate these logical lists.
+structure SlotBatch where
+  insert : Upsert
+  required : Nat
+  passes : List (Nat × Nat)
+  exclusionTag : Nat
+  exclusionInput : Nat
+  error : String
+
+def runSlotBatchPass [DecidableEq α] (program : SlotBatch) (excluded : List (Cell α))
+    (tag : Nat) : List (Cell α) → List (Cell α) → ArrayStore α → Except String (ArrayStore α)
+  | [], _, entries => .ok entries
+  | key :: rest, seen, entries =>
+    if key ∈ seen ∨ (tag = program.exclusionTag ∧ key ∈ excluded) then .error program.error
+    else
+      let result := runUpsert program.insert entries key tag
+      match result.2 with
+      | some error => .error error
+      | none => runSlotBatchPass program excluded tag rest (seen ++ [key]) result.1
+
+def runSlotBatchPasses [DecidableEq α] (program : SlotBatch) (inputs : List (List (Cell α))) :
+    List (Nat × Nat) → ArrayStore α → Except String (ArrayStore α)
+  | [], entries => .ok entries
+  | (input, tag) :: rest, entries =>
+    match runSlotBatchPass program (inputs[program.exclusionInput]?.getD []) tag (inputs[input]?.getD []) [] entries with
+    | .error error => .error error
+    | .ok next => runSlotBatchPasses program inputs rest next
+
+def runSlotBatch [DecidableEq α] (program : SlotBatch) (capacity : Nat)
+    (inputs : List (List (Cell α))) : Except String (ArrayStore α) :=
+  if (inputs[program.required]?.getD []).isEmpty then .error program.error
+  else runSlotBatchPasses program inputs program.passes (List.replicate capacity none)
+
+theorem runSlotBatchPass_preserves [DecidableEq α] (program : SlotBatch)
+    (invariant : ArrayStore α → Prop)
+    (step : ∀ entries key tag, invariant entries →
+      (runUpsert program.insert entries key tag).2 = none →
+      invariant (runUpsert program.insert entries key tag).1)
+    (excluded keys seen : List (Cell α)) (tag : Nat) (entries result : ArrayStore α)
+    (initial : invariant entries)
+    (success : runSlotBatchPass program excluded tag keys seen entries = .ok result) : invariant result := by
+  induction keys generalizing seen entries with
+  | nil => cases success; exact initial
+  | cons key rest ih =>
+    simp only [runSlotBatchPass] at success
+    split at success
+    · cases success
+    · cases failure : (runUpsert program.insert entries key tag).2 with
+      | some error => simp [failure] at success
+      | none =>
+        simp only [failure] at success
+        exact ih (seen ++ [key]) _ (step entries key tag initial failure) success
+
+theorem runSlotBatchPasses_preserves [DecidableEq α] (program : SlotBatch)
+    (invariant : ArrayStore α → Prop)
+    (step : ∀ entries key tag, invariant entries →
+      (runUpsert program.insert entries key tag).2 = none →
+      invariant (runUpsert program.insert entries key tag).1)
+    (inputs : List (List (Cell α))) (passes : List (Nat × Nat)) (entries result : ArrayStore α)
+    (initial : invariant entries)
+    (success : runSlotBatchPasses program inputs passes entries = .ok result) : invariant result := by
+  induction passes generalizing entries with
+  | nil => cases success; exact initial
+  | cons pass rest ih =>
+    obtain ⟨input, tag⟩ := pass
+    simp only [runSlotBatchPasses] at success
+    cases next : runSlotBatchPass program (inputs[program.exclusionInput]?.getD []) tag (inputs[input]?.getD []) [] entries with
+    | error error => simp [next] at success
+    | ok after =>
+      simp only [next] at success
+      exact ih after (runSlotBatchPass_preserves program invariant step _ _ [] tag entries after initial next) success
+
+theorem runSlotBatch_preserves [DecidableEq α] (program : SlotBatch)
+    (invariant : ArrayStore α → Prop)
+    (step : ∀ entries key tag, invariant entries →
+      (runUpsert program.insert entries key tag).2 = none →
+      invariant (runUpsert program.insert entries key tag).1)
+    (capacity : Nat) (inputs : List (List (Cell α))) (result : ArrayStore α)
+    (initial : invariant (List.replicate capacity none))
+    (success : runSlotBatch program capacity inputs = .ok result) : invariant result := by
+  simp only [runSlotBatch] at success
+  split at success
+  · cases success
+  · exact runSlotBatchPasses_preserves program invariant step inputs program.passes _ result initial success
+
+theorem runSlotBatch_length [DecidableEq α] (program : SlotBatch) (capacity : Nat)
+    (inputs : List (List (Cell α))) (result : ArrayStore α)
+    (success : runSlotBatch program capacity inputs = .ok result) : result.length = capacity := by
+  apply runSlotBatch_preserves program (fun entries => entries.length = capacity) _ capacity inputs result _ success
+  · intro entries key tag initial _
+    simpa only [runUpsert_length] using initial
+  · simp
+
+theorem runSlotBatchPass_valid [DecidableEq α] (program : SlotBatch)
+    (excluded keys seen : List (Cell α)) (tag : Nat) (entries result : ArrayStore α)
+    (success : runSlotBatchPass program excluded tag keys seen entries = .ok result) :
+    keys.Nodup ∧ ∀ key ∈ keys, key ∉ seen ∧ (tag = program.exclusionTag → key ∉ excluded) := by
+  induction keys generalizing seen entries with
+  | nil => simp
+  | cons key rest ih =>
+    simp only [runSlotBatchPass] at success
+    split at success
+    · cases success
+    · rename_i allowed
+      have tail : rest.Nodup ∧ ∀ next ∈ rest, next ∉ seen ++ [key] ∧
+          (tag = program.exclusionTag → next ∉ excluded) := by
+        cases failure : (runUpsert program.insert entries key tag).2 with
+        | some error => simp [failure] at success
+        | none =>
+          simp only [failure] at success
+          exact ih (seen ++ [key]) _ success
+      constructor
+      · apply List.nodup_cons.mpr
+        refine ⟨?_, tail.1⟩
+        intro member
+        exact (tail.2 key member).1 (by simp)
+      · intro next member
+        rcases List.mem_cons.mp member with same | member
+        · subst next
+          exact ⟨fun present => allowed (Or.inl present), fun same present => allowed (Or.inr ⟨same, present⟩)⟩
+        · obtain ⟨fresh, excluded⟩ := tail.2 next member
+          exact ⟨fun present => fresh (List.mem_append_left _ present), excluded⟩
+
+theorem runSlotBatchPasses_valid [DecidableEq α] (program : SlotBatch)
+    (inputs : List (List (Cell α))) (passes : List (Nat × Nat)) (entries result : ArrayStore α)
+    (success : runSlotBatchPasses program inputs passes entries = .ok result) :
+    ∀ pass ∈ passes, (inputs[pass.1]?.getD []).Nodup ∧
+      (pass.2 = program.exclusionTag → ∀ key ∈ inputs[pass.1]?.getD [], key ∉ inputs[program.exclusionInput]?.getD []) := by
+  induction passes generalizing entries with
+  | nil => simp
+  | cons pass rest ih =>
+    obtain ⟨input, tag⟩ := pass
+    simp only [runSlotBatchPasses] at success
+    cases next : runSlotBatchPass program (inputs[program.exclusionInput]?.getD []) tag (inputs[input]?.getD []) [] entries with
+    | error error => simp [next] at success
+    | ok after =>
+      simp only [next] at success
+      have valid := runSlotBatchPass_valid program _ _ [] tag entries after next
+      intro pass member
+      rcases List.mem_cons.mp member with same | member
+      · subst pass
+        exact ⟨valid.1, fun same key member => (valid.2 key member).2 same⟩
+      · exact ih after success pass member
+
+theorem runSlotBatch_valid [DecidableEq α] (program : SlotBatch) (capacity : Nat)
+    (inputs : List (List (Cell α))) (result : ArrayStore α)
+    (success : runSlotBatch program capacity inputs = .ok result) :
+    (inputs[program.required]?.getD []) ≠ [] ∧
+    ∀ pass ∈ program.passes, (inputs[pass.1]?.getD []).Nodup ∧
+      (pass.2 = program.exclusionTag → ∀ key ∈ inputs[pass.1]?.getD [], key ∉ inputs[program.exclusionInput]?.getD []) := by
+  simp only [runSlotBatch] at success
+  split at success
+  · cases success
+  · rename_i nonempty
+    exact ⟨by simpa using nonempty, runSlotBatchPasses_valid program inputs program.passes _ result success⟩
+
 -- Shared Result queries do not modify the store. The frontend checks the types
 -- of every accessed place. As above, malformed stores have a total extension;
 -- field-layout/source correspondence remains an explicit refinement obligation.

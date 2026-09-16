@@ -3963,7 +3963,7 @@
         "S12"
       ],
       "status": "component_evidence",
-      "note": "Complete original existing-identity-first search, empty-slot fallback, eager unit error, indexed get_or_insert, initialization and tag dispatch. Checked capacity, search bounds, exact full error, other-slot frame, selected identity and exact existing/new record effects, unchanged full-error state and preservation of identity uniqueness. Constructor loops and reachable caller contracts, Rust search/index/equality/ownership/layout/source refinement remain open.",
+      "note": "Complete original existing-identity-first search, empty-slot fallback, eager unit error, indexed get_or_insert, initialization and tag dispatch. Checked capacity, search bounds, exact full error, other-slot frame, selected identity and exact existing/new record effects, unchanged full-error state and preservation of identity uniqueness. Complete constructor/caller contracts, Rust search/index/equality/ownership/layout/source refinement remain open.",
       "root_apis": [],
       "contracts": [
         {
@@ -4116,12 +4116,37 @@
         "S11",
         "S12"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open.",
+      "status": "component_evidence",
+      "note": "Complete original checked slice batches and insertion callee; stable constructor forwards its exact input/empty-slice arguments. Successful results preserve capacity and establish identity uniqueness; necessary input conditions prove nonempty voters, distinct input sets and learner/target-voter disjointness, with rejection and single-voter witnesses. Exact output-set correspondence, sufficient acceptance/capacity-union criteria, reachable callers and Rust source/ownership/index/equality refinement remain open.",
       "root_apis": [
         "crate::membership::<Membership < MAX >>::new"
       ],
-      "contracts": [],
+      "contracts": [
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "StableConstruction.delegates_to_restore",
+          "function": "membership_Membership_new",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "StableConstruction.capacity_preserved",
+          "function": "membership_Membership_new",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "StableConstruction.unique_identities",
+          "function": "membership_Membership_new",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "StableConstruction.valid_inputs",
+          "function": "membership_Membership_new",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        }
+      ],
       "context": "production"
     },
     "crate::membership::<Membership < MAX >>::old_voters": {
@@ -4199,12 +4224,67 @@
         "S11",
         "S12"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open.",
+      "status": "component_evidence",
+      "note": "Complete original checked slice batches and insertion callee; stable constructor forwards its exact input/empty-slice arguments. Successful results preserve capacity and establish identity uniqueness; necessary input conditions prove nonempty voters, distinct input sets and learner/target-voter disjointness, with rejection and single-voter witnesses. Exact output-set correspondence, sufficient acceptance/capacity-union criteria, reachable callers and Rust source/ownership/index/equality refinement remain open.",
       "root_apis": [
         "crate::membership::<Membership < MAX >>::restore"
       ],
-      "contracts": [],
+      "contracts": [
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "Restoration.capacity_preserved",
+          "function": "membership_Membership_restore",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "Restoration.unique_identities",
+          "function": "membership_Membership_restore",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "Restoration.empty_voters",
+          "function": "membership_Membership_restore",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "Restoration.single_voter",
+          "function": "membership_Membership_restore",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "Restoration.duplicate_voter",
+          "function": "membership_Membership_restore",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "Restoration.learner_overlap",
+          "function": "membership_Membership_restore",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "Restoration.nonempty_voters",
+          "function": "membership_Membership_restore",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "Restoration.distinct_inputs",
+          "function": "membership_Membership_restore",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "Restoration.learners_disjoint",
+          "function": "membership_Membership_restore",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        }
+      ],
       "context": "production"
     },
     "crate::membership::<Membership < MAX >>::voters": {

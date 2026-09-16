@@ -378,3 +378,88 @@ theorem preserves_unique [DecidableEq α] (entries : ArrayStore α) (key : Cell 
         exact unique i j left right leftAt rightAt equal
 
 end Inclusion
+
+namespace Restoration
+open Provium.State JarlMembership
+
+theorem capacity_preserved [DecidableEq α] (capacity : Nat) (voters old learners : List (Cell α))
+    (result : ArrayStore α) (success : membership_Membership_restore capacity voters old learners = .ok result) :
+    result.length = capacity := runSlotBatch_length membership_Membership_restore_ir capacity [voters, old, learners] result success
+
+theorem unique_identities [DecidableEq α] (capacity : Nat) (voters old learners : List (Cell α))
+    (result : ArrayStore α) (success : membership_Membership_restore capacity voters old learners = .ok result) :
+    Inclusion.UniqueIdentities result := by
+  apply runSlotBatch_preserves membership_Membership_restore_ir Inclusion.UniqueIdentities _ capacity [voters, old, learners] result _ success
+  · intro entries key tag unique _
+    exact Inclusion.preserves_unique entries key tag unique
+  · intro i j left right leftAt _ _
+    have member : some left ∈ List.replicate capacity (none : Option (Store α)) :=
+      List.mem_of_getElem (List.getElem?_eq_some_iff.mp leftAt).2
+    simp at member
+
+theorem empty_voters [DecidableEq α] (capacity : Nat) (old learners : List (Cell α)) :
+    membership_Membership_restore capacity [] old learners = .error "Config" := by
+  simp [membership_Membership_restore, runSlotBatch, membership_Membership_restore_ir]
+
+theorem single_voter [DecidableEq α] (key : Cell α) :
+    membership_Membership_restore 1 [key] [] [] =
+      .ok [some (put (Inclusion.emptyRecord key) ["voter"] (.boolean true))] := by
+  simp [membership_Membership_restore, runSlotBatch, membership_Membership_restore_ir,
+    runSlotBatchPasses, runSlotBatchPass, runUpsert, upsertIndex, firstSlot, keySlot,
+    upsertRecord, upsertWrite, membership_Membership_restore_insert_ir, Inclusion.emptyRecord, run, value]
+
+theorem duplicate_voter [DecidableEq α] (key : Cell α) :
+    membership_Membership_restore 2 [key, key] [] [] = .error "Config" := by
+  simp [membership_Membership_restore, runSlotBatch, membership_Membership_restore_ir,
+    runSlotBatchPasses, runSlotBatchPass, runUpsert, upsertIndex, firstSlot, keySlot,
+    membership_Membership_restore_insert_ir]
+
+theorem learner_overlap [DecidableEq α] (key : Cell α) :
+    membership_Membership_restore 2 [key] [] [key] = .error "Config" := by
+  simp [membership_Membership_restore, runSlotBatch, membership_Membership_restore_ir,
+    runSlotBatchPasses, runSlotBatchPass, runUpsert, upsertIndex, firstSlot, keySlot,
+    membership_Membership_restore_insert_ir]
+theorem nonempty_voters [DecidableEq α] (capacity : Nat) (voters old learners : List (Cell α))
+    (result : ArrayStore α) (success : membership_Membership_restore capacity voters old learners = .ok result) : voters ≠ [] := by
+  have valid := (runSlotBatch_valid membership_Membership_restore_ir capacity [voters, old, learners] result success).1
+  simpa [membership_Membership_restore_ir] using valid
+
+theorem distinct_inputs [DecidableEq α] (capacity : Nat) (voters old learners : List (Cell α))
+    (result : ArrayStore α) (success : membership_Membership_restore capacity voters old learners = .ok result) :
+    voters.Nodup ∧ old.Nodup ∧ learners.Nodup := by
+  have valid := (runSlotBatch_valid membership_Membership_restore_ir capacity [voters, old, learners] result success).2
+  have votersValid := (valid (0, 0) (by simp [membership_Membership_restore_ir])).1
+  have oldValid := (valid (1, 2) (by simp [membership_Membership_restore_ir])).1
+  have learnersValid := (valid (2, 1) (by simp [membership_Membership_restore_ir])).1
+  exact ⟨by simpa using votersValid, by simpa using oldValid, by simpa using learnersValid⟩
+
+theorem learners_disjoint [DecidableEq α] (capacity : Nat) (voters old learners : List (Cell α))
+    (result : ArrayStore α) (success : membership_Membership_restore capacity voters old learners = .ok result) :
+    ∀ key ∈ learners, key ∉ voters := by
+  have valid := (runSlotBatch_valid membership_Membership_restore_ir capacity [voters, old, learners] result success).2
+  have learnersValid := (valid (2, 1) (by simp [membership_Membership_restore_ir])).2 (by rfl)
+  simpa [membership_Membership_restore_ir] using learnersValid
+
+end Restoration
+
+namespace StableConstruction
+open Provium.State JarlMembership
+
+theorem delegates_to_restore [DecidableEq α] (capacity : Nat) (voters learners : List (Cell α)) :
+    membership_Membership_new capacity voters learners = membership_Membership_restore capacity voters [] learners := rfl
+
+theorem capacity_preserved [DecidableEq α] (capacity : Nat) (voters learners : List (Cell α))
+    (result : ArrayStore α) (success : membership_Membership_new capacity voters learners = .ok result) :
+    result.length = capacity := Restoration.capacity_preserved capacity voters [] learners result success
+
+theorem unique_identities [DecidableEq α] (capacity : Nat) (voters learners : List (Cell α))
+    (result : ArrayStore α) (success : membership_Membership_new capacity voters learners = .ok result) :
+    Inclusion.UniqueIdentities result := Restoration.unique_identities capacity voters [] learners result success
+
+theorem valid_inputs [DecidableEq α] (capacity : Nat) (voters learners : List (Cell α))
+    (result : ArrayStore α) (success : membership_Membership_new capacity voters learners = .ok result) :
+    voters ≠ [] ∧ voters.Nodup ∧ learners.Nodup ∧ ∀ key ∈ learners, key ∉ voters := by
+  have distinct := Restoration.distinct_inputs capacity voters [] learners result success
+  exact ⟨Restoration.nonempty_voters capacity voters [] learners result success,
+    distinct.1, distinct.2.2, Restoration.learners_disjoint capacity voters [] learners result success⟩
+end StableConstruction
