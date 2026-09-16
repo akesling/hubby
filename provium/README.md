@@ -103,6 +103,24 @@ It currently requires a Rust 2021 crate buildable without external dependencies
 by its rustc invocation. This restriction applies to the *subject translation*,
 not to whether a consumer can depend on Provium through Cargo.
 
+Method projects can reuse consumer-owned Lean files without copying their proofs:
+
+```json
+"proof_modules": [
+  { "name": "Contracts.Storage", "path": "../storage/Proofs.lean" },
+  { "name": "Contracts.Validation", "path": "../validation/Proofs.lean" }
+]
+```
+
+List modules in dependency order, then import them in the root `Proofs.lean`.
+Paths are relative to the project file. Reused files may import `Generated`;
+select every method they need and use the same generated namespace as those
+files. Module names must be unique and cannot replace Provium or Lean modules.
+Each source is recorded and hashed in the certificate, and root axiom auditing
+follows its transitive dependencies. Every method verification compiles in a
+fresh import directory, so omitted libraries cannot resolve to stale artifacts.
+Compiled objects are published for inspection only after the checks succeed.
+
 For expression slices, `slices` explicitly records the source method, structural
 selectors, free-location bindings and types, and result type. Selectors include
 `tail`, `let:names`, `stmt:index`, `closure`, `condition`, `right`, `arg:index`,

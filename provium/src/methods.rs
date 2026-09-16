@@ -20,8 +20,18 @@ pub struct Project {
     pub namespace: String,
     pub methods: Vec<String>,
     pub proofs: PathBuf,
+    #[serde(default)]
+    pub proof_modules: Vec<ProofModule>,
     pub obligations: Vec<Obligation>,
 }
+/// Source libraries compiled in dependency order before the root proof module.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProofModule {
+    pub name: String,
+    pub path: PathBuf,
+}
+mod proof_modules;
 #[derive(Serialize)]
 pub struct Input {
     pub path: PathBuf,
@@ -975,11 +985,13 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
         .canonicalize()
         .map_err(|e| e.to_string())?;
     let proofs = fs::read_to_string(&proofs_path).map_err(|e| e.to_string())?;
+    let libraries = proof_modules::load(base, &project.proof_modules)?;
     fs::create_dir_all(out).map_err(|e| e.to_string())?;
     let out = out.canonicalize().map_err(|e| e.to_string())?;
     if krate
         .files
         .keys()
+        .chain(libraries.iter().map(|library| &library.path))
         .chain([
             &proofs_path,
             &config.canonicalize().map_err(|e| e.to_string())?,
@@ -1045,7 +1057,7 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
         ))
     }
     let toolchain_file = format!("{TOOLCHAIN}\n");
-    let artifacts = [
+    let mut artifacts = vec![
         ("lean-toolchain", toolchain_file.as_str()),
         ("Provium/State.lean", SEMANTICS),
         ("Provium/Audit.lean", AUDIT),
@@ -1053,24 +1065,40 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
         ("Proofs.lean", &proofs),
         ("Check.lean", &audit),
     ];
-    for (file, text) in artifacts {
-        fs::write(out.join(file), text).map_err(|e| e.to_string())?
+    artifacts.extend(
+        libraries
+            .iter()
+            .map(|library| (library.artifact.as_str(), library.source.as_str())),
+    );
+    let workspace = proof_modules::Workspace::new(&out)?;
+    for (file, text) in &artifacts {
+        let path = out.join(file);
+        fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())?;
+        fs::write(path, text).map_err(|e| e.to_string())?;
+        workspace.write(file, text)?;
     }
     let mut report = String::new();
     for (file, object) in [
         ("Provium/State.lean", Some("Provium/State.olean")),
         ("Provium/Audit.lean", Some("Provium/Audit.olean")),
         ("Generated.lean", Some("Generated.olean")),
-        ("Proofs.lean", Some("Proofs.olean")),
-        ("Check.lean", None),
     ] {
-        report.push_str(&crate::project::lean_file(&out, file, object)?)
+        report.push_str(&workspace.check(file, object)?);
     }
+    for library in &libraries {
+        report.push_str(&workspace.check(
+            &library.artifact,
+            Some(&library.artifact.replace(".lean", ".olean")),
+        )?);
+    }
+    report.push_str(&workspace.check("Proofs.lean", Some("Proofs.olean"))?);
+    report.push_str(&workspace.check("Check.lean", None)?);
     if report.matches("PROVIUM_VERIFIED ").count() != methods.len() + project.obligations.len() {
         return Err("incomplete method axiom audit".into());
     }
-    for (file, text) in artifacts {
-        if fs::read_to_string(out.join(file)).map_err(|e| e.to_string())? != text {
+    for (file, text) in &artifacts {
+        workspace.source_unchanged(file, text)?;
+        if fs::read_to_string(out.join(file)).map_err(|e| e.to_string())? != *text {
             return Err("artifact changed during method verification".into());
         }
     }
@@ -1078,6 +1106,11 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
         || fs::read_to_string(&proofs_path).map_err(|e| e.to_string())? != proofs
     {
         return Err("proof/config changed during verification".into());
+    }
+    for library in &libraries {
+        if fs::read_to_string(&library.path).map_err(|e| e.to_string())? != library.source {
+            return Err("proof module changed during verification".into());
+        }
     }
     for (path, text) in &krate.files {
         if fs::read_to_string(path).map_err(|e| e.to_string())? != *text {
@@ -1108,7 +1141,18 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
             String::from_utf8_lossy(&cfg.stderr)
         ));
     }
-    let manifest = serde_json::json!({"format":1,"compiler_sha256":hash(fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"scope":"complete explicit method bodies in supported Lean semantics; frontend, field resolution, borrowing/layout refinement and host durability remain trusted; not whole-program correctness", "lean_toolchain":TOOLCHAIN,"rustc":String::from_utf8_lossy(&rustc.stdout).trim(),"rust_target":project.rust_target,"rust_target_cfg":String::from_utf8_lossy(&cfg.stdout),"typecheck_args":typecheck_args,"config_sha256":hash(config_bytes),"sources":inputs,"methods":methods,"unproved_methods":krate.inventory().into_iter().filter(|n|!project.methods.contains(n)).collect::<Vec<_>>(),"artifacts":artifacts.iter().map(|(p,t)|(p,hash(t))).collect::<BTreeMap<_,_>>(),"obligations":project.obligations,"audit":report});
+    for object in [
+        "Provium/State.olean",
+        "Provium/Audit.olean",
+        "Generated.olean",
+        "Proofs.olean",
+    ] {
+        workspace.publish(object, &out)?;
+    }
+    for library in &libraries {
+        workspace.publish(&library.artifact.replace(".lean", ".olean"), &out)?;
+    }
+    let manifest = serde_json::json!({"format":1,"compiler_sha256":hash(fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"scope":"complete explicit method bodies in supported Lean semantics; frontend, field resolution, borrowing/layout refinement and host durability remain trusted; not whole-program correctness", "lean_toolchain":TOOLCHAIN,"rustc":String::from_utf8_lossy(&rustc.stdout).trim(),"rust_target":project.rust_target,"rust_target_cfg":String::from_utf8_lossy(&cfg.stdout),"typecheck_args":typecheck_args,"config_sha256":hash(config_bytes),"sources":inputs,"proof_modules":libraries.iter().map(|library| serde_json::json!({"name":library.module,"path":library.path,"artifact":library.artifact,"sha256":hash(&library.source)})).collect::<Vec<_>>(),"methods":methods,"unproved_methods":krate.inventory().into_iter().filter(|n|!project.methods.contains(n)).collect::<Vec<_>>(),"artifacts":artifacts.iter().map(|(p,t)|(p,hash(t))).collect::<BTreeMap<_,_>>(),"obligations":project.obligations,"audit":report});
     let bytes = serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?;
     fs::write(out.join("manifest.json"), &bytes).map_err(|e| e.to_string())?;
     fs::write(out.join("verified.json"),serde_json::to_vec_pretty(&serde_json::json!({"manifest_sha256":hash(bytes),"whole_program_proved":false,"complete_method_bodies":methods.len(),"obligations":project.obligations.len()})).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;

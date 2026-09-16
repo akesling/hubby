@@ -355,3 +355,87 @@ fn calls_are_resolved_inlined_and_bounded_without_opaque_effects() {
         .unwrap_err();
     assert!(error.contains("expansion exceeds budget"), "{error}");
 }
+
+#[test]
+fn proof_module_names_and_input_locations_fail_closed() {
+    let w = Work::new();
+    w.source(SOURCE);
+    fs::write(w.0.join("Proofs.lean"), "import Generated\n").unwrap();
+    let path = w.0.join("project.json");
+    for name in [
+        "Generated",
+        "Proofs.Other",
+        "Check",
+        "Provium.Custom",
+        "Init",
+        "Lean.Custom",
+        "Std.Custom",
+        "../Escaped",
+        "Foo..Bar",
+        "",
+    ] {
+        let config = serde_json::json!({"crate_root":"lib.rs","namespace":"Subject","methods":["Ready::persisted"],"proofs":"Proofs.lean","proof_modules":[{"name":name,"path":"Proofs.lean"}],"obligations":[{"theorem":"cleared","function":"Ready_persisted"}]});
+        fs::write(&path, config.to_string()).unwrap();
+        let error = provium::methods::verify(&path, &w.0.join("out")).unwrap_err();
+        assert!(error.contains("proof module"), "{name}: {error}");
+    }
+    fs::create_dir_all(w.0.join("out")).unwrap();
+    fs::write(w.0.join("out/Library.lean"), "import Generated\n").unwrap();
+    for libraries in [
+        serde_json::json!([{"name":"Library","path":"Proofs.lean"},{"name":"library","path":"Proofs.lean"}]),
+        serde_json::json!([{"name":"Library","path":"out/Library.lean"}]),
+    ] {
+        let config = serde_json::json!({"crate_root":"lib.rs","namespace":"Subject","methods":["Ready::persisted"],"proofs":"Proofs.lean","proof_modules":libraries,"obligations":[{"theorem":"cleared","function":"Ready_persisted"}]});
+        fs::write(&path, config.to_string()).unwrap();
+        assert!(provium::methods::verify(&path, &w.0.join("out")).is_err());
+        assert!(!w.0.join("out/verified.json").exists());
+    }
+}
+
+#[test]
+#[ignore = "requires pinned Lean; scripts/verify.sh runs this"]
+fn proof_libraries_are_hashed_audited_and_rebuilt_without_stale_imports() {
+    let w = Work::new();
+    w.source(SOURCE);
+    let library="import Generated\nopen Provium.State\ntheorem library_cleared (s : Store α) : Subject.Ready_persisted s [\"node\",\"dirty\"] = .boolean false := by simp [Subject.Ready_persisted, put]\n";
+    fs::write(w.0.join("Library.lean"), library).unwrap();
+    fs::write(w.0.join("Derived.lean"),"import Contracts.Library\nopen Provium.State\ntheorem derived (s : Store α) : Subject.Ready_persisted s [\"node\",\"dirty\"] = .boolean false := library_cleared s\n").unwrap();
+    fs::write(w.0.join("Proofs.lean"),"import Contracts.Derived\nopen Provium.State\ntheorem cleared (s : Store α) : Subject.Ready_persisted s [\"node\",\"dirty\"] = .boolean false := derived s\n").unwrap();
+    let mut config = serde_json::json!({"crate_root":"lib.rs","namespace":"Subject","methods":["Ready::persisted"],"proofs":"Proofs.lean","proof_modules":[{"name":"Contracts.Library","path":"Library.lean"},{"name":"Contracts.Derived","path":"Derived.lean"}],"obligations":[{"theorem":"cleared","function":"Ready_persisted"}]});
+    let path = w.0.join("project.json");
+    fs::write(&path, config.to_string()).unwrap();
+    let out = w.0.join("out");
+    provium::methods::verify(&path, &out).unwrap();
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&fs::read(out.join("manifest.json")).unwrap()).unwrap();
+    assert_eq!(manifest["proof_modules"].as_array().unwrap().len(), 2);
+    assert_eq!(
+        manifest["proof_modules"][0]["sha256"],
+        manifest["artifacts"]["Contracts/Library.lean"]
+    );
+    assert!(out.join("Contracts/Library.olean").exists());
+    // An old compiled module must not satisfy an import omitted from this run.
+    let libraries = config["proof_modules"].take();
+    config["proof_modules"] = serde_json::json!([]);
+    fs::write(&path, config.to_string()).unwrap();
+    let error = provium::methods::verify(&path, &out).unwrap_err();
+    assert!(error.contains("Lean rejected Proofs.lean"), "{error}");
+    assert!(!out.join("verified.json").exists());
+    config["proof_modules"] = libraries;
+    fs::write(&path, config.to_string()).unwrap();
+    // Root auditing follows dependencies across the library boundary.
+    fs::write(w.0.join("Library.lean"),"import Generated\nopen Provium.State\naxiom library_cleared (s : Store α) : Subject.Ready_persisted s [\"node\",\"dirty\"] = .boolean false\n").unwrap();
+    let error = provium::methods::verify(&path, &out).unwrap_err();
+    assert!(error.contains("Lean rejected Check.lean"), "{error}");
+    assert!(!out.join("verified.json").exists());
+    fs::write(w.0.join("Library.lean"), library).unwrap();
+    let root = fs::read_to_string(w.0.join("Proofs.lean")).unwrap();
+    fs::write(
+        w.0.join("Proofs.lean"),
+        format!("{root}\nrun_cmd do IO.FS.writeFile \"Contracts/Library.lean\" \"changed\"\n"),
+    )
+    .unwrap();
+    let error = provium::methods::verify(&path, &out).unwrap_err();
+    assert!(error.contains("Lean build source changed"), "{error}");
+    assert!(!out.join("verified.json").exists());
+}
