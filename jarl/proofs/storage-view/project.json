@@ -34,6 +34,32 @@
     {
       "theorem": "StorageView.retained_prefix_plus_returned_payloads",
       "function": "state_State_write"
+    },
+    {
+      "theorem": "StorageView.materialize_returned",
+      "function": "state_State_write"
+    },
+    {
+      "theorem": "StorageView.source_checkpoint",
+      "function": "state_State_write"
+    },
+    {
+      "theorem": "StorageView.source_retry_some",
+      "function": "state_State_write"
+    },
+    {
+      "theorem": "StorageView.source_retry_none",
+      "function": "state_State_write"
+    },
+    {
+      "theorem": "StorageView.checkpoint_witness",
+      "function": "state_State_write"
+    }
+  ],
+  "proof_modules": [
+    {
+      "name": "StorageDelta",
+      "path": "Delta.lean"
     }
   ]
 }

@@ -706,3 +706,44 @@ obligations also passed. The ordinary source-lowering/coverage tests and M0
 review-binding test passed. The reviewed coverage changes classify the new
 iterator evidence under existing R05 without changing the correctness goal.
 Lean ran sequentially with a 16384 MiB limit. Production Jarl code is unchanged.
+
+## Source-linked checkpoint application and retry (partial R04/R05)
+
+`storage-view/Delta.lean` specifies Jarl's required atomic host transaction:
+replace a supplied snapshot and discard through its boundary, truncate the
+requested suffix, append the returned entries, then replace hard state. It is a
+consumer-owned host contract, not a proof of an arbitrary storage adapter.
+Provium hashes, rebuilds and audits this proof module with the generated methods.
+
+`StorageView.source_checkpoint` now connects the complete original `State::write`
+and `Write::entries` bodies to that contract. The copied hard state, named
+borrowed snapshot and loaded payload suffix produce the intended checkpoint.
+It does not assume checkpoint equality: premises classify an old-log split into
+discarded/retained/discarded segments by their indices and describe snapshot
+tracking. Materialization rejects missing snapshot referents or wrong field/path
+mappings. The snapshot parameter supplies the logical value at the borrowed
+source field; physical heap/reference interpretation is still a refinement gap.
+
+`source_retry_some` derives that returned suffix entries are removed by the next
+identical truncation from the positional log invariant and the generated offset.
+`source_retry_none` derives an empty suffix from the original absent-index branch.
+Both prove idempotence of repeating the same atomic host transaction, including
+save-success-before-acknowledgment retry. A concrete generated-method witness
+exercises snapshot discard, prefix retention, suffix replacement and hard-state
+replacement together. It is not a reachability proof from engine initialization.
+
+Still open: derive and preserve the old-log segment classifications, snapshot
+tracking and positional log relation through every writing caller, including
+multiple mutations and panic/rollback paths. Source-to-IR preservation, physical
+borrowing/layout/lifetime refinement, actual host-adapter refinement and the
+complete crash/acknowledgment execution relation also remain open. R05 and M1/M2
+are not marked complete.
+
+Validation: both source bodies and all twelve storage-view obligations passed
+for the host and installed wasm32 target. Seven deliberate Rust/host-contract
+mutations were rejected and stale success invalidated. Concrete checkpoint,
+retained-segment, invalid-reference and non-idempotent-untruncated-append witnesses
+were kernel-checked. Clippy across Jarl targets, formatting, source coverage and
+M0 review binding passed. Only the reviewed coverage metadata hash changed in
+M0's input binding; its scope is unchanged. Lean ran sequentially with a 16384 MiB
+limit. Production Rust and the reusable Provium implementation are unchanged.

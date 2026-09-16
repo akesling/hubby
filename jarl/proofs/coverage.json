@@ -6195,7 +6195,7 @@
         "R05"
       ],
       "status": "component_evidence",
-      "note": "Complete original shared storage view and base helper, composed with Write::entries: exact returned locations/payloads and reconstruction by appending them to the correct retained prefix. Source/layout/lifetime refinement and caller proof that snapshot discard/truncation leave that prefix remain open.",
+      "note": "Complete shared view and iterator composition; conditional atomic checkpoint equivalence from explicit old-log segment/index classifications and snapshot tracking, plus source-derived retry idempotence and a concrete checkpoint witness. Caller preservation of those premises, physical borrowed-value interpretation and Rust-to-IR correspondence remain open.",
       "root_apis": [
         "crate::state::<State < V , S , CAP >>::write"
       ],
@@ -6227,6 +6227,36 @@
         {
           "project": "proofs/storage-view/project.json",
           "theorem": "StorageView.retained_prefix_plus_returned_payloads",
+          "function": "state_State_write",
+          "evidence": "artifacts/provium/proofs/storage-view/verified.json"
+        },
+        {
+          "project": "proofs/storage-view/project.json",
+          "theorem": "StorageView.materialize_returned",
+          "function": "state_State_write",
+          "evidence": "artifacts/provium/proofs/storage-view/verified.json"
+        },
+        {
+          "project": "proofs/storage-view/project.json",
+          "theorem": "StorageView.source_checkpoint",
+          "function": "state_State_write",
+          "evidence": "artifacts/provium/proofs/storage-view/verified.json"
+        },
+        {
+          "project": "proofs/storage-view/project.json",
+          "theorem": "StorageView.source_retry_some",
+          "function": "state_State_write",
+          "evidence": "artifacts/provium/proofs/storage-view/verified.json"
+        },
+        {
+          "project": "proofs/storage-view/project.json",
+          "theorem": "StorageView.source_retry_none",
+          "function": "state_State_write",
+          "evidence": "artifacts/provium/proofs/storage-view/verified.json"
+        },
+        {
+          "project": "proofs/storage-view/project.json",
+          "theorem": "StorageView.checkpoint_witness",
           "function": "state_State_write",
           "evidence": "artifacts/provium/proofs/storage-view/verified.json"
         }

@@ -298,3 +298,6 @@ fn m1_write_suffix_offset_is_inspected_from_original_rust() {
     assert_eq!(offset.evaluate(64, 7, 10, Some(9)).unwrap(), 0);
     assert_eq!(offset.evaluate(64, 7, 10, None).unwrap(), 7);
 }
+
+#[path = "proof_cases/storage_view.rs"]
+mod storage_view;
