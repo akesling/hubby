@@ -1434,3 +1434,34 @@ consumer suite passed all 15 enabled tests (186.82 seconds), and its changed
 acknowledgment source still failed the Lean contract (10.55 seconds). Provider
 ordinary tests, provider/Jarl proof-test Clippy, formatting and coverage review
 passed. Lean ran one process at a time with a 16384 MiB cap.
+
+### M1 P10: independently checked scalar source-language lowering
+
+The scalar assignment backend now has a second walk of the selected Rust bodies.
+It reads nested receiver places, boolean expressions, statement order and named
+callee bodies directly from the crate's syntax definitions, rather than deriving
+a witness from the lowered effects. The manifest records those definitions, their
+source locations, source-language terms and structural fuel.
+
+Lean checks each source term's lowering against the generated method IR. A
+generic preservation theorem relates the source-language interpreter to the
+initialized interpreter for every admitted result, including its memory faults.
+Fuel exhaustion and unresolved calls reject lowering, even in unselected branches.
+Generated outcome and initialized-heap refinements are axiom-audited. Jarl's
+acknowledgment now has a contract stated over the independently interpreted source
+term, with the same cleared flags and related output heap.
+
+This starts P10 for the scalar assignment subset. It does not verify Rust parsing,
+configured declaration selection, name/type/place resolution, or the adequacy of
+the source-language semantics for Rust memory, borrows and lifetimes. The report
+sets rust_source_preservation_proved=false. Other method backends still need their
+source interpretation and preservation derivations. M1/M2 remain incomplete.
+
+Validation: ten source-language statements passed axiom audit. Three corrupted
+lowerings (changed helper assignment, reversed order, dropped call) retained the
+original source witness and failed their Lean lowering certificates. All five
+provider method kernel tests passed (126.08 seconds). Jarl's consumer suite passed
+all 15 enabled tests (189.42 seconds); changing its acknowledgment still failed
+the original contract (11.38 seconds). Provider ordinary tests, provider/Jarl
+Clippy, formatting and coverage review passed. Lean remained serialized under
+the 16384 MiB cap.

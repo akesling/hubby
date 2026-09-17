@@ -200,6 +200,21 @@ destructor semantics remain separate obligations. Logical field paths do not
 model byte-level overlap, interior mutability or arbitrary Rust aliasing. This is
 not a source-level ownership proof or a refinement for other backends.
 
+For the same scalar assignment subset, verification independently walks the
+selected Rust syntax to emit nested source places, boolean expressions and named
+callee bodies. It does not reconstruct this witness from the lowered effect
+tree. Lean checks `<method>_source_compiles` against the generated IR, and the
+generic `ScalarSource.lower_correct` theorem preserves all admitted interpreter
+outcomes, including initialized-memory faults. Fuel exhaustion and unresolved
+calls reject lowering even in unselected branches.
+
+Generated `<method>_source_run` and `<method>_source_refinement` connect that
+interpreter to ordinary method postconditions. The manifest records the source
+definitions, syntax witnesses and fuel. This checks a source-language-to-IR
+translation; Rust parsing, configured declaration selection, name/type/place
+resolution and the adequacy of the source-language semantics remain trusted.
+The certificate explicitly leaves `rust_source_preservation_proved` false.
+
 Whole-array and shared-slice iterators support builtin `iter().flatten()` without
 a separate length field. Their denotation retains holes and both iterator ends.
 

@@ -23,6 +23,24 @@ theorem idempotent (state : Store α) :
   funext key
   simp only [JarlMethods.ready_Ready_persisted, put]
   split <;> simp_all
+
+private theorem heap_flags (result : Initialized.Heap α) (state : Store α)
+    (related : Initialized.Relates JarlMethods.ready_Ready_persisted_layout result
+      (JarlMethods.ready_Ready_persisted state)) :
+    result ["node", "dirty"] = some (.boolean false) ∧
+    result ["node", "log_from"] = some .absent ∧
+    result ["node", "snapshot_changed"] = some (.boolean false) := by
+  refine ⟨?_, ?_, ?_⟩
+  · have field := (related ["node", "dirty"] .boolean
+      (by simp [JarlMethods.ready_Ready_persisted_layout])).1
+    simpa [JarlMethods.ready_Ready_persisted, put] using field
+  · have field := (related ["node", "log_from"] .optional
+      (by simp [JarlMethods.ready_Ready_persisted_layout])).1
+    simpa [JarlMethods.ready_Ready_persisted, put] using field
+  · have field := (related ["node", "snapshot_changed"] .boolean
+      (by simp [JarlMethods.ready_Ready_persisted_layout])).1
+    simpa [JarlMethods.ready_Ready_persisted, put] using field
+
 -- Logical loan admission for the complete source-derived acknowledgment body.
 -- The caller must still establish that Ready owns this loan and that storage
 -- completed durably; neither fact follows from these field effects.
@@ -44,16 +62,7 @@ theorem loan_checked_acknowledgment (world : Loans.World) (owner : Nat)
       JarlMethods.ready_Ready_persisted_ir]
   obtain ⟨result, completed, finalRelated⟩ :=
     JarlMethods.ready_Ready_persisted_loan_refinement world owner loan.stack.ticket heap state related allowed
-  refine ⟨result, completed, finalRelated, ?_, ?_, ?_⟩
-  · have field := (finalRelated ["node", "dirty"] .boolean
-      (by simp [JarlMethods.ready_Ready_persisted_layout])).1
-    simpa [JarlMethods.ready_Ready_persisted, put] using field
-  · have field := (finalRelated ["node", "log_from"] .optional
-      (by simp [JarlMethods.ready_Ready_persisted_layout])).1
-    simpa [JarlMethods.ready_Ready_persisted, put] using field
-  · have field := (finalRelated ["node", "snapshot_changed"] .boolean
-      (by simp [JarlMethods.ready_Ready_persisted_layout])).1
-    simpa [JarlMethods.ready_Ready_persisted, put] using field
+  exact ⟨result, completed, finalRelated, heap_flags result state finalRelated⟩
 
 theorem loan_preserves_other_borrow (world : Loans.World)
     (owner ticket otherOwner otherTicket : Nat) (state : Store α) (path : Path)
@@ -63,5 +72,20 @@ theorem loan_preserves_other_borrow (world : Loans.World)
     JarlMethods.ready_Ready_persisted state path = state path := by
   rw [← JarlMethods.ready_Ready_persisted_correspondence]
   exact Loans.execute_other_loan_frame valid different allowed other
+
+-- The source-language witness is read independently of the lowered effects.
+-- Parsing and Rust place/type/lifetime correspondence remain outside this claim.
+theorem source_checked_acknowledgment (heap : Initialized.Heap α) (state : Store α)
+    (related : Initialized.Relates JarlMethods.ready_Ready_persisted_layout heap state) :
+    ∃ result,
+      JarlMethods.ready_Ready_persisted_source_run JarlMethods.ready_Ready_persisted_layout heap = .ok result ∧
+      Initialized.Relates JarlMethods.ready_Ready_persisted_layout result
+        (JarlMethods.ready_Ready_persisted state) ∧
+      result ["node", "dirty"] = some (.boolean false) ∧
+      result ["node", "log_from"] = some .absent ∧
+      result ["node", "snapshot_changed"] = some (.boolean false) := by
+  obtain ⟨result, completed, finalRelated⟩ :=
+    JarlMethods.ready_Ready_persisted_source_refinement heap state related
+  exact ⟨result, completed, finalRelated, heap_flags result state finalRelated⟩
 
 end Persistence

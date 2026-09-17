@@ -2,6 +2,7 @@
 //! No statement is sliced away or accepted as an opaque call.
 mod build;
 mod configured;
+mod source;
 
 use crate::project::{hash, Obligation, AUDIT, TOOLCHAIN};
 use quote::ToTokens;
@@ -13,6 +14,7 @@ use std::{
     process::Command,
 };
 use syn::{spanned::Spanned, Expr, Item, Type};
+const SCALAR_SOURCE: &str = include_str!("../lean/Provium/ScalarSource.lean");
 const LOANS: &str = include_str!("../lean/Provium/Loans.lean");
 const SEMANTICS: &str = include_str!("../lean/Provium/State.lean");
 const SCALAR_SEMANTICS: &str = include_str!("../lean/Provium/Semantics.lean");
@@ -980,7 +982,7 @@ fn executable(body: &[Statement], indent: usize) -> String {
     text
 }
 pub fn generate(methods: &[Method], namespace: &str) -> String {
-    let mut text=format!("-- Generated from complete Rust method bodies; no sliced statements.\nimport Provium.State\nimport Provium.Loans\nimport Provium.NumericFolds\nnamespace {namespace}\nopen Provium.State\n");
+    let mut text=format!("-- Generated from complete Rust method bodies; no sliced statements.\nimport Provium.State\nimport Provium.Loans\nimport Provium.ScalarSource\nimport Provium.NumericFolds\nnamespace {namespace}\nopen Provium.State\n");
     for method in methods {
         let name = &method.symbol;
         if method.validator.is_some() {
@@ -1117,6 +1119,12 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
             format!("{}_well_typed", m.symbol),
             format!("{}_initialized_refinement", m.symbol),
             format!("{}_loan_refinement", m.symbol),
+            format!("{}_source", m.symbol),
+            format!("{}_source_environment", m.symbol),
+            format!("{}_source_compiles", m.symbol),
+            format!("{}_source_outcomes", m.symbol),
+            format!("{}_source_run", m.symbol),
+            format!("{}_source_refinement", m.symbol),
         ] {
             if !identifier(&name) || !symbols.insert(name) {
                 return Err("invalid/colliding generated method symbol".into());
@@ -1198,7 +1206,10 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
             snapshot,
         });
     }
-    let generated = generate(&methods, &project.namespace);
+    let mut generated = generate(&methods, &project.namespace);
+    let (source_witnesses, source_evidence) =
+        source::generate(&krate, &methods, &project.namespace)?;
+    generated.push_str(&source_witnesses);
     let mut audit = "import Provium.Audit\nimport Proofs\n".to_string();
     for m in &methods {
         audit.push_str(&format!(
@@ -1214,6 +1225,14 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
                 "#provium_check {}.{}_loan_refinement references {}.{}\n",
                 project.namespace, m.symbol, project.namespace, m.symbol
             ));
+            audit.push_str(&format!(
+                "#provium_check {}.{}_source_refinement references {}.{}\n",
+                project.namespace, m.symbol, project.namespace, m.symbol
+            ));
+            audit.push_str(&format!(
+                "#provium_check {}.{}_source_outcomes references {}.{}_ir\n",
+                project.namespace, m.symbol, project.namespace, m.symbol
+            ));
         }
     }
     for o in &project.obligations {
@@ -1227,6 +1246,7 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
         ("lean-toolchain", toolchain_file.as_str()),
         ("Provium/State.lean", SEMANTICS),
         ("Provium/Loans.lean", LOANS),
+        ("Provium/ScalarSource.lean", SCALAR_SOURCE),
         ("Provium/OrderStatistics.lean", ORDER_STATISTICS),
         ("Provium/Semantics.lean", SCALAR_SEMANTICS),
         ("Provium/RankArithmetic.lean", RANK_ARITHMETIC),
@@ -1252,6 +1272,10 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
     for (file, object) in [
         ("Provium/State.lean", Some("Provium/State.olean")),
         ("Provium/Loans.lean", Some("Provium/Loans.olean")),
+        (
+            "Provium/ScalarSource.lean",
+            Some("Provium/ScalarSource.olean"),
+        ),
         (
             "Provium/OrderStatistics.lean",
             Some("Provium/OrderStatistics.olean"),
@@ -1280,7 +1304,7 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
     report.push_str(&workspace.check("Check.lean", None)?);
     let initialized_refinements = methods.iter().filter(|m| initialized::supported(m)).count();
     if report.matches("PROVIUM_VERIFIED ").count()
-        != methods.len() + 2 * initialized_refinements + project.obligations.len()
+        != methods.len() + 4 * initialized_refinements + project.obligations.len()
     {
         return Err("incomplete method axiom audit".into());
     }
@@ -1323,6 +1347,7 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
     for object in [
         "Provium/State.olean",
         "Provium/Loans.olean",
+        "Provium/ScalarSource.olean",
         "Provium/Audit.olean",
         "Generated.olean",
         "Proofs.olean",
@@ -1332,10 +1357,10 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
     for library in &libraries {
         workspace.publish(&library.artifact.replace(".lean", ".olean"), &out)?;
     }
-    let manifest = serde_json::json!({"format":1,"compiler_sha256":hash(fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"scope":"complete explicit method bodies in supported Lean semantics; frontend, field resolution, borrowing/layout refinement and host durability remain trusted; not whole-program correctness", "lean_toolchain":TOOLCHAIN,"rustc":String::from_utf8_lossy(&rustc.stdout).trim(),"rust_target":cargo_build.as_ref().map(|b| b.capture.subject.request.target.clone()).or(project.rust_target),"rust_target_cfg":cfg_text,"cargo_build":cargo_build.as_ref().map(build::Build::evidence),"typecheck_args":typecheck_args,"config_sha256":hash(config_bytes),"sources":inputs,"proof_modules":libraries.iter().map(|library| serde_json::json!({"name":library.module,"path":library.path,"artifact":library.artifact,"sha256":hash(&library.source)})).collect::<Vec<_>>(),"methods":methods,"unproved_methods":krate.inventory().into_iter().filter(|n|!project.methods.contains(n)).collect::<Vec<_>>(),"artifacts":artifacts.iter().map(|(p,t)|(p,hash(t))).collect::<BTreeMap<_,_>>(),"obligations":project.obligations,"audit":report});
+    let manifest = serde_json::json!({"format":1,"compiler_sha256":hash(fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"scope":"complete explicit method bodies in supported Lean semantics; frontend, field resolution, borrowing/layout refinement and host durability remain trusted; not whole-program correctness", "lean_toolchain":TOOLCHAIN,"rustc":String::from_utf8_lossy(&rustc.stdout).trim(),"rust_target":cargo_build.as_ref().map(|b| b.capture.subject.request.target.clone()).or(project.rust_target),"rust_target_cfg":cfg_text,"cargo_build":cargo_build.as_ref().map(build::Build::evidence),"typecheck_args":typecheck_args,"config_sha256":hash(config_bytes),"sources":inputs,"proof_modules":libraries.iter().map(|library| serde_json::json!({"name":library.module,"path":library.path,"artifact":library.artifact,"sha256":hash(&library.source)})).collect::<Vec<_>>(),"methods":methods,"source_interpretations":source_evidence,"unproved_methods":krate.inventory().into_iter().filter(|n|!project.methods.contains(n)).collect::<Vec<_>>(),"artifacts":artifacts.iter().map(|(p,t)|(p,hash(t))).collect::<BTreeMap<_,_>>(),"obligations":project.obligations,"audit":report});
     let bytes = serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?;
     fs::write(out.join("manifest.json"), &bytes).map_err(|e| e.to_string())?;
-    fs::write(out.join("verified.json"),serde_json::to_vec_pretty(&serde_json::json!({"manifest_sha256":hash(bytes),"whole_program_proved":false,"complete_method_bodies":methods.len(),"initialized_slot_refinements":initialized_refinements,"loan_refinements":initialized_refinements,"obligations":project.obligations.len()})).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;
+    fs::write(out.join("verified.json"),serde_json::to_vec_pretty(&serde_json::json!({"manifest_sha256":hash(bytes),"whole_program_proved":false,"complete_method_bodies":methods.len(),"initialized_slot_refinements":initialized_refinements,"loan_refinements":initialized_refinements,"source_language_refinements":initialized_refinements,"rust_source_preservation_proved":false,"obligations":project.obligations.len()})).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;
     Ok(format!("Verified {} complete method bodies and {} obligations in supported Lean semantics. Whole-program proof remains incomplete.\n{report}",methods.len(),project.obligations.len()))
 }
 
