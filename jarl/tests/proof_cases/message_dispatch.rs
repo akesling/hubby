@@ -15,7 +15,8 @@ fn complete_message_term_rejects_using_campaign_as_durable_term() {
         .to_str()
         .unwrap()
         .into();
-    project["rust_target"] = "wasm32-unknown-unknown".into();
+    w.build_request(&root.join("Cargo.toml"), "wasm32-unknown-unknown");
+    project["cargo_build"] = "build.json".into();
     let config = w.write("project.json", &project.to_string());
     provium::methods::verify(&config, &w.out()).unwrap();
     fs::create_dir(w.0.join("src")).unwrap();
@@ -36,6 +37,8 @@ fn complete_message_term_rejects_using_campaign_as_durable_term() {
     )
     .unwrap();
     project["crate_root"] = "src/lib.rs".into();
+    w.cargo_build_for("wasm32-unknown-unknown");
+    project["cargo_build"] = "build.json".into();
     fs::write(&config, project.to_string()).unwrap();
     let error = provium::methods::verify(&config, &w.out()).unwrap_err();
     assert!(error.contains("Lean rejected Proofs.lean"), "{error}");

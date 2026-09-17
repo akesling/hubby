@@ -4,13 +4,15 @@ use std::{fs, path::Path};
 #[test]
 #[ignore = "requires pinned Lean and installed wasm32 target; scripts/verify.sh runs this"]
 fn composed_replacement_verifies_on_32_bit_and_rejects_changed_lookup_and_cut() {
+    let w = Work::new();
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let directory = root.join("proofs/replication-contract");
     let mut project: serde_json::Value =
         serde_json::from_slice(&fs::read(directory.join("project.json")).unwrap()).unwrap();
     project["crate_root"] = root.join("src/lib.rs").to_str().unwrap().into();
     project["proofs"] = directory.join("Proofs.lean").to_str().unwrap().into();
-    project["rust_target"] = "wasm32-unknown-unknown".into();
+    w.build_request(&root.join("Cargo.toml"), "wasm32-unknown-unknown");
+    project["cargo_build"] = "build.json".into();
     for library in project["proof_modules"].as_array_mut().unwrap() {
         library["path"] = directory
             .join(library["path"].as_str().unwrap())
@@ -18,7 +20,6 @@ fn composed_replacement_verifies_on_32_bit_and_rejects_changed_lookup_and_cut() 
             .unwrap()
             .into();
     }
-    let w = Work::new();
     let config = w.write("project.json", &project.to_string());
     provium::methods::verify(&config, &w.out()).unwrap();
     let certificate: serde_json::Value =
@@ -37,6 +38,8 @@ fn composed_replacement_verifies_on_32_bit_and_rejects_changed_lookup_and_cut() 
     }
     fs::copy(root.join("README.md"), w.0.join("README.md")).unwrap();
     project["crate_root"] = "src/lib.rs".into();
+    w.cargo_build_for("wasm32-unknown-unknown");
+    project["cargo_build"] = "build.json".into();
     fs::write(&config, project.to_string()).unwrap();
     let path = w.0.join("src/state.rs");
     let source = fs::read_to_string(&path).unwrap();

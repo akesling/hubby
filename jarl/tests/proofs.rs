@@ -29,12 +29,21 @@ impl Work {
     fn out(&self) -> PathBuf {
         self.0.join("out")
     }
+    fn build_request(&self, manifest: &Path, target: &str) {
+        self.write(
+            "build.json",
+            &serde_json::json!({"manifest": manifest, "target": target}).to_string(),
+        );
+    }
     fn cargo_build(&self) {
+        self.cargo_build_for("host");
+    }
+    fn cargo_build_for(&self, target: &str) {
         self.write(
             "Cargo.toml",
             "[package]\nname=\"proof_subject\"\nversion=\"0.1.0\"\nedition=\"2021\"\n[workspace]\n",
         );
-        self.write("build.json", r#"{"manifest":"Cargo.toml","target":"host"}"#);
+        self.build_request(Path::new("Cargo.toml"), target);
         let locked = std::process::Command::new("cargo")
             .args(["generate-lockfile", "--offline", "--manifest-path"])
             .arg(self.0.join("Cargo.toml"))

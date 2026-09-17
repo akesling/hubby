@@ -15,7 +15,8 @@ fn complete_input_gate_and_acknowledgment_composition_verify_on_32_bit() {
         .to_str()
         .unwrap()
         .into();
-    project["rust_target"] = "wasm32-unknown-unknown".into();
+    w.build_request(&root.join("Cargo.toml"), "wasm32-unknown-unknown");
+    project["cargo_build"] = "build.json".into();
     let config = w.write("project.json", &project.to_string());
     provium::methods::verify(&config, &w.out()).unwrap();
     let manifest: serde_json::Value =
@@ -63,6 +64,8 @@ fn each_missing_input_gate_breaks_the_original_source_contract() {
         )
         .unwrap();
         project["crate_root"] = "src/lib.rs".into();
+        w.cargo_build_for("host");
+        project["cargo_build"] = "build.json".into();
         fs::copy(
             root.join("proofs/input-gating/Proofs.lean"),
             w.0.join("Proofs.lean"),

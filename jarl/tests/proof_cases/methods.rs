@@ -25,6 +25,8 @@ fn changing_jarl_acknowledgment_breaks_the_kernel_checked_contract() {
         serde_json::from_slice(&fs::read(root.join("proofs/persistence/project.json")).unwrap())
             .unwrap();
     project["crate_root"] = "src/lib.rs".into();
+    w.cargo_build();
+    project["cargo_build"] = "build.json".into();
     fs::copy(
         root.join("proofs/persistence/Proofs.lean"),
         w.0.join("Proofs.lean"),

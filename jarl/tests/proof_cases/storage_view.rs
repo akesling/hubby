@@ -29,7 +29,8 @@ fn delta_contracts_reject_source_and_host_order_changes() {
     project["crate_root"] = "src/lib.rs".into();
     project["proofs"] = proof.join("Proofs.lean").to_str().unwrap().into();
     project["proof_modules"][0]["path"] = "Delta.lean".into();
-    project["rust_target"] = "wasm32-unknown-unknown".into();
+    work.cargo_build_for("wasm32-unknown-unknown");
+    project["cargo_build"] = "build.json".into();
     let config = work.write("project.json", &project.to_string());
     let out = work.out();
     provium::methods::verify(&config, &out).unwrap();

@@ -14,7 +14,8 @@ fn lookup_contract_verifies_for_32_bit_and_rejects_source_offset_changes() {
         .to_str()
         .unwrap()
         .into();
-    project["rust_target"] = "wasm32-unknown-unknown".into();
+    w.build_request(&root.join("Cargo.toml"), "wasm32-unknown-unknown");
+    project["cargo_build"] = "build.json".into();
     let config = w.write("project.json", &project.to_string());
     provium::methods::verify(&config, &w.out()).unwrap();
     fs::create_dir(w.0.join("src")).unwrap();
@@ -26,6 +27,8 @@ fn lookup_contract_verifies_for_32_bit_and_rejects_source_offset_changes() {
     }
     fs::copy(root.join("README.md"), w.0.join("README.md")).unwrap();
     project["crate_root"] = "src/lib.rs".into();
+    w.cargo_build_for("wasm32-unknown-unknown");
+    project["cargo_build"] = "build.json".into();
     fs::write(&config, project.to_string()).unwrap();
     let path = w.0.join("src/state.rs");
     let source = fs::read_to_string(&path).unwrap();

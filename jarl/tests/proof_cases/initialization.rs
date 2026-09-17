@@ -15,7 +15,8 @@ fn initialization_bound_holds_on_32_bit_and_rejects_nonempty_initial_length() {
         .to_str()
         .unwrap()
         .into();
-    project["rust_target"] = "wasm32-unknown-unknown".into();
+    w.build_request(&root.join("Cargo.toml"), "wasm32-unknown-unknown");
+    project["cargo_build"] = "build.json".into();
     let config = w.write("project.json", &project.to_string());
     provium::methods::verify(&config, &w.out()).unwrap();
     fs::create_dir(w.0.join("src")).unwrap();
@@ -31,6 +32,8 @@ fn initialization_bound_holds_on_32_bit_and_rejects_nonempty_initial_length() {
     assert_eq!(source.matches("len: 0,").count(), 1);
     fs::write(&state, source.replace("len: 0,", "len: 1,")).unwrap();
     project["crate_root"] = "src/lib.rs".into();
+    w.cargo_build_for("wasm32-unknown-unknown");
+    project["cargo_build"] = "build.json".into();
     fs::write(&config, project.to_string()).unwrap();
     let error = provium::methods::verify(&config, &w.out()).unwrap_err();
     assert!(error.contains("Lean rejected Proofs.lean"), "{error}");

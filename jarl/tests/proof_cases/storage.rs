@@ -15,7 +15,8 @@ fn storage_shape_holds_on_32_bit_and_rejects_changed_effects() {
         .to_str()
         .unwrap()
         .into();
-    project["rust_target"] = "wasm32-unknown-unknown".into();
+    w.build_request(&root.join("Cargo.toml"), "wasm32-unknown-unknown");
+    project["cargo_build"] = "build.json".into();
     let config = w.write("project.json", &project.to_string());
     provium::methods::verify(&config, &w.out()).unwrap();
     fs::create_dir(w.0.join("src")).unwrap();
@@ -29,6 +30,8 @@ fn storage_shape_holds_on_32_bit_and_rejects_changed_effects() {
     let state = w.0.join("src/state.rs");
     let source = fs::read_to_string(&state).unwrap();
     project["crate_root"] = "src/lib.rs".into();
+    w.cargo_build_for("wasm32-unknown-unknown");
+    project["cargo_build"] = "build.json".into();
     fs::write(&config, project.to_string()).unwrap();
     for (from, to) in [
         ("last.index.checked_add(1)", "last.index.checked_add(2)"),

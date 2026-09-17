@@ -1,4 +1,5 @@
 {
+  "cargo_build": "../builds.json",
   "crate_root": "../../src/lib.rs",
   "namespace": "JarlBoundary",
   "methods": [

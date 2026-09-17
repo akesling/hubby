@@ -15,7 +15,8 @@ fn complete_validation_rejects_missing_batch_and_snapshot_guards() {
         .to_str()
         .unwrap()
         .into();
-    project["rust_target"] = "wasm32-unknown-unknown".into();
+    w.build_request(&root.join("Cargo.toml"), "wasm32-unknown-unknown");
+    project["cargo_build"] = "build.json".into();
     let config = w.write("project.json", &project.to_string());
     provium::methods::verify(&config, &w.out()).unwrap();
     fs::create_dir(w.0.join("src")).unwrap();
@@ -27,6 +28,8 @@ fn complete_validation_rejects_missing_batch_and_snapshot_guards() {
     }
     fs::copy(root.join("README.md"), w.0.join("README.md")).unwrap();
     project["crate_root"] = "src/lib.rs".into();
+    w.cargo_build_for("wasm32-unknown-unknown");
+    project["cargo_build"] = "build.json".into();
     fs::write(&config, project.to_string()).unwrap();
     let file = w.0.join("src/node.rs");
     let source = fs::read_to_string(&file).unwrap();

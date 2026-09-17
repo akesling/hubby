@@ -1376,3 +1376,29 @@ mutations failed their Lean contracts using fresh Cargo fixture builds (330.55
 seconds), with stale proof success removed. Provider ordinary tests, provider/Jarl
 proof-test Clippy, formatting, rustdoc and coverage review passed. Lean ran one
 process at a time with a 16384 MiB cap.
+
+### M1 P01: Cargo provenance across all method projects
+
+All ten Jarl method projects now request fresh captured Cargo builds: initialization,
+input gating, log boundaries, membership, message dispatch, message validation,
+persistence, replication, storage and storage views. The host suite checks 267
+declared method obligations. Each method manifest records the captured root
+arguments and effective cfg, and binds its capture report by hash.
+
+Copied-source mutation fixtures now have local Cargo manifests and offline
+lockfiles. Their build requests follow the copied source, including installed
+wasm32 builds; original-source wasm32 checks point at Jarl's own manifest.
+Fixture target creation and cleanup remain exclusively Cargo operations.
+
+This extends build provenance to the existing method evidence. Scalar projects
+still use their separate verification route. It adds no source-preservation or
+whole-program theorem, and does not close M1 or M2.
+
+Validation: the consumer proof suite passed all 15 enabled tests (173.53 seconds).
+All ten affected ignored wasm32/mutation tests passed (716.06 seconds), rejecting
+43 intentional source or model changes. Kernel-contract negative controls still
+require Lean rejection, while unsupported storage-view shapes remain frontend
+rejections; setup errors cannot substitute for the required Lean failures.
+The ten host method manifests were checked against their captured argument vectors,
+effective cfg and capture hashes. Jarl proof-test Clippy, formatting and coverage
+review passed. Lean checks ran serially with a 16384 MiB cap.
