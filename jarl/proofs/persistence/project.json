@@ -7,6 +7,8 @@
   "obligations": [
     {"theorem": "Persistence.flags_cleared", "function": "ready_Ready_persisted"},
     {"theorem": "Persistence.other_fields_unchanged", "function": "ready_Ready_persisted"},
-    {"theorem": "Persistence.idempotent", "function": "ready_Ready_persisted"}
+    {"theorem": "Persistence.idempotent", "function": "ready_Ready_persisted"},
+    {"theorem": "Persistence.loan_checked_acknowledgment", "function": "ready_Ready_persisted"},
+    {"theorem": "Persistence.loan_preserves_other_borrow", "function": "ready_Ready_persisted"}
   ]
 }

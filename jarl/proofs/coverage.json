@@ -6000,7 +6000,7 @@
         "R09"
       ],
       "status": "component_evidence",
-      "note": "Existing source-linked component contracts; see proofs/README.md for assumptions and scope. No global correctness claim.",
+      "note": "Source-linked acknowledgment effects now compose with initialized-heap execution under an active logical loan, and preserve fields authorized to other borrowers in a valid loan world. Rust pointer/loan/lifetime correspondence and successful durable storage remain caller obligations; no global correctness claim.",
       "root_apis": [
         "crate::ready::<Ready < '_ , V , S , N , CAP >>::persisted"
       ],
@@ -6026,6 +6026,18 @@
         {
           "project": "proofs/persistence/project.json",
           "theorem": "Persistence.idempotent",
+          "function": "ready_Ready_persisted",
+          "evidence": "artifacts/provium/proofs/persistence/verified.json"
+        },
+        {
+          "project": "proofs/persistence/project.json",
+          "theorem": "Persistence.loan_checked_acknowledgment",
+          "function": "ready_Ready_persisted",
+          "evidence": "artifacts/provium/proofs/persistence/verified.json"
+        },
+        {
+          "project": "proofs/persistence/project.json",
+          "theorem": "Persistence.loan_preserves_other_borrow",
           "function": "ready_Ready_persisted",
           "evidence": "artifacts/provium/proofs/persistence/verified.json"
         }

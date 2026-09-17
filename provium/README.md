@@ -186,9 +186,19 @@ the generated scalar footprint and that execution on a related initialized heap
 refines the field-store method. Uninitialized storage differs from an initialized
 `None`; the interpreter retains read/type faults and short-circuiting. The
 refinement theorem's axioms are audited with the ordinary method obligations.
-It assumes a related input heap. Source layout, pointer identity, exclusive
-access, reborrows, lifetimes, and destructor semantics remain separate obligations;
-this is not a source-level ownership proof or a refinement for other backends.
+The additional `<method>_loan_refinement` checks execution against a logical loan
+world and an active borrow ticket. Root reservations exclude overlapping writers;
+scoped reborrows suspend parents, returning children restores parent authority,
+and monotonically allocated tickets prevent stale children from becoming active
+again. The arena preserves reservation validity and does not recycle root IDs.
+The provider checks these rules independently of Jarl and audits the generated
+loan refinements with the ordinary method obligations.
+
+The refinement assumes a related initialized heap and admitted loan permissions.
+Rust place/pointer identity, actual loan creation and lifetime validation, and
+destructor semantics remain separate obligations. Logical field paths do not
+model byte-level overlap, interior mutability or arbitrary Rust aliasing. This is
+not a source-level ownership proof or a refinement for other backends.
 
 Whole-array and shared-slice iterators support builtin `iter().flatten()` without
 a separate length field. Their denotation retains holes and both iterator ends.

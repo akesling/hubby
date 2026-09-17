@@ -133,6 +133,49 @@ theorem checked (heap : Initialized.Heap α) (state : Store α)
       Initialized.Relates Subject.State_update_layout result (Subject.State_update state) :=
   Subject.State_update_initialized_refinement heap state related
 
+theorem checkedLoan (world : Loans.World) (owner ticket : Nat)
+    (heap : Initialized.Heap α) (state : Store α)
+    (related : Initialized.Relates Subject.State_update_layout heap state)
+    (allowed : Loans.ProgramAllowed world owner ticket Subject.State_update_ir) :
+    ∃ result, Loans.execute world owner ticket Subject.State_update_layout Subject.State_update_ir heap = .ok result ∧
+      Initialized.Relates Subject.State_update_layout result (Subject.State_update state) :=
+  Subject.State_update_loan_refinement world owner ticket heap state related allowed
+
+def parentFrame : Loans.Frame := ⟨[], .exclusive⟩
+def childFrame : Loans.Frame := ⟨["flag"], .shared⟩
+def parentLoan : Loans.Loan := Loans.initial parentFrame
+def childLoan : Loans.Loan := Loans.childLoan parentLoan childFrame (by decide)
+def parentWorld : Loans.World := Loans.set (fun _ => none) 0 (some parentLoan)
+def childWorld : Loans.World := Loans.set parentWorld 0 (some childLoan)
+
+example : Loans.Valid parentWorld :=
+  Loans.acquire_valid parentFrame Loans.empty_valid rfl
+    (by intro j other impossible; cases impossible)
+example : Loans.reborrow parentLoan 0 childFrame = .ok childLoan := rfl
+example : Loans.endBorrow childLoan 1 = .ok (Loans.advance parentLoan) := rfl
+example : Loans.reborrow childLoan 1 ⟨["flag"], .exclusive⟩ = .error .denied := rfl
+example : Loans.reborrow childLoan 1 ⟨["other"], .shared⟩ = .error .denied := rfl
+example : Loans.endBorrow parentLoan 0 = .error .rootRelease := rfl
+example : Loans.Allowed parentWorld 0 0 ⟨["other"], .exclusive⟩ := by decide
+example : ¬ Loans.Allowed childWorld 0 1 ⟨["other"], .shared⟩ := by decide
+example : Loans.Allowed childWorld 0 1 childFrame := by decide
+example : ¬ Loans.Allowed childWorld 0 0 childFrame := by decide
+example : Loans.endBorrow childLoan 0 = .error .denied := rfl
+def siblingLoan : Loans.Loan := Loans.childLoan (Loans.advance parentLoan) childFrame (by decide)
+example : ¬ Loans.Allowed (Loans.set parentWorld 0 (some siblingLoan)) 0 1 childFrame := by decide
+example : Loans.Allowed (Loans.set parentWorld 0 (some siblingLoan)) 0 2 childFrame := by decide
+example : ¬ Loans.Allowed childWorld 0 1 ⟨["flag"], .exclusive⟩ := by decide
+example : ¬ Loans.Allowed childWorld 1 1 childFrame := by decide
+example : Loans.Compatible ⟨["a"], .exclusive⟩ ⟨["b"], .exclusive⟩ := by decide
+example : Loans.Compatible ⟨[], .shared⟩ ⟨["a"], .shared⟩ := by decide
+example : ¬ Loans.Compatible ⟨[], .exclusive⟩ ⟨["a"], .shared⟩ := by decide
+example : Loans.execute (α := Unit) childWorld 0 1 (fun _ => some .boolean)
+    (.write ⟨["flag"], .boolean false⟩) (fun _ => some (.boolean true)) =
+      .error (.inl .denied) := rfl
+example : Loans.execute (α := Unit) parentWorld 0 0 (fun _ => some .boolean)
+    (.write ⟨["flag"], .boolean false⟩) (fun _ => some (.boolean true)) =
+      .ok (Initialized.set (fun _ => some (.boolean true)) ["flag"] (some (.boolean false))) := rfl
+
 -- A live None is readable; uninitialized storage is not.
 example : Initialized.read (fun _ => some .optional)
     (fun _ => some (Cell.absent (α := Unit))) ["value"] = .ok .absent := rfl
@@ -157,7 +200,7 @@ example : Initialized.condition (α := Unit) (fun _ => some .boolean) (fun _ => 
 example : Initialized.condition (α := Unit) (fun _ => some .boolean) (fun _ => none)
     (.and (.boolean true) (.field ["missing"])) = .error .uninitialized := rfl
 "#).unwrap();
-    let config = serde_json::json!({"crate_root":"lib.rs","namespace":"Subject","methods":["State::update", "State::empty"],"proofs":"Proofs.lean","obligations":[{"theorem":"checked","function":"State_update"}]});
+    let config = serde_json::json!({"crate_root":"lib.rs","namespace":"Subject","methods":["State::update", "State::empty"],"proofs":"Proofs.lean","obligations":[{"theorem":"checked","function":"State_update"},{"theorem":"checkedLoan","function":"State_update"}]});
     let path = w.0.join("project.json");
     fs::write(&path, config.to_string()).unwrap();
     provium::methods::verify(&path, &w.0.join("out")).unwrap();

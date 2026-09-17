@@ -1402,3 +1402,35 @@ rejections; setup errors cannot substitute for the required Lean failures.
 The ten host method manifests were checked against their captured argument vectors,
 effective cfg and capture hashes. Jarl proof-test Clippy, formatting and coverage
 review passed. Lean checks ran serially with a 16384 MiB cap.
+
+### M1 P04: loan admission and acknowledgment composition
+
+Provium now has a generic logical loan machine for initialized scalar programs.
+Root reservations establish alias exclusion. Scoped reborrows retain the full
+root reservation, suspend parent access, and restore parent authority on return.
+Access checks both root ownership and an active ticket. Tickets increase across
+sibling borrows, and an arena allocates root IDs monotonically across lifetime
+invalidation; stale child or root handles do not revive. Reservation validity is
+preserved by arena construction and replacement.
+
+Generated scalar methods now emit and audit loan-admission refinements alongside
+their initialized-slot refinements. The footprint includes both branches
+conservatively; accepted execution retains the original short-circuit behavior.
+A generic frame theorem derives preservation of another loan's accessible field
+from valid reservations and the generated write footprint.
+
+Jarl owns two new acknowledgment contracts: initialized-heap execution clears
+the dirty, log-from and snapshot-changed fields under the node loan, and another
+borrower's field remains unchanged under valid disjoint permissions. The
+consumer still must establish Ready's actual Rust loan identity and successful
+durable storage. Physical layout, pointer/alias correspondence, source lifetime
+validation, interior mutability and destruction are not proved by the logical
+loan machine. Other backends have not acquired this refinement. M1/M2 remain open.
+
+Validation: 35 ownership statements/traces passed axiom audit, and three mutated
+failure behaviors were rejected. All five provider method kernel tests passed
+(122.68 seconds), including original-source mutation and cfg controls. Jarl's
+consumer suite passed all 15 enabled tests (186.82 seconds), and its changed
+acknowledgment source still failed the Lean contract (10.55 seconds). Provider
+ordinary tests, provider/Jarl proof-test Clippy, formatting and coverage review
+passed. Lean ran one process at a time with a 16384 MiB cap.

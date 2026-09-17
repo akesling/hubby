@@ -75,10 +75,22 @@ pub(super) fn generate(method: &Method) -> String {
         );
     }
     // A conflicting footprint cannot pass the kernel's ProgramTyped check.
-    format!(
+    let initialized = format!(
         "def {name}_layout : Initialized.Layout := fun {binder} => {layout}\n\
          set_option linter.unusedSimpArgs false in\n\
          theorem {name}_well_typed : Initialized.ProgramTyped {name}_layout {name}_ir := by\n  simp [Initialized.ProgramTyped, Initialized.ConditionTyped, Initialized.literalKind, {name}_layout, {name}_ir]\n\
          theorem {name}_initialized_refinement (heap : Initialized.Heap α) (state : Store α)\n    (related : Initialized.Relates {name}_layout heap state) :\n    ∃ result, Initialized.execute {name}_layout {name}_ir heap = .ok result ∧\n      Initialized.Relates {name}_layout result ({name} state) := by\n  simpa only [{name}_correspondence] using\n    Initialized.execute_refines {name}_ir related {name}_well_typed\n"
+    );
+    format!(
+        r#"{initialized}
+theorem {name}_loan_refinement (world : Loans.World) (owner ticket : Nat)
+    (heap : Initialized.Heap α) (state : Store α)
+    (related : Initialized.Relates {name}_layout heap state)
+    (allowed : Loans.ProgramAllowed world owner ticket {name}_ir) :
+    ∃ result, Loans.execute world owner ticket {name}_layout {name}_ir heap = .ok result ∧
+      Initialized.Relates {name}_layout result ({name} state) := by
+  simpa only [{name}_correspondence] using
+    Loans.execute_refines {name}_ir related {name}_well_typed allowed
+"#
     )
 }
