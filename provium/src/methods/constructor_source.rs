@@ -385,6 +385,7 @@ mod tests {
         for (name, text) in [
             ("State", super::super::SEMANTICS),
             ("Loans", super::super::LOANS),
+            ("ArrayMoves", super::super::ARRAY_MOVES),
             ("ScalarSource", super::super::SCALAR_SOURCE),
             ("ConstructorSource", super::super::CONSTRUCTOR_SOURCE),
             ("Audit", super::super::AUDIT),

@@ -1535,3 +1535,29 @@ passed. Jarl passed all 15 enabled proof-suite tests (262.88 seconds), its
 captured wasm32 membership proof (15.07 seconds), and proof-test Clippy. The
 preceding target-width checkpoint also passed all 15 enabled Jarl tests
 (217.94 seconds). Lean remained serialized under the 16384 MiB cap.
+
+### M1 P04: initialized optional-array movement under a loan
+
+Provium now interprets the complete source-ordered Option::take slot traversal
+using separate initialized and uninitialized states. Taking an optional value
+leaves initialized None, including when the value was already absent. Bounds and
+uninitialized-slot faults retain the values already moved and the partially
+changed source. The traversal requires the active ticket of an exclusive logical
+array loan; generic reservation validity excludes independently admitted aliases.
+
+Every selected growth method now emits an audited loan/initialized-array
+refinement to its slot-move IR. Jarl's growth contract composes that refinement
+with its arbitrary-capacity result: the occupied prefix moves in order, capacity
+extends with absent values, and all old slots end as initialized None. Metadata
+transfer, physical array layout, source ownership and failed-construction cleanup
+remain separate obligations. This is traversal refinement, not a full Rust memory
+or Raft correctness theorem. M1 and M2 remain open.
+
+Validation: eleven array-movement statements passed axiom audit, and two changed
+fault behaviors were rejected (9.02 seconds). All three original growth mutations
+still failed the provider contract (51.46 seconds). Scalar and constructor source
+controls passed (27.30 seconds). Jarl's full consumer suite passed all 15 enabled
+tests (216.63 seconds), and the complete storage project passed on both captured
+host and wasm32 builds with the new growth contract. Provider ordinary tests,
+provider/Jarl proof-test Clippy, formatting and coverage review passed. Lean ran
+serially under the 16384 MiB cap.

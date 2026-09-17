@@ -6332,7 +6332,7 @@
         "R05"
       ],
       "status": "component_evidence",
-      "note": "Complete original consuming growth in proofs/storage: arbitrary larger capacity, live payload/metadata/length preservation without drops, and induction across changing-capacity append/grow histories. Rust layout/ownership, failed-construction unwinding, restore/truncate/install and protocol log invariants remain open.",
+      "note": "Complete original consuming growth in proofs/storage: arbitrary larger capacity, live payload/metadata/length preservation without drops, and induction across changing-capacity append/grow histories. Rust layout/ownership, failed-construction unwinding, restore/truncate/install and protocol log invariants remain open. Its complete Option::take slot traversal now refines initialized optional-array memory under an active exclusive logical loan, retaining partial bounds/uninitialized outcomes and leaving taken slots initialized to None. The Jarl contract composes that traversal with arbitrary-capacity growth; source ownership, physical array layout, metadata transfer and cleanup refinement remain open.",
       "root_apis": [],
       "contracts": [
         {
@@ -6362,6 +6362,12 @@
         {
           "project": "proofs/storage/project.json",
           "theorem": "Storage.growth_preserves_log",
+          "function": "state_State_grow",
+          "evidence": "artifacts/provium/proofs/storage/verified.json"
+        },
+        {
+          "project": "proofs/storage/project.json",
+          "theorem": "Storage.grow_initialized_moves",
           "function": "state_State_grow",
           "evidence": "artifacts/provium/proofs/storage/verified.json"
         }

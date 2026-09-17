@@ -468,6 +468,13 @@ or taken from an Option, and custom receiver Drop is rejected. The generated
 slot-move semantics expose residual payload disposal and preserve metadata as an
 opaque value. They do not model metadata ownership during failed construction,
 panic hooks or unwinding; source/layout/ownership refinement remains open.
+`Provium.ArrayMoves` separately interprets the complete take traversal over
+initialized optional slots. It distinguishes an initialized `None` from an
+uninitialized slot, retains partial state on faults, and requires an active
+exclusive loan over the array region. Generated growth methods expose
+`_loan_moves` and an audited `_loan_moves_refinement` to the original slot-move
+IR. These contracts cover the array traversal; metadata transfer, allocation,
+actual Rust ownership, and cleanup still require their own refinements.
 
 Shared optional-record selectors retain their receiver and payload field paths
 in Lean and check eager default computation. Storage IR also records source

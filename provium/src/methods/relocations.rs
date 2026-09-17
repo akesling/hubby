@@ -333,7 +333,18 @@ impl Crate {
 pub(super) fn generate(method: &Method) -> String {
     let r = method.relocation.as_ref().unwrap();
     let name = &method.symbol;
-    format!("def {name}_ir : Relocation := ⟨{}, {}, {:?}, {:?}, {}, {}⟩\ndef {name} (oldCapacity newCapacity : Nat) (state : BufferState α) (metadata : β) : RelocationRun α β :=\n  relocate {name}_ir oldCapacity newCapacity state metadata\ntheorem {name}_correspondence (oldCapacity newCapacity : Nat) (state : BufferState α) (metadata : β) :\n  relocate {name}_ir oldCapacity newCapacity state metadata = {name} oldCapacity newCapacity state metadata := by rfl\n",lean_path(std::slice::from_ref(&r.slots)),lean_path(std::slice::from_ref(&r.length)),r.old_capacity,r.new_capacity,r.ascending,r.inclusive)
+    let mut output = format!("def {name}_ir : Relocation := ⟨{}, {}, {:?}, {:?}, {}, {}⟩\ndef {name} (oldCapacity newCapacity : Nat) (state : BufferState α) (metadata : β) : RelocationRun α β :=\n  relocate {name}_ir oldCapacity newCapacity state metadata\ntheorem {name}_correspondence (oldCapacity newCapacity : Nat) (state : BufferState α) (metadata : β) :\n  relocate {name}_ir oldCapacity newCapacity state metadata = {name} oldCapacity newCapacity state metadata := by rfl\n",lean_path(std::slice::from_ref(&r.slots)),lean_path(std::slice::from_ref(&r.length)),r.old_capacity,r.new_capacity,r.ascending,r.inclusive);
+    output.push_str(&format!(r#"def {name}_loan_moves (world : Loans.World) (owner ticket length newCapacity : Nat)
+    (source : ArrayMoves.Slots α) : Except Loans.Fault (ArrayMoves.Result α) :=
+  ArrayMoves.move world owner ticket {name}_ir.slotsPath {name}_ir.inclusive length 0 newCapacity source
+theorem {name}_loan_moves_refinement (world : Loans.World) (owner ticket length newCapacity : Nat)
+    (source : List (Option α))
+    (allowed : Loans.Allowed world owner ticket ⟨{name}_ir.slotsPath, .exclusive⟩) :
+    {name}_loan_moves world owner ticket length newCapacity (ArrayMoves.initializedSlots source) =
+      .ok (ArrayMoves.lift (moveSlots {name}_ir.inclusive length 0 newCapacity source)) :=
+  ArrayMoves.move_refines allowed
+"#));
+    output
 }
 
 #[derive(Debug, PartialEq, Eq)]

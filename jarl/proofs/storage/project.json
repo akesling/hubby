@@ -187,6 +187,10 @@
     {
       "theorem": "Storage.truncation_retains_base",
       "function": "state_State_truncate"
+    },
+    {
+      "theorem": "Storage.grow_initialized_moves",
+      "function": "state_State_grow"
     }
   ]
 }

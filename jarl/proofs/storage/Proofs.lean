@@ -149,6 +149,29 @@ theorem grow_exact (oldCapacity newCapacity : Nat) (live : List α) (metadata : 
   simpa only [List.length_map] using
     relocate_prefix oldCapacity newCapacity (live.map some) metadata (by simpa using fits) grows
 
+theorem grow_initialized_moves (oldCapacity newCapacity : Nat) (live : List α) (metadata : β)
+    (world : Loans.World) (owner ticket : Nat)
+    (fits : live.length ≤ oldCapacity) (grows : oldCapacity ≤ newCapacity)
+    (allowed : Loans.Allowed world owner ticket ⟨["entries"], .exclusive⟩) :
+    Jarl.state_State_grow oldCapacity newCapacity
+      ⟨live.map some ++ List.replicate (oldCapacity - live.length) none, live.length⟩ metadata =
+      .returned ⟨live.map some ++ List.replicate (newCapacity - live.length) none, live.length⟩ metadata ∧
+    Jarl.state_State_grow_loan_moves world owner ticket live.length newCapacity
+      (ArrayMoves.initializedSlots (live.map some ++ List.replicate (oldCapacity - live.length) none)) =
+      .ok (.done (live.map some ++ List.replicate (newCapacity - live.length) none)
+        (List.replicate oldCapacity (some none))) := by
+  refine ⟨grow_exact oldCapacity newCapacity live metadata fits grows, ?_⟩
+  have room : live.length ≤ newCapacity := Nat.le_trans fits grows
+  have moves := move_prefix (live.map some) (List.replicate (oldCapacity - live.length) none)
+    0 (newCapacity - live.length)
+  simp only [List.length_map, Nat.zero_add, Nat.add_sub_of_le room,
+    List.replicate_append_replicate, Nat.add_sub_of_le fits] at moves
+  rw [Jarl.state_State_grow_loan_moves_refinement world owner ticket live.length newCapacity _
+    (by simpa only [Jarl.state_State_grow_ir] using allowed)]
+  change Except.ok (ArrayMoves.lift (moveSlots false live.length 0 newCapacity _)) = _
+  rw [moves]
+  simp only [ArrayMoves.lift, ArrayMoves.initializedSlots, List.map_replicate]
+
 private theorem empty_suffix (state : BufferState α) (capacity : Nat) (shape : Shape state capacity) :
     state.slots.drop state.len = List.replicate (capacity - state.len) none := by
   apply List.ext_getElem?
