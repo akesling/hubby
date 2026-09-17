@@ -4444,7 +4444,7 @@
         "S12"
       ],
       "status": "component_evidence",
-      "note": "Complete original callback loops, prefix sorts, rank expressions, early return and minimum lower to the numeric interaction model. Contracts connect both source projections, stable execution and empty-current panic. Numeric scalar rank contracts and an unbounded indexed-buffer/prefix-sort-to-collection refinement are reusable Provium evidence; the execution contract now uses the buffer refinement. The complete two-pass typed-word execution, including increments and rank reads, refines the source-derived model under explicit width/capacity premises. Rust memory/usize/sort_unstable/ownership/source refinement, build-to-panic-policy binding, panic detail and reachable caller invariants remain open. The callback response budget and observation completion now cover both numeric passes and cleanup, conditional on supplied responses; actual Rust/callback termination is still open. The membership project now binds source bytes and declaration cfg to a fresh captured Cargo build; this does not discharge Rust-to-model preservation or arithmetic/panic parameter interpretation. A target-word specialization now uses target_pointer_width from that effective Cargo invocation, retaining capacity and overflow/panic premises; Jarl discharges the divisor bound.",
+      "note": "Complete original callback loops, prefix sorts, rank expressions, early return and minimum lower to the numeric interaction model. Contracts connect both source projections, stable execution and empty-current panic. Numeric scalar rank contracts and an unbounded indexed-buffer/prefix-sort-to-collection refinement are reusable Provium evidence; the execution contract now uses the buffer refinement. The complete two-pass typed-word execution, including increments and rank reads, refines the source-derived model under explicit width/capacity premises. Rust memory/usize/sort_unstable/ownership/source refinement, panic runtime/hook effects, panic detail and reachable caller invariants remain open. The callback response budget and observation completion now cover both numeric passes and cleanup, conditional on supplied responses; actual Rust/callback termination is still open. The membership project now binds source bytes and declaration cfg to a fresh captured Cargo build; this does not discharge Rust-to-model preservation. A target-word specialization now uses target_pointer_width from that effective Cargo invocation, retaining capacity; Jarl discharges the divisor bound. A further build-word specialization takes overflow checks from effective compiler options and panic strategy from effective cfg, including profile overrides. Compiler-option interpretation and the adequacy of panic/runtime semantics remain trusted.",
       "root_apis": [],
       "contracts": [
         {
@@ -4474,6 +4474,18 @@
         {
           "project": "proofs/membership/project.json",
           "theorem": "QuorumIndex.target_word_execution",
+          "function": "membership_Membership_quorum_index",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "QuorumIndex.build_word_execution",
+          "function": "membership_Membership_quorum_index",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "QuorumIndex.build_empty_current",
           "function": "membership_Membership_quorum_index",
           "evidence": "artifacts/provium/proofs/membership/verified.json"
         },

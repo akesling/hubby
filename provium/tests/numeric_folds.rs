@@ -25,6 +25,17 @@ impl Work {
 }
 impl Drop for Work {
     fn drop(&mut self) {
+        if self.0.join("target").exists() {
+            let cleaned = std::process::Command::new("cargo")
+                .args(["clean", "--manifest-path"])
+                .arg(self.0.join("Cargo.toml"))
+                .arg("--target-dir")
+                .arg(self.0.join("target"))
+                .output();
+            if !cleaned.is_ok_and(|result| result.status.success()) {
+                return;
+            }
+        }
         let _ = fs::remove_dir_all(&self.0);
     }
 }
@@ -194,6 +205,113 @@ theorem target_execution (entries : ArrayStore α) (callback : σ) (checked abor
         fs::write(
             w.0.join("Proofs.lean"),
             proofs.replace(&format!("= {bits} :="), &format!("= {} :=", bits + 1)),
+        )
+        .unwrap();
+        let error = provium::methods::verify(&project, &out).unwrap_err();
+        assert!(error.contains("Lean rejected Proofs.lean"), "{error}");
+        assert!(!out.join("verified.json").exists());
+    }
+}
+
+#[test]
+#[ignore = "requires pinned Lean; scripts/verify.sh runs this"]
+fn captured_profile_overrides_drive_numeric_words_and_panic_outcomes() {
+    use std::process::Command;
+    let w = Work::new(&format!("#![no_std]\n{SOURCE}"));
+    let manifest = w.0.join("Cargo.toml");
+    fs::write(
+        &manifest,
+        r#"[package]
+name="numeric_profile"
+version="0.1.0"
+edition="2021"
+[workspace]
+[lib]
+path="source.rs"
+[profile.dev]
+debug-assertions=false
+overflow-checks=true
+panic="unwind"
+[profile.release]
+debug-assertions=true
+overflow-checks=false
+panic="abort"
+"#,
+    )
+    .unwrap();
+    let locked = Command::new("cargo")
+        .args(["generate-lockfile", "--offline", "--manifest-path"])
+        .arg(&manifest)
+        .output()
+        .unwrap();
+    assert!(
+        locked.status.success(),
+        "{}",
+        String::from_utf8_lossy(&locked.stderr)
+    );
+    let project = w.0.join("project.json");
+    fs::write(
+        &project,
+        serde_json::json!({
+            "crate_root":"source.rs", "cargo_build":"build.json", "namespace":"Subject",
+            "methods":["Table::threshold"], "proofs":"Proofs.lean",
+            "obligations":[
+                {"theorem":"build_execution","function":"Table_threshold"},
+                {"theorem":"empty_outcome","function":"Table_threshold"}
+            ]
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let out = w.0.join("out");
+    for (profile, checked, abort) in [("dev", true, false), ("release", false, true)] {
+        fs::write(
+            w.0.join("build.json"),
+            serde_json::json!({
+                "manifest":"Cargo.toml", "target":"host", "profile":profile
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let outcome = if abort {
+            "some (.abort, [])"
+        } else {
+            "some (.unwind, [.dropped 0 .returned])"
+        };
+        let proofs = format!(
+            r#"import Generated
+open Provium.State
+theorem build_execution (entries : ArrayStore α) (callback : σ)
+    (capacity : entries.length < 2^Subject.target_usize_bits) :
+    Subject.target_overflow_checked = {checked} ∧ Subject.target_panic_abort = {abort} ∧
+    Subject.Table_threshold_build_words entries callback = Subject.Table_threshold entries callback {abort} := by
+  refine ⟨rfl, rfl, ?_⟩
+  exact Subject.Table_threshold_build_refinement entries callback capacity (by decide)
+theorem empty_outcome :
+    Subject.Table_threshold_build_words ([] : ArrayStore Nat) 0 = Subject.Table_threshold [] 0 {abort} ∧
+    observeCallback 2
+    (fun (_ : Cell Nat) (state : Nat) => .value (9 : UInt64) (state + 1)) (fun _ => .returned)
+    (Subject.Table_threshold_build_words [] 0) = {outcome} := by
+  refine ⟨(build_execution [] 0 (by decide)).2.2, ?_⟩
+  rw [(build_execution [] 0 (by decide)).2.2]
+  rfl
+"#
+        );
+        fs::write(w.0.join("Proofs.lean"), &proofs).unwrap();
+        provium::methods::verify(&project, &out).unwrap();
+        let evidence: serde_json::Value =
+            serde_json::from_slice(&fs::read(out.join("manifest.json")).unwrap()).unwrap();
+        assert_eq!(evidence["arithmetic_profile"]["overflow_checked"], checked);
+        assert_eq!(evidence["arithmetic_profile"]["panic_abort"], abort);
+        let verified: serde_json::Value =
+            serde_json::from_slice(&fs::read(out.join("verified.json")).unwrap()).unwrap();
+        assert_eq!(verified["build_word_refinements"], 1);
+        fs::write(
+            w.0.join("Proofs.lean"),
+            proofs.replace(
+                &format!("target_overflow_checked = {checked}"),
+                &format!("target_overflow_checked = {}", !checked),
+            ),
         )
         .unwrap();
         let error = provium::methods::verify(&project, &out).unwrap_err();

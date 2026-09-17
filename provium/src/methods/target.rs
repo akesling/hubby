@@ -35,16 +35,28 @@ pub(super) fn numeric(method: &Method) -> bool {
     method.array.as_ref().is_some_and(|a| a.numeric.is_some())
 }
 
-pub(super) fn generate(methods: &[Method], namespace: &str, bits: u32) -> String {
+pub(super) fn generate(
+    methods: &[Method],
+    namespace: &str,
+    bits: u32,
+    profile: &super::profile::Profile,
+) -> String {
     let mut output = format!(
         "namespace {namespace}\nopen Provium.State\ndef target_usize_bits : Nat := {bits}\ntheorem target_usize_valid : Provium.validWidth target_usize_bits = true := by decide\n"
     );
+    output.push_str(&format!(
+        "def target_overflow_checked : Bool := {}\ndef target_panic_abort : Bool := {}\n",
+        profile.overflow_checked, profile.panic_abort
+    ));
     for method in methods.iter().filter(|m| numeric(m)) {
         let name = &method.symbol;
         // The divisor remains a checked premise: an arbitrary source literal can
         // fit u64 while not fitting the target's usize.
         output.push_str(&format!(
             "def {name}_target_words (entries : ArrayStore α) (callback : σ) (checked abortOnPanic : Bool) : CallbackRun α σ UInt64 UInt64 :=\n  runNumericWords {name}_ir entries callback target_usize_bits checked abortOnPanic\ntheorem {name}_target_refinement (entries : ArrayStore α) (callback : σ) (checked abortOnPanic : Bool)\n    (capacity : entries.length < 2^target_usize_bits)\n    (divisor : {name}_ir.divisor < 2^target_usize_bits) :\n    {name}_target_words entries callback checked abortOnPanic = {name} entries callback abortOnPanic := by\n  exact runNumericWords_refines _ entries callback target_usize_bits checked abortOnPanic target_usize_valid capacity divisor\n"
+        ));
+        output.push_str(&format!(
+            "def {name}_build_words (entries : ArrayStore α) (callback : σ) : CallbackRun α σ UInt64 UInt64 :=\n  {name}_target_words entries callback target_overflow_checked target_panic_abort\ntheorem {name}_build_refinement (entries : ArrayStore α) (callback : σ)\n    (capacity : entries.length < 2^target_usize_bits)\n    (divisor : {name}_ir.divisor < 2^target_usize_bits) :\n    {name}_build_words entries callback = {name} entries callback target_panic_abort := by\n  exact {name}_target_refinement entries callback target_overflow_checked target_panic_abort capacity divisor\n"
         ));
     }
     output.push_str(&format!("end {namespace}\n"));

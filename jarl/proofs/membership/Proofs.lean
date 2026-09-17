@@ -1450,6 +1450,23 @@ theorem target_word_execution (entries : ArrayStore α) (callback : σ)
   exact membership_Membership_quorum_index_target_refinement entries callback checked abortOnPanic
     capacity (by decide)
 
+theorem build_word_execution (entries : ArrayStore α) (callback : σ)
+    (capacity : entries.length < 2^target_usize_bits) :
+    membership_Membership_quorum_index_build_words entries callback =
+      membership_Membership_quorum_index entries callback target_panic_abort := by
+  exact membership_Membership_quorum_index_build_refinement entries callback capacity (by decide)
+
+theorem build_empty_current (entries : ArrayStore α) (callback : σ)
+    (capacity : entries.length < 2^target_usize_bits)
+    (empty : membership_Membership_voters entries = []) :
+    membership_Membership_quorum_index_build_words entries callback =
+      membership_Membership_quorum_index entries callback target_panic_abort ∧
+    membership_Membership_quorum_index_build_words entries callback =
+      finishNumericPanic callback target_panic_abort := by
+  refine ⟨build_word_execution entries callback capacity, ?_⟩
+  rw [build_word_execution entries callback capacity]
+  exact empty_current entries callback target_panic_abort empty
+
 theorem response_budget (entries : ArrayStore α) (callback : σ) (abortOnPanic : Bool) :
     callbackBudget ((membership_Membership_voters entries).length + (membership_Membership_old_voters entries).length + 2)
       (membership_Membership_quorum_index entries callback abortOnPanic) :=

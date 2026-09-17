@@ -281,8 +281,16 @@ cfg (the captured root invocation for Cargo-backed projects). Numeric methods
 gain a `_target_words` executable and an audited `_target_refinement` that uses
 that width. Missing, duplicate and unsupported widths reject verification.
 Capacity and divisor representability remain premises; the overflow and panic
-modes remain explicit parameters. This binds index width, not Rust allocations
-or the complete arithmetic/profile semantics.
+modes remain explicit parameters of that entry point. A `_build_words` entry
+point and audited `_build_refinement` additionally specialize those modes to the
+actual compiler arguments and cfg. Explicit overflow flags take precedence over
+the effective debug-assertion default, independently of the Cargo profile name.
+Response files, unstable options, injected built-in mode cfg, and unsupported
+panic modes reject this interpretation. The manifest records `arithmetic_profile`.
+Compiler-option interpretation remains trusted, with native override controls;
+this does not prove Rust allocations, panic hooks/runtime effects, or complete
+arithmetic/profile preservation for other method backends. The default rule follows
+the [rustc option specification](https://doc.rust-lang.org/rustc/codegen-options/index.html#overflow-checks).
 Generic callback budgets and observation completeness also cover numeric folds:
 the two projection lengths plus two units of observer fuel suffice for every
 completed callback/drop response sequence. The bound transfers to typed-word

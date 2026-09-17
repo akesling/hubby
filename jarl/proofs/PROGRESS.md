@@ -1508,3 +1508,30 @@ wasm32 membership project passed (19.68 seconds). Width-admission unit controls,
 provider/Jarl proof-test Clippy and formatting passed. The preceding constructor
 checkpoint also passed all 15 enabled Jarl proof-suite tests (224.58 seconds).
 Lean remained serialized under the 16384 MiB cap.
+
+### M1 P06: effective overflow and panic mode binding
+
+Generated numeric methods now have a build-word entry point that fixes width,
+overflow checking and panic strategy from the checked invocation. Explicit
+codegen options override the effective debug-assertion default, including repeated
+flags and Rust's accepted option spellings. Unsupported panic modes, unstable
+options, response files and injected built-in mode cfg reject interpretation.
+The manifest records the interpreted arithmetic profile.
+
+Jarl owns a quorum-index build-execution contract and a linked empty-current
+outcome contract. Compiler-option interpretation remains a trusted frontend step;
+native comparisons exercise it, rather than presenting it as a Lean proof of
+rustc. Physical allocation/ownership, source arithmetic preservation, panic hooks,
+callback/runtime effects and nonnumeric backend profile refinements remain open.
+Neither M1 nor M2 is complete.
+
+Validation: eight native compiler configurations matched the interpreted overflow
+behavior. Captured dev/release builds with deliberate profile overrides passed
+kernel checks for complete numeric execution and modeled empty-input cleanup or
+abort; contradictory overflow contracts were rejected (57.01 seconds). Standalone
+host/wasm32 width contracts and their negative controls also passed with profile
+binding enabled (59.41 seconds). Provider ordinary tests, Clippy and formatting
+passed. Jarl passed all 15 enabled proof-suite tests (262.88 seconds), its
+captured wasm32 membership proof (15.07 seconds), and proof-test Clippy. The
+preceding target-width checkpoint also passed all 15 enabled Jarl tests
+(217.94 seconds). Lean remained serialized under the 16384 MiB cap.
