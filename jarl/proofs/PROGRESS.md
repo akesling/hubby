@@ -1465,3 +1465,26 @@ all 15 enabled tests (189.42 seconds); changing its acknowledgment still failed
 the original contract (11.38 seconds). Provider ordinary tests, provider/Jarl
 Clippy, formatting and coverage review passed. Lean remained serialized under
 the 16384 MiB cap.
+
+### M1 P10: independently interpreted constructor initialization
+
+Provium now walks the original constructor initializer separately from its
+flattened field IR. Its source witness retains nested fields, array declarations,
+const-parameter substitution, and the types in derived-Default declarations.
+Lean computes defaults from those types and checks the source lowering against
+the generated constructor. A generic interpreter theorem proves the resulting
+initial store agrees for every admitted capacity assignment.
+
+Jarl's initialization project now states fresh hard-state, snapshot, log-array and
+length facts over that source interpreter. The constructor source refinement is
+also generated and audited for constructors selected by other method projects.
+This does not close Rust parsing, trait/type/const resolution, physical allocation,
+layout or reachable restoration invariants. M1 and M2 remain incomplete.
+
+Validation: ten constructor statements passed axiom audit, including typed default
+computation, const substitution and explicit unresolved-input/fuel outcomes. Four
+corrupted lowerings (changed default, capacity, field path and omitted field)
+failed their unchanged source certificates. The scalar source controls also passed.
+Jarl's installed 32-bit initialization proof passed, and a changed initial length
+failed its original contract. Provider ordinary tests and provider/Jarl proof-test
+Clippy passed. Lean ran serially with a 16384 MiB cap.

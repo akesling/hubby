@@ -24,4 +24,20 @@ theorem all_slots_empty (sizes : String → Nat) (entries : List (Option Unit))
   cases h
   simp
 
+-- Constructor syntax, derived defaults and capacity substitution are checked
+-- independently of the flattened field IR. Rust resolution and physical
+-- initialization remain explicit source-correspondence obligations.
+theorem source_fresh_fields (sizes : String → Nat) :
+    ∃ result,
+      JarlInitial.state_State_new_source_run sizes = .ok result ∧
+      result = JarlInitial.state_State_new sizes ∧
+      result ["hard", "term"] = .unsigned "u64" 0 ∧
+      result ["hard", "voted_for"] = .absent ∧
+      result ["hard", "commit"] = .unsigned "u64" 0 ∧
+      result ["snapshot"] = .absent ∧
+      result ["entries"] = .slots (List.replicate (sizes "CAP") none) ∧
+      result ["len"] = .unsigned "usize" 0 := by
+  exact ⟨JarlInitial.state_State_new sizes, JarlInitial.state_State_new_source_refinement sizes,
+    rfl, fresh_fields sizes⟩
+
 end Initialization

@@ -7,6 +7,7 @@
   "obligations":[
     {"theorem":"Initialization.fresh_fields","function":"state_State_new"},
     {"theorem":"Initialization.initial_length_within_capacity","function":"state_State_new"},
-    {"theorem":"Initialization.all_slots_empty","function":"state_State_new"}
+    {"theorem":"Initialization.all_slots_empty","function":"state_State_new"},
+    {"theorem":"Initialization.source_fresh_fields","function":"state_State_new"}
   ]
 }

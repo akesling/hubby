@@ -6517,7 +6517,7 @@
         "R02"
       ],
       "status": "component_evidence",
-      "note": "Complete fresh-state constructor contracts in proofs/initialization; restore/mutation preservation and source/layout refinement remain open.",
+      "note": "Fresh-state constructor contracts now include an independently walked source initializer, typed derived-default declarations and const-capacity substitution checked against the flattened IR. Rust parsing, trait/const/type resolution, physical initialization and restore/mutation preservation remain open.",
       "root_apis": [
         "crate::state::<State < V , S , CAP >>::new"
       ],
@@ -6545,6 +6545,12 @@
           "theorem": "Storage.fresh_representation",
           "function": "state_State_new",
           "evidence": "artifacts/provium/proofs/storage/verified.json"
+        },
+        {
+          "project": "proofs/initialization/project.json",
+          "theorem": "Initialization.source_fresh_fields",
+          "function": "state_State_new",
+          "evidence": "artifacts/provium/proofs/initialization/verified.json"
         }
       ],
       "context": "production"

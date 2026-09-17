@@ -290,6 +290,7 @@ mod tests {
             ("State", super::super::SEMANTICS),
             ("Loans", super::super::LOANS),
             ("ScalarSource", super::super::SCALAR_SOURCE),
+            ("ConstructorSource", super::super::CONSTRUCTOR_SOURCE),
             ("Audit", super::super::AUDIT),
         ] {
             workspace

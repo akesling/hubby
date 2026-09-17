@@ -358,6 +358,16 @@ custom/inherent defaults, shadowed standard namespaces and omitted fields. Their
 logical initialization stores do not establish Rust memory/layout refinement or
 physical resource availability; standard-operation semantics remain trusted.
 
+Constructor verification also walks the original initializer, record declarations
+and const arguments independently of the flattened fields. The source witness
+retains named derived defaults and formal capacity parameters. Lean computes
+default values from the recorded field types, applies the const substitution,
+checks `<method>_source_compiles`, and proves
+`<method>_source_run sizes = .ok (<method> sizes)`. Corrupted default values,
+capacity substitutions, field paths and omitted fields fail that certificate.
+This is a source-language refinement; Rust trait/const resolution, builtin
+adequacy, physical allocation and the parser remain in the trusted boundary.
+
 Assignment stores model nonoverlapping leaf locations with opaque values for untouched
 payloads. Boolean reads have a total extension on malformed stores; Rust
 refinement requires the corresponding leaves to contain booleans. Frame theorems
