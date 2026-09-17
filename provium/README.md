@@ -276,6 +276,13 @@ explicit supported-width and representable-capacity premises; empty input retain
 distinct overflow and bounds faults. Build/profile binding remains separate.
 The typed-word execution model composes those operations through both callback
 loops and rank reads, with a checked refinement to the numeric-fold model.
+Method verification also emits `target_usize_bits` from the effective compiler
+cfg (the captured root invocation for Cargo-backed projects). Numeric methods
+gain a `_target_words` executable and an audited `_target_refinement` that uses
+that width. Missing, duplicate and unsupported widths reject verification.
+Capacity and divisor representability remain premises; the overflow and panic
+modes remain explicit parameters. This binds index width, not Rust allocations
+or the complete arithmetic/profile semantics.
 Generic callback budgets and observation completeness also cover numeric folds:
 the two projection lengths plus two units of observer fuel suffice for every
 completed callback/drop response sequence. The bound transfers to typed-word

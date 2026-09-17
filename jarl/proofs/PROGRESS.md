@@ -1488,3 +1488,23 @@ failed their unchanged source certificates. The scalar source controls also pass
 Jarl's installed 32-bit initialization proof passed, and a changed initial length
 failed its original contract. Provider ordinary tests and provider/Jarl proof-test
 Clippy passed. Lean ran serially with a 16384 MiB cap.
+
+### M1 P06: compiler-target binding for quorum index words
+
+Method verification now obtains the index width from the effective compiler cfg,
+using the captured root invocation for Cargo-backed projects. Missing, repeated
+or unsupported target widths reject verification. Generated numeric methods have
+an audited target-word refinement; consumers retain the array representability
+and divisor bounds, and overflow/panic modes remain explicit parameters.
+
+Jarl's quorum-index contract now specializes its word execution to that target
+and discharges its divisor bound. This removes a free width choice from that
+contract; it does not establish the Rust allocation bound, sort/ownership/source
+refinement or complete build-profile semantics. M1 and M2 remain incomplete.
+
+Validation: host and installed wasm32 provider contracts passed, and incorrect
+width contracts were rejected on both targets (73.77 seconds). Jarl's captured
+wasm32 membership project passed (19.68 seconds). Width-admission unit controls,
+provider/Jarl proof-test Clippy and formatting passed. The preceding constructor
+checkpoint also passed all 15 enabled Jarl proof-suite tests (224.58 seconds).
+Lean remained serialized under the 16384 MiB cap.

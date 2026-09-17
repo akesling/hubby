@@ -4,6 +4,7 @@ mod build;
 mod configured;
 mod constructor_source;
 mod source;
+mod target;
 
 use crate::project::{hash, Obligation, AUDIT, TOOLCHAIN};
 use quote::ToTokens;
@@ -1100,6 +1101,7 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
         String::from_utf8(cfg.stdout).map_err(|e| e.to_string())?
     };
     let configuration = crate::cfg::Configuration::parse(&cfg_text)?;
+    let pointer_bits = target::pointer_bits(&cfg_text)?;
     let krate = Crate::load_configured(&base.join(&project.crate_root), configuration)?;
     if let Some(build) = &cargo_build {
         build.bind_sources(&krate)?;
@@ -1109,7 +1111,10 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
         .iter()
         .map(|m| krate.lower(m))
         .collect::<Result<Vec<_>, _>>()?;
-    let mut symbols = std::collections::BTreeSet::new();
+    let mut symbols = std::collections::BTreeSet::from([
+        "target_usize_bits".to_owned(),
+        "target_usize_valid".to_owned(),
+    ]);
     for m in &methods {
         for name in [
             m.symbol.clone(),
@@ -1129,6 +1134,8 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
             format!("{}_source_outcomes", m.symbol),
             format!("{}_source_run", m.symbol),
             format!("{}_source_refinement", m.symbol),
+            format!("{}_target_words", m.symbol),
+            format!("{}_target_refinement", m.symbol),
         ] {
             if !identifier(&name) || !symbols.insert(name) {
                 return Err("invalid/colliding generated method symbol".into());
@@ -1217,8 +1224,19 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
     let (constructor_witnesses, constructor_evidence) =
         constructor_source::generate(&krate, &methods, &project.namespace)?;
     generated.push_str(&constructor_witnesses);
+    generated.push_str(&target::generate(
+        &methods,
+        &project.namespace,
+        pointer_bits,
+    ));
     let mut audit = "import Provium.Audit\nimport Proofs\n".to_string();
     for m in &methods {
+        if target::numeric(m) {
+            audit.push_str(&format!(
+                "#provium_check {}.{}_target_refinement references {}.{}\n",
+                project.namespace, m.symbol, project.namespace, m.symbol
+            ));
+        }
         audit.push_str(&format!(
             "#provium_check {}.{}_correspondence references {}.{}\n",
             project.namespace, m.symbol, project.namespace, m.symbol
@@ -1322,10 +1340,12 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
     report.push_str(&workspace.check("Check.lean", None)?);
     let initialized_refinements = methods.iter().filter(|m| initialized::supported(m)).count();
     let constructor_refinements = constructor_evidence.len();
+    let target_refinements = methods.iter().filter(|m| target::numeric(m)).count();
     if report.matches("PROVIUM_VERIFIED ").count()
         != methods.len()
             + 4 * initialized_refinements
             + constructor_refinements
+            + target_refinements
             + project.obligations.len()
     {
         return Err("incomplete method axiom audit".into());
@@ -1380,10 +1400,10 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
     for library in &libraries {
         workspace.publish(&library.artifact.replace(".lean", ".olean"), &out)?;
     }
-    let manifest = serde_json::json!({"format":1,"compiler_sha256":hash(fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"scope":"complete explicit method bodies in supported Lean semantics; frontend, field resolution, borrowing/layout refinement and host durability remain trusted; not whole-program correctness", "lean_toolchain":TOOLCHAIN,"rustc":String::from_utf8_lossy(&rustc.stdout).trim(),"rust_target":cargo_build.as_ref().map(|b| b.capture.subject.request.target.clone()).or(project.rust_target),"rust_target_cfg":cfg_text,"cargo_build":cargo_build.as_ref().map(build::Build::evidence),"typecheck_args":typecheck_args,"config_sha256":hash(config_bytes),"sources":inputs,"proof_modules":libraries.iter().map(|library| serde_json::json!({"name":library.module,"path":library.path,"artifact":library.artifact,"sha256":hash(&library.source)})).collect::<Vec<_>>(),"methods":methods,"source_interpretations":source_evidence,"constructor_source_interpretations":constructor_evidence,"unproved_methods":krate.inventory().into_iter().filter(|n|!project.methods.contains(n)).collect::<Vec<_>>(),"artifacts":artifacts.iter().map(|(p,t)|(p,hash(t))).collect::<BTreeMap<_,_>>(),"obligations":project.obligations,"audit":report});
+    let manifest = serde_json::json!({"format":1,"compiler_sha256":hash(fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"scope":"complete explicit method bodies in supported Lean semantics; frontend, field resolution, borrowing/layout refinement and host durability remain trusted; not whole-program correctness", "lean_toolchain":TOOLCHAIN,"rustc":String::from_utf8_lossy(&rustc.stdout).trim(),"rust_target":cargo_build.as_ref().map(|b| b.capture.subject.request.target.clone()).or(project.rust_target),"rust_target_cfg":cfg_text,"target_usize_bits":pointer_bits,"cargo_build":cargo_build.as_ref().map(build::Build::evidence),"typecheck_args":typecheck_args,"config_sha256":hash(config_bytes),"sources":inputs,"proof_modules":libraries.iter().map(|library| serde_json::json!({"name":library.module,"path":library.path,"artifact":library.artifact,"sha256":hash(&library.source)})).collect::<Vec<_>>(),"methods":methods,"source_interpretations":source_evidence,"constructor_source_interpretations":constructor_evidence,"unproved_methods":krate.inventory().into_iter().filter(|n|!project.methods.contains(n)).collect::<Vec<_>>(),"artifacts":artifacts.iter().map(|(p,t)|(p,hash(t))).collect::<BTreeMap<_,_>>(),"obligations":project.obligations,"audit":report});
     let bytes = serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?;
     fs::write(out.join("manifest.json"), &bytes).map_err(|e| e.to_string())?;
-    fs::write(out.join("verified.json"),serde_json::to_vec_pretty(&serde_json::json!({"manifest_sha256":hash(bytes),"whole_program_proved":false,"complete_method_bodies":methods.len(),"initialized_slot_refinements":initialized_refinements,"loan_refinements":initialized_refinements,"source_language_refinements":initialized_refinements+constructor_refinements,"constructor_source_refinements":constructor_refinements,"rust_source_preservation_proved":false,"obligations":project.obligations.len()})).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;
+    fs::write(out.join("verified.json"),serde_json::to_vec_pretty(&serde_json::json!({"manifest_sha256":hash(bytes),"whole_program_proved":false,"complete_method_bodies":methods.len(),"initialized_slot_refinements":initialized_refinements,"loan_refinements":initialized_refinements,"source_language_refinements":initialized_refinements+constructor_refinements,"constructor_source_refinements":constructor_refinements,"target_word_refinements":target_refinements,"rust_source_preservation_proved":false,"obligations":project.obligations.len()})).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;
     Ok(format!("Verified {} complete method bodies and {} obligations in supported Lean semantics. Whole-program proof remains incomplete.\n{report}",methods.len(),project.obligations.len()))
 }
 

@@ -121,6 +121,33 @@ fn main(){{cases::<0>();cases::<1>();cases::<2>();cases::<3>();}}
 }
 
 #[test]
+#[ignore = "requires pinned Lean and installed wasm32 target; scripts/verify.sh runs this"]
+fn membership_word_contract_uses_captured_32_bit_target() {
+    let w = Work::new();
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let mut project: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join("proofs/membership/project.json")).unwrap())
+            .unwrap();
+    project["crate_root"] = root.join("src/lib.rs").to_str().unwrap().into();
+    project["proofs"] = root
+        .join("proofs/membership/Proofs.lean")
+        .to_str()
+        .unwrap()
+        .into();
+    w.build_request(&root.join("Cargo.toml"), "wasm32-unknown-unknown");
+    project["cargo_build"] = "build.json".into();
+    let config = w.write("project.json", &project.to_string());
+    provium::methods::verify(&config, &w.out()).unwrap();
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&fs::read(w.out().join("manifest.json")).unwrap()).unwrap();
+    assert_eq!(manifest["target_usize_bits"], 32);
+    assert!(!manifest["cargo_build"].is_null());
+    let verified: serde_json::Value =
+        serde_json::from_slice(&fs::read(w.out().join("verified.json")).unwrap()).unwrap();
+    assert_eq!(verified["target_word_refinements"], 1);
+}
+
+#[test]
 #[ignore = "requires pinned Lean; scripts/verify.sh runs this"]
 fn original_membership_mutations_break_the_array_contracts() {
     let w = Work::new();

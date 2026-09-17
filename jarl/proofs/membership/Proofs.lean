@@ -1443,6 +1443,13 @@ theorem word_execution (entries : ArrayStore α) (callback : σ) (bits : Nat)
     rcases width with ((rfl | rfl) | rfl) | rfl <;> decide
   exact runNumericWords_refines _ entries callback bits checked abortOnPanic width capacity divisor_fits
 
+theorem target_word_execution (entries : ArrayStore α) (callback : σ)
+    (checked abortOnPanic : Bool) (capacity : entries.length < 2^target_usize_bits) :
+    membership_Membership_quorum_index_target_words entries callback checked abortOnPanic =
+      membership_Membership_quorum_index entries callback abortOnPanic := by
+  exact membership_Membership_quorum_index_target_refinement entries callback checked abortOnPanic
+    capacity (by decide)
+
 theorem response_budget (entries : ArrayStore α) (callback : σ) (abortOnPanic : Bool) :
     callbackBudget ((membership_Membership_voters entries).length + (membership_Membership_old_voters entries).length + 2)
       (membership_Membership_quorum_index entries callback abortOnPanic) :=

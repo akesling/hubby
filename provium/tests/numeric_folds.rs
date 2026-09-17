@@ -151,3 +151,53 @@ open Provium.State
         assert!(!out.join("verified.json").exists());
     }
 }
+
+#[test]
+#[ignore = "requires pinned Lean and installed wasm32 target; scripts/verify.sh runs this"]
+fn numeric_words_use_the_checked_target_and_reject_a_wrong_width_contract() {
+    let w = Work::new(&format!("#![no_std]\n{SOURCE}"));
+    let project = w.0.join("project.json");
+    let out = w.0.join("out");
+    for (target, bits) in [(None, usize::BITS), (Some("wasm32-unknown-unknown"), 32)] {
+        let proofs = format!(
+            r#"import Generated
+open Provium.State
+theorem target_width : Subject.target_usize_bits = {bits} := by rfl
+theorem target_execution (entries : ArrayStore α) (callback : σ) (checked abortOnPanic : Bool)
+    (capacity : entries.length < 2^Subject.target_usize_bits) :
+    Subject.Table_threshold_target_words entries callback checked abortOnPanic =
+      Subject.Table_threshold entries callback abortOnPanic := by
+  have fits : Subject.Table_threshold_ir.divisor < 2^Subject.target_usize_bits := by
+    rw [target_width]
+    decide
+  exact Subject.Table_threshold_target_refinement entries callback checked abortOnPanic capacity fits
+"#
+        );
+        fs::write(w.0.join("Proofs.lean"), &proofs).unwrap();
+        fs::write(
+            &project,
+            serde_json::json!({
+                "crate_root":"source.rs", "namespace":"Subject", "rust_target":target,
+                "methods":["Table::threshold"], "proofs":"Proofs.lean",
+                "obligations":[{"theorem":"target_execution","function":"Table_threshold"}]
+            })
+            .to_string(),
+        )
+        .unwrap();
+        provium::methods::verify(&project, &out).unwrap();
+        let manifest: serde_json::Value =
+            serde_json::from_slice(&fs::read(out.join("manifest.json")).unwrap()).unwrap();
+        assert_eq!(manifest["target_usize_bits"], bits);
+        let report: serde_json::Value =
+            serde_json::from_slice(&fs::read(out.join("verified.json")).unwrap()).unwrap();
+        assert_eq!(report["target_word_refinements"], 1);
+        fs::write(
+            w.0.join("Proofs.lean"),
+            proofs.replace(&format!("= {bits} :="), &format!("= {} :=", bits + 1)),
+        )
+        .unwrap();
+        let error = provium::methods::verify(&project, &out).unwrap_err();
+        assert!(error.contains("Lean rejected Proofs.lean"), "{error}");
+        assert!(!out.join("verified.json").exists());
+    }
+}
