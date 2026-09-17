@@ -19,6 +19,15 @@ theorem exact_view (bits : Nat) (state : SharedSuffixStore α)
   simpa [JarlView.state_State_write, JarlView.state_State_write_ir,
     JarlView.state_State_write_offset] using result
 
+theorem hard_matches_write (bits : Nat) (state : SharedSuffixStore α)
+    (first : Option Nat) (changed : Bool) (start : Nat)
+    (offset : suffixOffset JarlView.state_State_write_offset bits state.view first = .ok start)
+    (capacity : state.view.lengths ["len"] ≤ state.capacities ["entries"]) :
+    ∃ result, JarlView.state_State_write bits state first changed = .ok result ∧
+      JarlView.state_State_hard (fun path => .other (state.copied path)) = .other result.copied := by
+  refine ⟨_, exact_view bits state first changed start offset capacity, ?_⟩
+  rfl
+
 theorem metadata_only (bits : Nat) (state : SharedSuffixStore α)
     (word : state.view.lengths ["len"] < 2^bits)
     (capacity : state.view.lengths ["len"] ≤ state.capacities ["entries"]) :

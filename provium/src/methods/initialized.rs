@@ -4,7 +4,8 @@
 use super::*;
 
 pub(super) fn supported(m: &Method) -> bool {
-    m.view.is_none()
+    m.getter.is_none()
+        && m.view.is_none()
         && m.array.is_none()
         && m.query.is_none()
         && m.constructor.is_none()

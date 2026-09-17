@@ -1561,3 +1561,22 @@ tests (216.63 seconds), and the complete storage project passed on both captured
 host and wasm32 builds with the new growth contract. Provider ordinary tests,
 provider/Jarl proof-test Clippy, formatting and coverage review passed. Lean ran
 serially under the 16384 MiB cap.
+
+### M1 P02/P04/P10: copied hard-state reads
+
+Provium now admits complete shared-receiver getters for concrete Copy fields.
+The original nested source place is walked separately from the flattened field
+IR, and Lean checks all initialized-memory outcomes as well as shared-loan
+admission. Jarl owns contracts for State::hard and its agreement with the hard
+state returned by State::write. This does not establish Rust type/Copy resolution,
+physical aggregate layout or lifetimes of references embedded in opaque values.
+No production Jarl Rust changed. M1 and M2 remain open.
+
+Validation: twelve kernel statements cover nested reads, memory faults and loan
+admission; two corrupted paths were rejected (12.21 seconds). Four provider
+getters and five consumer obligations passed, and changing the original getter
+body invalidated the contract (28.09 seconds). The complete scalar, constructor
+and getter source-control bundle passed (36.02 seconds). Both affected Jarl
+projects passed on captured host and wasm32 builds. Provider ordinary tests,
+provider/Jarl proof-test Clippy, formatting and current source-coverage review
+passed. Lean remained serial with a 16384 MiB cap.

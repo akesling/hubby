@@ -337,7 +337,7 @@ impl Crate {
             error,
         };
         Ok(Method { name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],
-            iteration:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,view:None,record_at:None,lookup:None,selection:None,relocation:None,buffer:None,constructor:None,query:None,
+            iteration:None,last:None,truncation:None,installation:None,restoration:None,getter: None, enum_projection:None,validator:None,view:None,record_at:None,lookup:None,selection:None,relocation:None,buffer:None,constructor:None,query:None,
             array:Some(arrays::Shape{field:field[0].clone(),capacity:tokens(&array.len),record,predicate:None,projection:None,preserve_slots:false,key:None,upsert:Some(upsert),batch:None,rebuild:None,merge:None,fold:None,numeric:None,scope:"complete existing-key-first optional Copy-record upsert; structural equality and indexed update denotation; Rust source/ownership/layout refinement remains open"}) })
     }
 }

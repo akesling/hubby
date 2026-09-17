@@ -258,6 +258,7 @@ impl Crate {
             truncation: None,
             installation: None,
             restoration: None,
+            getter: None,
             enum_projection: None,
             validator: None,
             view: None,

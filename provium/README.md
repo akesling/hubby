@@ -215,6 +215,15 @@ translation; Rust parsing, configured declaration selection, name/type/place
 resolution and the adequacy of the source-language semantics remain trusted.
 The certificate explicitly leaves `rust_source_preservation_proved` false.
 
+Shared-receiver getters returning concrete Copy fields retain both the flattened
+field path and an independently walked nested source place. Lean checks their
+agreement, initialized-memory outcomes and shared-loan admission. Missing places,
+uninitialized cells, wrong kinds and suspended tickets remain explicit faults.
+Copy declarations are recorded and the original Rust is typechecked; physical
+aggregate layout, name/type/Copy resolution and reference lifetimes inside opaque
+Copy values remain frontend or caller obligations. These contracts do not prove
+Rust lifetime or representation adequacy.
+
 Whole-array and shared-slice iterators support builtin `iter().flatten()` without
 a separate length field. Their denotation retains holes and both iterator ends.
 

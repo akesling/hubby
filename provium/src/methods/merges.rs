@@ -274,7 +274,7 @@ impl Crate {
             insert_error,
             target,
         };
-        Ok(Method {name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],iteration:None,last:None,truncation:None,installation:None,restoration:None,enum_projection:None,validator:None,view:None,record_at:None,lookup:None,selection:None,relocation:None,buffer:None,constructor:None,query:None,array:Some(arrays::Shape{field,capacity,record,predicate:None,projection:None,preserve_slots:false,key:None,upsert:None,batch:None,rebuild:None,merge:Some(Box::new(merge)),fold:None,numeric:None,scope:"complete guarded Copy-array merge with source projection and mapped insertion errors; Rust source/ownership refinement remains open"})})
+        Ok(Method {name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],iteration:None,last:None,truncation:None,installation:None,restoration:None,getter: None, enum_projection:None,validator:None,view:None,record_at:None,lookup:None,selection:None,relocation:None,buffer:None,constructor:None,query:None,array:Some(arrays::Shape{field,capacity,record,predicate:None,projection:None,preserve_slots:false,key:None,upsert:None,batch:None,rebuild:None,merge:Some(Box::new(merge)),fold:None,numeric:None,scope:"complete guarded Copy-array merge with source projection and mapped insertion errors; Rust source/ownership refinement remains open"})})
     }
 }
 pub(super) fn generate(name: &str, merge: &Merge) -> String {

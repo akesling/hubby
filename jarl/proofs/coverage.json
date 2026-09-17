@@ -6381,12 +6381,37 @@
         "R03",
         "R05"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open.",
+      "status": "component_evidence",
+      "note": "Complete original copied-field getter now has a separate nested source-place witness, initialized-memory outcome checks and shared-loan admission refinement. Jarl proves exact hard-state observation and agreement with the hard state returned in Write. Rust parsing/name/type/Copy resolution, physical aggregate representation and reachable caller/lifetime premises remain open.",
       "root_apis": [
         "crate::state::<State < V , S , CAP >>::hard"
       ],
-      "contracts": [],
+      "contracts": [
+        {
+          "project": "proofs/storage/project.json",
+          "theorem": "Storage.hard_copy",
+          "function": "state_State_hard",
+          "evidence": "artifacts/provium/proofs/storage/verified.json"
+        },
+        {
+          "project": "proofs/storage/project.json",
+          "theorem": "Storage.hard_source_read",
+          "function": "state_State_hard",
+          "evidence": "artifacts/provium/proofs/storage/verified.json"
+        },
+        {
+          "project": "proofs/storage/project.json",
+          "theorem": "Storage.hard_loan_read",
+          "function": "state_State_hard",
+          "evidence": "artifacts/provium/proofs/storage/verified.json"
+        },
+        {
+          "project": "proofs/storage-view/project.json",
+          "theorem": "StorageView.hard_matches_write",
+          "function": "state_State_hard",
+          "evidence": "artifacts/provium/proofs/storage-view/verified.json"
+        }
+      ],
       "context": "production"
     },
     "crate::state::<State < V , S , CAP >>::id_at": {

@@ -4,7 +4,8 @@
   "namespace": "JarlView",
   "methods": [
     "state::State::write",
-    "ready::Write::entries"
+    "ready::Write::entries",
+    "state::State::hard"
   ],
   "proofs": "Proofs.lean",
   "obligations": [
@@ -55,6 +56,10 @@
     {
       "theorem": "StorageView.checkpoint_witness",
       "function": "state_State_write"
+    },
+    {
+      "theorem": "StorageView.hard_matches_write",
+      "function": "state_State_hard"
     }
   ],
   "proof_modules": [

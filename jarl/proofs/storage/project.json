@@ -8,7 +8,8 @@
     "state::State::grow",
     "state::State::truncate",
     "state::State::install",
-    "state::State::restore"
+    "state::State::restore",
+    "state::State::hard"
   ],
   "proofs": "Proofs.lean",
   "obligations": [
@@ -191,6 +192,18 @@
     {
       "theorem": "Storage.grow_initialized_moves",
       "function": "state_State_grow"
+    },
+    {
+      "theorem": "Storage.hard_copy",
+      "function": "state_State_hard"
+    },
+    {
+      "theorem": "Storage.hard_source_read",
+      "function": "state_State_hard"
+    },
+    {
+      "theorem": "Storage.hard_loan_read",
+      "function": "state_State_hard"
     }
   ]
 }

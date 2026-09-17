@@ -7,6 +7,8 @@ cargo test --locked --test lean -- --ignored
 cargo test --locked --test methods -- --ignored
 cargo test --locked --test loans -- --ignored
 cargo test --locked --test array_moves -- --ignored
+cargo test --locked --test getters -- --ignored
+cargo test --locked --lib methods::getters::tests -- --ignored
 cargo test --locked --lib methods::source::tests -- --ignored
 cargo test --locked --lib methods::constructor_source::tests -- --ignored
 cargo test --locked --test cargo_capture -- --ignored

@@ -2,6 +2,21 @@ import Generated
 open Provium.State
 namespace Storage
 
+theorem hard_copy (state : Store α) : Jarl.state_State_hard state = state ["hard"] := rfl
+
+theorem hard_source_read (layout : Initialized.Layout) (heap : Initialized.Heap α) (state : Store α)
+    (related : Initialized.Relates layout heap state) (declared : layout ["hard"] = some .payload) :
+    FieldReads.readSourceMemory .payload Jarl.state_State_hard_source_place layout heap =
+      .ok (Jarl.state_State_hard state) :=
+  Jarl.state_State_hard_source_refinement layout heap state related declared
+
+theorem hard_loan_read (world : Loans.World) (owner ticket : Nat)
+    (layout : Initialized.Layout) (heap : Initialized.Heap α) (state : Store α)
+    (related : Initialized.Relates layout heap state) (declared : layout ["hard"] = some .payload)
+    (allowed : Loans.Allowed world owner ticket ⟨["hard"], .shared⟩) :
+    Jarl.state_State_hard_loan world owner ticket layout heap = .ok (Jarl.state_State_hard state) :=
+  Jarl.state_State_hard_loan_refinement world owner ticket layout heap state related declared allowed
+
 -- All translated storage operations preserve this occupied-prefix predicate.
 -- Payloads are opaque owned values; log semantics are separate obligations.
 def Shape (state : BufferState α) (capacity : Nat) : Prop :=

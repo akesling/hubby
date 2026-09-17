@@ -291,6 +291,7 @@ mod tests {
             ("Loans", super::super::LOANS),
             ("ArrayMoves", super::super::ARRAY_MOVES),
             ("ScalarSource", super::super::SCALAR_SOURCE),
+            ("FieldReads", super::super::FIELD_READS),
             ("ConstructorSource", super::super::CONSTRUCTOR_SOURCE),
             ("Audit", super::super::AUDIT),
         ] {
