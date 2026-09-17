@@ -1392,14 +1392,19 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
     let constructor_refinements = constructor_evidence.len();
     let target_refinements = methods.iter().filter(|m| target::numeric(m)).count();
     let array_move_refinements = methods.iter().filter(|m| m.relocation.is_some()).count();
-    let copied_field_refinements = methods.iter().filter(|m| m.getter.is_some()).count();
+    let field_refinements = methods.iter().filter(|m| m.getter.is_some()).count();
+    let borrowed_field_refinements = methods
+        .iter()
+        .filter(|m| m.getter.as_ref().is_some_and(|g| g.borrowed))
+        .count();
+    let copied_field_refinements = field_refinements - borrowed_field_refinements;
     if report.matches("PROVIUM_VERIFIED ").count()
         != methods.len()
             + 4 * initialized_refinements
             + constructor_refinements
             + 2 * target_refinements
             + array_move_refinements
-            + 4 * copied_field_refinements
+            + 4 * field_refinements
             + project.obligations.len()
     {
         return Err("incomplete method axiom audit".into());
@@ -1459,7 +1464,7 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
     let manifest = serde_json::json!({"format":1,"compiler_sha256":hash(fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"scope":"complete explicit method bodies in supported Lean semantics; frontend, field resolution, borrowing/layout refinement and host durability remain trusted; not whole-program correctness", "lean_toolchain":TOOLCHAIN,"rustc":String::from_utf8_lossy(&rustc.stdout).trim(),"rust_target":cargo_build.as_ref().map(|b| b.capture.subject.request.target.clone()).or(project.rust_target),"rust_target_cfg":cfg_text,"target_usize_bits":pointer_bits,"arithmetic_profile":arithmetic_profile,"cargo_build":cargo_build.as_ref().map(build::Build::evidence),"typecheck_args":typecheck_args,"config_sha256":hash(config_bytes),"sources":inputs,"proof_modules":libraries.iter().map(|library| serde_json::json!({"name":library.module,"path":library.path,"artifact":library.artifact,"sha256":hash(&library.source)})).collect::<Vec<_>>(),"methods":methods,"source_interpretations":source_evidence,"constructor_source_interpretations":constructor_evidence,"unproved_methods":krate.inventory().into_iter().filter(|n|!project.methods.contains(n)).collect::<Vec<_>>(),"artifacts":artifacts.iter().map(|(p,t)|(p,hash(t))).collect::<BTreeMap<_,_>>(),"obligations":project.obligations,"audit":report});
     let bytes = serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?;
     fs::write(out.join("manifest.json"), &bytes).map_err(|e| e.to_string())?;
-    fs::write(out.join("verified.json"),serde_json::to_vec_pretty(&serde_json::json!({"manifest_sha256":hash(bytes),"whole_program_proved":false,"complete_method_bodies":methods.len(),"initialized_slot_refinements":initialized_refinements+copied_field_refinements,"copied_field_refinements":copied_field_refinements,"loan_refinements":initialized_refinements+array_move_refinements+copied_field_refinements,"array_move_refinements":array_move_refinements,"source_language_refinements":initialized_refinements+constructor_refinements+copied_field_refinements,"constructor_source_refinements":constructor_refinements,"target_word_refinements":target_refinements,"build_word_refinements":target_refinements,"rust_source_preservation_proved":false,"obligations":project.obligations.len()})).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;
+    fs::write(out.join("verified.json"),serde_json::to_vec_pretty(&serde_json::json!({"manifest_sha256":hash(bytes),"whole_program_proved":false,"complete_method_bodies":methods.len(),"initialized_slot_refinements":initialized_refinements+field_refinements,"copied_field_refinements":copied_field_refinements,"borrowed_field_refinements":borrowed_field_refinements,"loan_refinements":initialized_refinements+array_move_refinements+field_refinements,"array_move_refinements":array_move_refinements,"source_language_refinements":initialized_refinements+constructor_refinements+field_refinements,"constructor_source_refinements":constructor_refinements,"target_word_refinements":target_refinements,"build_word_refinements":target_refinements,"rust_source_preservation_proved":false,"obligations":project.obligations.len()})).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;
     Ok(format!("Verified {} complete method bodies and {} obligations in supported Lean semantics. Whole-program proof remains incomplete.\n{report}",methods.len(),project.obligations.len()))
 }
 

@@ -17,6 +17,59 @@ theorem hard_loan_read (world : Loans.World) (owner ticket : Nat)
     Jarl.state_State_hard_loan world owner ticket layout heap = .ok (Jarl.state_State_hard state) :=
   Jarl.state_State_hard_loan_refinement world owner ticket layout heap state related declared allowed
 
+theorem snapshot_none (owner ticket : Nat) (state : Store α)
+    (absent : state ["snapshot"] = .absent) :
+    Jarl.state_State_snapshot owner ticket state = .ok none := by
+  simp [Jarl.state_State_snapshot, Jarl.state_State_snapshot_ir, absent, FieldReads.Borrowed.select]
+
+theorem snapshot_some (owner ticket : Nat) (state : Store α) (payload : α)
+    (present : state ["snapshot"] = .other payload) :
+    Jarl.state_State_snapshot owner ticket state = .ok (some ⟨owner, ticket, ["snapshot"]⟩) := by
+  simp [Jarl.state_State_snapshot, Jarl.state_State_snapshot_ir, present, FieldReads.Borrowed.select]
+
+theorem snapshot_borrowed_payload (world : Loans.World) (owner ticket : Nat)
+    (layout : Initialized.Layout) (heap : Initialized.Heap α) (state : Store α) (payload : α)
+    (related : Initialized.Relates layout heap state) (declared : layout ["snapshot"] = some .optional)
+    (live : FieldReads.Borrowed.Live world ⟨owner, ticket, ["snapshot"]⟩)
+    (present : state ["snapshot"] = .other payload) :
+    Jarl.state_State_snapshot owner ticket state = .ok (some ⟨owner, ticket, ["snapshot"]⟩) ∧
+    Jarl.state_State_snapshot_loan world owner ticket layout heap = .ok (some ⟨owner, ticket, ["snapshot"]⟩) ∧
+    FieldReads.Borrowed.dereference world ⟨owner, ticket, ["snapshot"]⟩ layout heap = .ok payload := by
+  refine ⟨snapshot_some owner ticket state payload present, ?_,
+    FieldReads.Borrowed.dereference_present related declared live present⟩
+  rw [Jarl.state_State_snapshot_loan_refinement world owner ticket layout heap state related declared live,
+    snapshot_some owner ticket state payload present]
+  rfl
+
+theorem snapshot_excludes_writes (world : Loans.World) (owner ticket : Nat)
+    (state : Store α) (payload : α) (path : Path) (writer writerTicket : Nat)
+    (valid : Loans.Valid world)
+    (live : FieldReads.Borrowed.Live world ⟨owner, ticket, ["snapshot"]⟩)
+    (present : state ["snapshot"] = .other payload)
+    (write : Loans.Allowed world writer writerTicket ⟨path, .exclusive⟩) :
+    Jarl.state_State_snapshot owner ticket state = .ok (some ⟨owner, ticket, ["snapshot"]⟩) ∧
+    ¬ Loans.Overlap path ["snapshot"] := by
+  refine ⟨snapshot_some owner ticket state payload present, ?_⟩
+  by_cases same : writer = owner
+  · subst writer
+    exact False.elim (FieldReads.Borrowed.same_owner_cannot_write live write)
+  · exact FieldReads.Borrowed.other_owner_cannot_overlap valid live same write
+
+-- Derive lifetime admission from the checked accessor result, rather than
+-- requiring the consumer to assert that the returned reference is live.
+theorem snapshot_result_is_live (world : Loans.World) (owner ticket : Nat)
+    (layout : Initialized.Layout) (heap : Initialized.Heap α)
+    (returned : FieldReads.Borrowed.Reference)
+    (success : Jarl.state_State_snapshot_loan world owner ticket layout heap = .ok (some returned)) :
+    returned = ⟨owner, ticket, ["snapshot"]⟩ ∧ FieldReads.Borrowed.Live world returned ∧
+    (∀ state : Store α, Jarl.state_State_snapshot owner ticket state =
+      FieldReads.Borrowed.select returned (state ["snapshot"])) := by
+  have result := FieldReads.Borrowed.read_returns_live success
+  refine ⟨result.1, result.2, ?_⟩
+  intro state
+  rw [result.1]
+  rfl
+
 -- All translated storage operations preserve this occupied-prefix predicate.
 -- Payloads are opaque owned values; log semantics are separate obligations.
 def Shape (state : BufferState α) (capacity : Nat) : Prop :=

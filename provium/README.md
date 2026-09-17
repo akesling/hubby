@@ -224,6 +224,15 @@ aggregate layout, name/type/Copy resolution and reference lifetimes inside opaqu
 Copy values remain frontend or caller obligations. These contracts do not prove
 Rust lifetime or representation adequacy.
 
+Builtin `Option::as_ref` field getters support opaque generic payloads without
+Copy or Clone. Their returned descriptors retain the field path, owner and ticket
+of an active shared receiver loan. Successful reads imply descriptor liveness;
+each dereference checks it again. Shared authority excludes same-owner writes,
+and valid reservations exclude other-owner overlapping writes. Ending the loan
+invalidates subsequent dereferences. Caller loan preservation, physical payload
+representation, interior mutability and actual Rust lifetime adequacy remain
+separate obligations; these rules describe the conservative logical loan model.
+
 Whole-array and shared-slice iterators support builtin `iter().flatten()` without
 a separate length field. Their denotation retains holes and both iterator ends.
 

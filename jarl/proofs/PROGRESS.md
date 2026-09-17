@@ -1580,3 +1580,40 @@ and getter source-control bundle passed (36.02 seconds). Both affected Jarl
 projects passed on captured host and wasm32 builds. Provider ordinary tests,
 provider/Jarl proof-test Clippy, formatting and current source-coverage review
 passed. Lean remained serial with a 16384 MiB cap.
+
+### M1 P02/P04/P10: borrowed snapshot identity and retained loans
+
+Provium now admits complete builtin Option::as_ref field getters for opaque
+generic payloads without Copy or Clone. Source-place lowering remains independently
+checked. Returned descriptors retain an active shared receiver ticket; ordinary
+read permission through an exclusive active loan is insufficient. Every subsequent
+dereference rechecks liveness. Generic theorems derive liveness and exact identity
+from successful reads and exclude same-owner writes and other-owner overlapping
+writes under valid reservations.
+
+Jarl owns five State::snapshot contracts covering absence, presence, loan-checked
+payload access, write exclusion and successful-result liveness. Rust lifetime
+adequacy, physical layout, interior mutability and preservation of caller loans
+remain explicit obligations. This is a conservative logical loan refinement;
+production Jarl Rust remains unchanged and neither M1 nor M2 is complete.
+
+Validation: twenty-one kernel statements passed, and corrupting shared authority,
+ticket checks or returned identity was rejected (11.26 seconds). The generic
+borrowed getter passed source-derived contracts and rejected a valid Rust change
+to a different field (25.62 seconds). Native non-Copy payload checks verified
+reference identity, repeated reads and exactly-once destruction; rustc rejected
+an escaping reference (0.24 seconds). Both captured host and wasm32 storage
+projects passed all new Jarl contracts. Provider ordinary tests and provider/Jarl
+proof-test Clippy, formatting and source-coverage review passed. A frontend
+routing regression caught by existing indexed-lookup tests was fixed before the
+successful provider rerun. Lean remained serial under the 16384 MiB cap.
+
+The complete enabled Jarl consumer suite passed all 15 tests (246.77 seconds;
+17 optional tests remained ignored). Its first run exposed the replication
+project's imported storage-contract dependency on the new getters; selecting
+both source methods fixed that composition failure before the successful rerun.
+
+Next work: connect constructor field values to initialized layout/heap semantics,
+then derive fresh-state accessor preconditions from construction. The exploratory
+constructor-memory draft was removed when pausing; it is not implemented evidence.
+Continue under CORRECTNESS_PLAN.md and M1_M2.md, with M1 preceding M2.

@@ -128,3 +128,121 @@ theorem source_copied (layout : Initialized.Layout) (heap : Initialized.Heap α)
     assert!(error.contains("Lean rejected Proofs.lean"), "{error}");
     assert!(!out.join("verified.json").exists());
 }
+
+const BORROWED: &str = "struct State<T>{value:Option<T>,backup:Option<T>} impl<T> State<T>{fn value(&self)->Option<&T>{self.value.as_ref()}}";
+#[test]
+fn borrowed_fields_require_builtin_option_and_shared_elided_lifetimes() {
+    let getter = Work::new(BORROWED)
+        .lower("State::value")
+        .unwrap()
+        .getter
+        .unwrap();
+    assert!(getter.borrowed);
+    assert_eq!(getter.path, ["value"]);
+    assert!(getter.copy_declarations.is_empty());
+    for changed in [
+        BORROWED.replace("&self", "&mut self"),
+        BORROWED.replace("Option<&T>", "Option<&mut T>"),
+        BORROWED.replace("Option<&T>", "Option<&'static T>"),
+        BORROWED.replace("as_ref()", "as_mut()"),
+        BORROWED.replace("self.value.as_ref()", "external();self.value.as_ref()"),
+        BORROWED.replace("Option<&T>", "Option<&u64>"),
+        BORROWED.replace("as_ref()", "as_ref::<T>()"),
+    ] {
+        assert!(
+            Work::new(&changed).lower("State::value").is_err(),
+            "accepted {changed}"
+        );
+    }
+}
+
+#[test]
+#[ignore = "requires pinned Lean; scripts/verify.sh runs this"]
+fn borrowed_field_contracts_retain_identity_and_reject_source_drift() {
+    let w = Work::new(BORROWED);
+    fs::write(w.0.join("Proofs.lean"), r#"import Generated
+open Provium.State
+theorem borrowed_none (owner ticket : Nat) (state : Store α) (absent : state ["value"] = .absent) :
+    Subject.State_value owner ticket state = .ok none := by
+  simp [Subject.State_value, Subject.State_value_ir, absent, FieldReads.Borrowed.select]
+theorem borrowed_some (owner ticket : Nat) (state : Store α) (payload : α) (present : state ["value"] = .other payload) :
+    Subject.State_value owner ticket state = .ok (some ⟨owner, ticket, ["value"]⟩) := by
+  simp [Subject.State_value, Subject.State_value_ir, present, FieldReads.Borrowed.select]
+"#).unwrap();
+    let config = w.0.join("project.json");
+    fs::write(
+        &config,
+        serde_json::json!({"crate_root":"lib.rs","namespace":"Subject",
+        "methods":["State::value"],"proofs":"Proofs.lean","obligations":[
+        {"theorem":"borrowed_none","function":"State_value"},
+        {"theorem":"borrowed_some","function":"State_value"}]})
+        .to_string(),
+    )
+    .unwrap();
+    provium::methods::verify(&config, &w.0.join("out")).unwrap();
+    let report: serde_json::Value =
+        serde_json::from_slice(&fs::read(w.0.join("out/verified.json")).unwrap()).unwrap();
+    assert_eq!(report["borrowed_field_refinements"], 1);
+    assert_eq!(report["copied_field_refinements"], 0);
+    fs::write(
+        w.0.join("lib.rs"),
+        BORROWED.replace("self.value.as_ref()", "self.backup.as_ref()"),
+    )
+    .unwrap();
+    assert!(provium::methods::verify(&config, &w.0.join("changed")).is_err());
+}
+
+#[test]
+fn native_borrowed_getter_preserves_location_and_payload_ownership() {
+    let w = Work::new(BORROWED);
+    let program = format!(
+        r#"{BORROWED}
+use std::sync::atomic::{{AtomicUsize,Ordering}};
+static DROPS:AtomicUsize=AtomicUsize::new(0);
+struct Payload(u64);
+impl Drop for Payload{{fn drop(&mut self){{DROPS.fetch_add(1,Ordering::SeqCst);}}}}
+fn main(){{
+ let state=State{{value:Some(Payload(7)),backup:None}};
+ let first=state.value().unwrap();
+ let second=state.value().unwrap();
+ assert!(std::ptr::eq(first,state.value.as_ref().unwrap()));
+ assert!(std::ptr::eq(first,second));
+ assert_eq!(second.0,7);
+ assert_eq!(DROPS.load(Ordering::SeqCst),0);
+ drop(state);
+ assert_eq!(DROPS.load(Ordering::SeqCst),1);
+ let empty:State<Payload>=State{{value:None,backup:None}};
+ assert!(empty.value().is_none());
+}}
+"#
+    );
+    let source = w.0.join("native.rs");
+    let binary = w.0.join("native");
+    fs::write(&source, program).unwrap();
+    let built = std::process::Command::new("rustc")
+        .args(["--edition=2021", "-Adead_code"])
+        .arg(&source)
+        .arg("-o")
+        .arg(&binary)
+        .output()
+        .unwrap();
+    assert!(
+        built.status.success(),
+        "{}",
+        String::from_utf8_lossy(&built.stderr)
+    );
+    assert!(std::process::Command::new(&binary)
+        .status()
+        .unwrap()
+        .success());
+    fs::write(&source, format!("{BORROWED} fn main(){{let r;{{let state=State{{value:Some(7),backup:None}};r=state.value();}}assert_eq!(r,Some(&7));}}")).unwrap();
+    let rejected = std::process::Command::new("rustc")
+        .args(["--edition=2021", "-Adead_code"])
+        .arg(&source)
+        .arg("-o")
+        .arg(&binary)
+        .output()
+        .unwrap();
+    assert!(!rejected.status.success());
+    assert!(String::from_utf8_lossy(&rejected.stderr).contains("does not live long enough"));
+}

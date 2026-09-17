@@ -6785,12 +6785,43 @@
         "R03",
         "R05"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open.",
+      "status": "component_evidence",
+      "note": "Complete builtin Option::as_ref getter with independently walked source place, initialized-memory outcomes and retained shared receiver ticket. Contracts cover None/Some identity, loan-checked payload access, successful-result liveness and exclusion of admitted overlapping writes. Physical layout, Rust lifetime/source adequacy, interior mutability and caller loan preservation remain open.",
       "root_apis": [
         "crate::state::<State < V , S , CAP >>::snapshot"
       ],
-      "contracts": [],
+      "contracts": [
+        {
+          "project": "proofs/storage/project.json",
+          "theorem": "Storage.snapshot_none",
+          "function": "state_State_snapshot",
+          "evidence": "artifacts/provium/proofs/storage/verified.json"
+        },
+        {
+          "project": "proofs/storage/project.json",
+          "theorem": "Storage.snapshot_some",
+          "function": "state_State_snapshot",
+          "evidence": "artifacts/provium/proofs/storage/verified.json"
+        },
+        {
+          "project": "proofs/storage/project.json",
+          "theorem": "Storage.snapshot_borrowed_payload",
+          "function": "state_State_snapshot",
+          "evidence": "artifacts/provium/proofs/storage/verified.json"
+        },
+        {
+          "project": "proofs/storage/project.json",
+          "theorem": "Storage.snapshot_excludes_writes",
+          "function": "state_State_snapshot",
+          "evidence": "artifacts/provium/proofs/storage/verified.json"
+        },
+        {
+          "project": "proofs/storage/project.json",
+          "theorem": "Storage.snapshot_result_is_live",
+          "function": "state_State_snapshot",
+          "evidence": "artifacts/provium/proofs/storage/verified.json"
+        }
+      ],
       "context": "production"
     },
     "crate::state::<State < V , S , CAP >>::truncate": {

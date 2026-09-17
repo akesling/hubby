@@ -10,7 +10,9 @@
     "state::State::install",
     "state::State::restore",
     "node::Node::valid",
-    "state::State::id_at"
+    "state::State::id_at",
+    "state::State::hard",
+    "state::State::snapshot"
   ],
   "proof_modules": [
     {

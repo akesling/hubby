@@ -9,7 +9,8 @@
     "state::State::truncate",
     "state::State::install",
     "state::State::restore",
-    "state::State::hard"
+    "state::State::hard",
+    "state::State::snapshot"
   ],
   "proofs": "Proofs.lean",
   "obligations": [
@@ -204,6 +205,26 @@
     {
       "theorem": "Storage.hard_loan_read",
       "function": "state_State_hard"
+    },
+    {
+      "theorem": "Storage.snapshot_none",
+      "function": "state_State_snapshot"
+    },
+    {
+      "theorem": "Storage.snapshot_some",
+      "function": "state_State_snapshot"
+    },
+    {
+      "theorem": "Storage.snapshot_borrowed_payload",
+      "function": "state_State_snapshot"
+    },
+    {
+      "theorem": "Storage.snapshot_excludes_writes",
+      "function": "state_State_snapshot"
+    },
+    {
+      "theorem": "Storage.snapshot_result_is_live",
+      "function": "state_State_snapshot"
     }
   ]
 }
