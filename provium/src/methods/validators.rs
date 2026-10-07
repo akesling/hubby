@@ -1036,7 +1036,7 @@ impl Crate {
         compiler.bind(binding, ty, false);
         let (expression, result) = compiler.block(&f.block)?;
         Compiler::require(&result, &Ty::Bool)?;
-        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],array:None,query:None,constructor:None,buffer:None,relocation:None,iteration:None,last:None,truncation:None,installation:None,restoration:None,record_at:None,lookup:None,selection:None,getter: None, enum_projection:None,view:None,validator:Some(Validator{input,expression,helpers:compiler.helpers,scope:"complete restricted pure borrowed body with explicit fuel and structural inputs; frontend, borrow/layout preservation and totality remain unproved"})})
+        Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],array:None,query:None,constructor:None,buffer:None,relocation:None,iteration:None,last:None,truncation:None,installation:None,restoration:None,record_at:None,lookup:None,selection:None,getter: None, enum_projection:None,view:None,imperative:None,validator:Some(Validator{input,expression,helpers:compiler.helpers,scope:"complete restricted pure borrowed body with explicit fuel and structural inputs; frontend, borrow/layout preservation and totality remain unproved"})})
     }
 }
 pub(super) fn generate(method: &Method) -> String {

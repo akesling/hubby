@@ -21,6 +21,7 @@ pub(super) fn supported(m: &Method) -> bool {
         && m.restoration.is_none()
         && m.validator.is_none()
         && m.enum_projection.is_none()
+        && m.imperative.is_none()
 }
 
 fn condition(c: &Condition, fields: &mut BTreeMap<Vec<String>, &'static str>) {

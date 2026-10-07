@@ -432,7 +432,7 @@ impl Crate {
             writes: vec![], body: vec![], array: None, query: None, constructor: None,
             buffer: None, relocation: None, selection: None, lookup: None, record_at: None,
             iteration: None, last: None, truncation: None, installation: None, restoration: None,
-            getter: None, enum_projection: None, validator: None,
+            getter: None, enum_projection: None, imperative: None, validator: None,
             view: Some(SharedView { offset, copied: copied.unwrap(), optional: optional.unwrap(), slots: slots.unwrap(), output_type, output_fields,
                 scope: "complete shared suffix record construction and source-resolved base helper; copied metadata and borrowed optional/slice places; bounds faults retained; source layout, borrow lifetimes, and Rust-to-IR preservation remain open" }),
         })

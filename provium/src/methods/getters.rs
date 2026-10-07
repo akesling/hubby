@@ -237,7 +237,7 @@ impl Crate {
                 scope: "complete field getter with separate nested source place, initialized reads and loan admission; borrowed Option results retain an active shared receiver ticket; Rust parsing/type/Copy resolution, lifetimes and physical representation remain trusted" }),
             array: None, query: None, constructor: None, buffer: None, relocation: None,
             selection: None, lookup: None, record_at: None, iteration: None, last: None,
-            truncation: None, installation: None, restoration: None, validator: None,
+            truncation: None, installation: None, restoration: None, imperative: None, validator: None,
             view: None, enum_projection: None,
         })
     }

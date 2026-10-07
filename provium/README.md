@@ -109,6 +109,30 @@ It currently requires a Rust 2021 crate buildable without external dependencies
 by its rustc invocation. This restriction applies to the *subject translation*,
 not to whether a consumer can depend on Provium through Cargo.
 
+A state-method project may also list `imperative_methods`: qualified
+`&self`/`&mut self` methods lowered by the imperative backend instead of by
+shape-directed selection (`methods` may then be empty). Each generated
+`<name> bits checked fuel receiver arguments` runs the complete body in
+`Provium.Imperative`, a value-semantics machine: the receiver is one record value
+in slot 0, parameters follow it, and an assignment replaces a field or array
+element of a slot's value. `checked` is the overflow profile: with overflow
+checks, `+`, `-`, `*` and out-of-range shifts fault as Rust's debug arithmetic
+panics; without them they wrap and shift amounts are masked. Division by zero
+and out-of-range indexing fault in both profiles. `<name>_build` instantiates
+the target width and profile of the verified build. Supported syntax: `let`
+(with optional type), assignment and compound assignment to locals, receiver
+fields and array elements, `if`/`if let`/`match` over `Option`, unit and tuple
+variants with identifier or `_` subpatterns, `return`, unsigned arithmetic,
+comparisons and bitwise operations, the wrapping/saturating/checked arithmetic
+methods, `min`/`max`, `is_some`/`is_none`, struct and variant construction,
+derived equality, and calls to the receiver's own inherent methods, which are
+inlined. Fields the body never reads may have any type, including generic
+parameters. Loops, closures, `?`, references, trait calls and match guards are
+rejected. A fault carries no receiver: partially mutated state under unwinding
+is not modeled. The correspondence between the record value and the Rust
+layout, and the frontend's typing and lowering, are trusted; a differential
+test compares native runs with kernel-reduced results.
+
 Backends interpret standard methods (`Option::as_ref`, `take`, slice sorts,
 derived `Default`) and receiver-local helpers by name, so the loader rejects
 every crate shape that could make Rust's method probe choose something else:

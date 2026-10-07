@@ -27,6 +27,7 @@ const SCALAR_SEMANTICS: &str = include_str!("../lean/Provium/Semantics.lean");
 const RANK_ARITHMETIC: &str = include_str!("../lean/Provium/RankArithmetic.lean");
 const NUMERIC_FOLDS: &str = include_str!("../lean/Provium/NumericFolds.lean");
 const ORDER_STATISTICS: &str = include_str!("../lean/Provium/OrderStatistics.lean");
+const IMPERATIVE: &str = include_str!("../lean/Provium/Imperative.lean");
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Project {
@@ -37,6 +38,10 @@ pub struct Project {
     pub cargo_build: Option<PathBuf>,
     pub namespace: String,
     pub methods: Vec<String>,
+    /// Receiver methods lowered by the imperative backend instead of by
+    /// shape-directed selection.
+    #[serde(default)]
+    pub imperative_methods: Vec<String>,
     pub proofs: PathBuf,
     #[serde(default)]
     pub proof_modules: Vec<ProofModule>,
@@ -116,6 +121,7 @@ pub struct Method {
     pub installation: Option<installations::Installation>,
     pub restoration: Option<restorations::Restoration>,
     pub validator: Option<validators::Validator>,
+    pub imperative: Option<imperative::Imperative>,
     pub view: Option<views::SharedView>,
     pub enum_projection: Option<enum_projections::Projection>,
 }
@@ -957,6 +963,7 @@ impl Crate {
             restoration: None,
             getter: None,
             enum_projection: None,
+            imperative: None,
             validator: None,
             view: None,
         })
@@ -1235,7 +1242,7 @@ fn executable(body: &[Statement], indent: usize) -> String {
     text
 }
 pub fn generate(methods: &[Method], namespace: &str) -> String {
-    let mut text=format!("-- Generated from complete Rust method bodies; no sliced statements.\nimport Provium.State\nimport Provium.Loans\nimport Provium.ArrayMoves\nimport Provium.ScalarSource\nimport Provium.FieldReads\nimport Provium.ConstructorSource\nimport Provium.NumericFolds\nnamespace {namespace}\nopen Provium.State\n");
+    let mut text=format!("-- Generated from complete Rust method bodies; no sliced statements.\nimport Provium.State\nimport Provium.Loans\nimport Provium.ArrayMoves\nimport Provium.ScalarSource\nimport Provium.FieldReads\nimport Provium.ConstructorSource\nimport Provium.NumericFolds\n{}namespace {namespace}\nopen Provium.State\n", if methods.iter().any(|m| m.imperative.is_some()) { "import Provium.Imperative\n" } else { "" });
     for method in methods {
         let name = &method.symbol;
         if method.getter.is_some() {
@@ -1244,6 +1251,10 @@ pub fn generate(methods: &[Method], namespace: &str) -> String {
         }
         if method.validator.is_some() {
             text.push_str(&validators::generate(method));
+            continue;
+        }
+        if method.imperative.is_some() {
+            text.push_str(&imperative::generate(method));
             continue;
         }
         if method.enum_projection.is_some() {
@@ -1327,7 +1338,7 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
     let config_bytes = fs::read(config).map_err(|e| e.to_string())?;
     let project: Project = serde_json::from_slice(&config_bytes).map_err(|e| e.to_string())?;
     if !identifier(&project.namespace)
-        || project.methods.is_empty()
+        || (project.methods.is_empty() && project.imperative_methods.is_empty())
         || project.obligations.is_empty()
     {
         return Err("valid namespace, selected methods, and obligations required".into());
@@ -1367,6 +1378,12 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
         .methods
         .iter()
         .map(|m| krate.lower(m))
+        .chain(
+            project
+                .imperative_methods
+                .iter()
+                .map(|m| krate.lower_imperative(m)),
+        )
         .collect::<Result<Vec<_>, _>>()?;
     let mut symbols = std::collections::BTreeSet::from([
         "target_usize_bits".to_owned(),
@@ -1404,6 +1421,7 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
             format!("{}_heap_refinement", m.symbol),
             format!("{}_loan", m.symbol),
             format!("{}_indices", m.symbol),
+            format!("{}_build", m.symbol),
         ] {
             if !identifier(&name) || !symbols.insert(name) {
                 return Err("invalid/colliding generated method symbol".into());
@@ -1583,6 +1601,7 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
         ("Provium/Semantics.lean", SCALAR_SEMANTICS),
         ("Provium/RankArithmetic.lean", RANK_ARITHMETIC),
         ("Provium/NumericFolds.lean", NUMERIC_FOLDS),
+        ("Provium/Imperative.lean", IMPERATIVE),
         ("Provium/Audit.lean", AUDIT),
         ("Generated.lean", &generated),
         ("Proofs.lean", &proofs),
@@ -1627,6 +1646,7 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
             "Provium/NumericFolds.lean",
             Some("Provium/NumericFolds.olean"),
         ),
+        ("Provium/Imperative.lean", Some("Provium/Imperative.olean")),
         ("Provium/Audit.lean", Some("Provium/Audit.olean")),
         ("Generated.lean", Some("Generated.olean")),
     ] {
@@ -1715,6 +1735,7 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
         "Provium/Semantics.olean",
         "Provium/RankArithmetic.olean",
         "Provium/NumericFolds.olean",
+        "Provium/Imperative.olean",
         "Provium/Audit.olean",
         "Generated.olean",
         "Proofs.olean",
@@ -1724,7 +1745,7 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
     for library in &libraries {
         workspace.publish(&library.artifact.replace(".lean", ".olean"), &out)?;
     }
-    let manifest = serde_json::json!({"format":1,"compiler_sha256":hash(fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"scope":"complete explicit method bodies in supported Lean semantics; frontend, field resolution, borrowing/layout refinement and host durability remain trusted; not whole-program correctness", "lean_toolchain":TOOLCHAIN,"rustc":String::from_utf8_lossy(&rustc.stdout).trim(),"rust_target":cargo_build.as_ref().map(|b| b.capture.subject.request.target.clone()).or(project.rust_target),"rust_target_cfg":cfg_text,"target_usize_bits":pointer_bits,"arithmetic_profile":arithmetic_profile,"arithmetic_profile_source":if cargo_build.is_some(){"cargo_build"}else{"synthetic_typecheck: Provium's own -C overflow-checks=yes invocation; says nothing about consumer builds"},"cargo_build":cargo_build.as_ref().map(build::Build::evidence),"typecheck_args":typecheck_args,"config_sha256":hash(config_bytes),"sources":inputs,"proof_modules":libraries.iter().map(|library| serde_json::json!({"name":library.module,"path":library.path,"artifact":library.artifact,"sha256":hash(&library.source)})).collect::<Vec<_>>(),"methods":methods,"source_interpretations":source_evidence,"constructor_source_interpretations":constructor_evidence,"unproved_methods":krate.inventory().into_iter().filter(|n|!project.methods.contains(n)).collect::<Vec<_>>(),"artifacts":artifacts.iter().map(|(p,t)|(p,hash(t))).collect::<BTreeMap<_,_>>(),"obligations":project.obligations,"audit":report});
+    let manifest = serde_json::json!({"format":1,"compiler_sha256":hash(fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"scope":"complete explicit method bodies in supported Lean semantics; frontend, field resolution, borrowing/layout refinement and host durability remain trusted; not whole-program correctness", "lean_toolchain":TOOLCHAIN,"rustc":String::from_utf8_lossy(&rustc.stdout).trim(),"rust_target":cargo_build.as_ref().map(|b| b.capture.subject.request.target.clone()).or(project.rust_target),"rust_target_cfg":cfg_text,"target_usize_bits":pointer_bits,"arithmetic_profile":arithmetic_profile,"arithmetic_profile_source":if cargo_build.is_some(){"cargo_build"}else{"synthetic_typecheck: Provium's own -C overflow-checks=yes invocation; says nothing about consumer builds"},"cargo_build":cargo_build.as_ref().map(build::Build::evidence),"typecheck_args":typecheck_args,"config_sha256":hash(config_bytes),"sources":inputs,"proof_modules":libraries.iter().map(|library| serde_json::json!({"name":library.module,"path":library.path,"artifact":library.artifact,"sha256":hash(&library.source)})).collect::<Vec<_>>(),"methods":methods,"source_interpretations":source_evidence,"constructor_source_interpretations":constructor_evidence,"unproved_methods":krate.inventory().into_iter().filter(|n|!project.methods.contains(n)&&!project.imperative_methods.contains(n)).collect::<Vec<_>>(),"artifacts":artifacts.iter().map(|(p,t)|(p,hash(t))).collect::<BTreeMap<_,_>>(),"obligations":project.obligations,"audit":report});
     let bytes = serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?;
     fs::write(out.join("manifest.json"), &bytes).map_err(|e| e.to_string())?;
     crate::project::publish_certificate(&out,serde_json::to_vec_pretty(&serde_json::json!({"manifest_sha256":hash(bytes),"whole_program_proved":false,"complete_method_bodies":methods.len(),"initialized_slot_refinements":initialized_refinements+field_refinements,"copied_field_refinements":copied_field_refinements,"borrowed_field_refinements":borrowed_field_refinements,"loan_refinements":initialized_refinements+array_move_refinements+field_refinements,"array_move_refinements":array_move_refinements,"source_language_refinements":initialized_refinements+constructor_refinements+field_refinements,"constructor_source_refinements":constructor_refinements,"target_word_refinements":target_refinements,"build_word_refinements":target_refinements,"rust_source_preservation_proved":false,"obligations":project.obligations.len()})).map_err(|e|e.to_string())?)?;
@@ -1758,6 +1779,7 @@ pub mod restorations;
 
 pub mod enum_projections;
 
+pub mod imperative;
 pub mod validators;
 
 pub mod views;

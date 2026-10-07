@@ -59,6 +59,12 @@ pub(super) fn generate(
             "def {name}_build_words (entries : ArrayStore α) (callback : σ) : CallbackRun α σ UInt64 UInt64 :=\n  {name}_target_words entries callback target_overflow_checked target_panic_abort\ntheorem {name}_build_refinement (entries : ArrayStore α) (callback : σ)\n    (capacity : entries.length < 2^target_usize_bits)\n    (divisor : {name}_ir.divisor < 2^target_usize_bits) :\n    {name}_build_words entries callback = {name} entries callback target_panic_abort := by\n  exact {name}_target_refinement entries callback target_overflow_checked target_panic_abort capacity divisor\n"
         ));
     }
+    for method in methods.iter().filter(|m| m.imperative.is_some()) {
+        let name = &method.symbol;
+        output.push_str(&format!(
+            "def {name}_build (fuel : Nat) (receiver : PureValue) (arguments : List PureValue) : Except Provium.Imperative.Fault (PureValue × PureValue) :=\n  {name} target_usize_bits target_overflow_checked fuel receiver arguments\n"
+        ));
+    }
     output.push_str(&format!("end {namespace}\n"));
     output
 }
