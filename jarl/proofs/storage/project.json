@@ -147,6 +147,10 @@
       "function": "state_State_restore"
     },
     {
+      "theorem": "Storage.restoration_accepts",
+      "function": "state_State_restore"
+    },
+    {
       "theorem": "Storage.growth_preserves_log",
       "function": "state_State_grow"
     },

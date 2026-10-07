@@ -51,7 +51,7 @@ concrete host witnesses. It does not establish source-level protocol correctness
 | [input-gating](input-gating/Proofs.lean) | Complete `Node::available` and `idle`: exact Result, dirty-state/reply/outbox rejection, and clean/drained admission over arbitrary outbox lengths |
 | [capacity](capacity/Proofs.lean) | Complete `State::full`: exact equality against the original const-generic capacity; non-full implies room under the separate `len ≤ CAP` representation invariant |
 | [log-boundary](log-boundary/Proofs.lean) | Complete `State::base`, `get`, `id_at`, `entries` and `last`: snapshot boundary, checked borrowed lookup, ordered prefix iteration, and exact boundary/final-entry records |
-| [storage](storage/Proofs.lean) | Complete `State::push`, `new`, `grow`, `truncate`, `install` and `restore`: no-drop append/growth, occupied-prefix/capacity and metadata preservation, explicit destruction boundaries, and induction over histories with changing capacity |
+| [storage](storage/Proofs.lean) | Complete `State::push`, `new`, `grow`, `truncate`, `install` and `restore`: no-drop append/growth, occupied-prefix/capacity and metadata preservation, explicit destruction boundaries, induction over histories with changing capacity, and restore soundness and completeness (valid checkpoints are accepted with exactly their entries) |
 | [storage-view](storage-view/Proofs.lean) | Complete `State::write` and `Write::entries`: exact view, rebased borrowed locations and payload suffix; conditional atomic checkpoint equivalence and retry idempotence from explicit log/snapshot/index premises; caller preservation, source/heap refinement and storage-adapter correctness remain open |
 | [initialization](initialization/Proofs.lean) | Complete `State::new`: initial hard-state fields, absent snapshot, all slots empty for arbitrary capacity, and initial `len ≤ CAP` |
 
@@ -188,6 +188,13 @@ indices are consecutive from the snapshot boundary, terms are positive and
 nondecreasing, and all terms are bounded by the hard-state term. Exact-index
 contracts bind live slots and the original last() result to their offsets.
 Snapshot validity and the term-zero vote rule are checked from the initial guard.
+Restoration is also complete for valid checkpoints: `restoration_accepts` shows
+that every checkpoint meeting those conditions (nonzero snapshot id, snapshot
+term at most the hard term, no vote at term zero, an ordered chain that fits the
+capacity, and commit between the snapshot index and the last index) has a
+normally returning run that yields exactly its entries. A guard that rejects more
+than the source's validity conditions therefore fails the proof; the storage
+mutation test strengthens three guards to check this.
 Growth and truncation preserve this logical representation: growth retains the
 chain, and truncation retains an ordered prefix. Append preserves the chain under explicit successor/term preconditions.
 Truncation proves an exact retained length and protects committed entries when

@@ -1862,4 +1862,250 @@ theorem truncation_retains_base (view : α → Path → InitStore) (records : Se
   simpa [lastRecord,iterateRecords,truncationView,Jarl.state_State_truncate_ir,empty,presentPlaces]
     using congrArg (Except.ok (ε := TraversalFault)) selected
 
+private theorem ordered_nil (view : α → Path → InitStore) (hard base last : InitStore)
+    (chain : OrderedEntries view hard base [] last) : last = base := by
+  generalize empty : ([] : List α) = entries at chain
+  cases chain with
+  | empty => rfl
+  | snoc => simp at empty
+
+private theorem ordered_single (view : α → Path → InitStore) (hard base last : InitStore) (entry : α)
+    (chain : OrderedEntries view hard base [entry] last) :
+    last = view entry ["id"] ∧ ∃ previousIndex index previousTerm term hardTerm,
+      recordWord base ["index"] = some previousIndex ∧
+      recordWord (view entry ["id"]) ["index"] = some index ∧
+      recordWord base ["term"] = some previousTerm ∧
+      recordWord (view entry ["id"]) ["term"] = some term ∧
+      recordWord hard ["term"] = some hardTerm ∧
+      index = previousIndex + 1 ∧ index < 2^64 ∧ 0 < term ∧ previousTerm ≤ term ∧ term ≤ hardTerm := by
+  generalize single : [entry] = entries at chain
+  cases chain with
+  | empty => simp at single
+  | @snoc entries previous final previousIndex index previousTerm term hardTerm inner previousRead indexRead previousTermRead termRead hardRead successor range positive monotone upper =>
+    have nil : entries = [] := by
+      have size := congrArg List.length single
+      simp only [List.length_append,List.length_cons,List.length_nil] at size
+      exact List.eq_nil_of_length_eq_zero (by omega)
+    subst entries
+    have same : entry = final := by simpa using single
+    subst final
+    have rooted := ordered_nil view hard base previous inner
+    subst previous
+    exact ⟨rfl,previousIndex,index,previousTerm,term,hardTerm,previousRead,indexRead,previousTermRead,termRead,hardRead,
+      successor,range,positive,monotone,upper⟩
+
+private theorem ordered_head (view : α → Path → InitStore) (hard base last : InitStore) (entry : α) (rest : List α)
+    (chain : OrderedEntries view hard base (entry :: rest) last) :
+    OrderedEntries view hard (view entry ["id"]) rest last ∧ ∃ previousIndex index previousTerm term hardTerm,
+      recordWord base ["index"] = some previousIndex ∧
+      recordWord (view entry ["id"]) ["index"] = some index ∧
+      recordWord base ["term"] = some previousTerm ∧
+      recordWord (view entry ["id"]) ["term"] = some term ∧
+      recordWord hard ["term"] = some hardTerm ∧
+      index = previousIndex + 1 ∧ index < 2^64 ∧ 0 < term ∧ previousTerm ≤ term ∧ term ≤ hardTerm := by
+  obtain ⟨middle,first,remaining⟩ := ordered_split view hard base (entry :: rest) last chain 1 (by simp)
+  simp only [List.take_succ_cons,List.take_zero,List.drop_succ_cons,List.drop_zero] at first remaining
+  obtain ⟨same,reads⟩ := ordered_single view hard base middle entry first
+  subst middle
+  exact ⟨remaining,reads⟩
+
+-- The converse of accepted_entry_order: a well-formed successor passes the guard.
+private theorem entry_guard_accepts (view : α → Path → InitStore)
+    (snapshotView : β → Path → InitStore) (hardView : δ → InitStore) (hardPresence : δ → Path → Bool)
+    (context : RecoveryContext α β δ) (previousIndex index previousTerm term hardTerm : Nat)
+    (previousRead : recordWord context.last ["index"] = some previousIndex)
+    (indexRead : recordWord context.entry ["index"] = some index)
+    (previousTermRead : recordWord context.last ["term"] = some previousTerm)
+    (termRead : recordWord context.entry ["term"] = some term)
+    (hardRead : recordWord (hardView context.state.hard) ["term"] = some hardTerm)
+    (successor : index = previousIndex + 1) (range : index < 2^64) (positive : 0 < term)
+    (monotone : previousTerm ≤ term) (upper : term ≤ hardTerm) :
+    recoveryPredicate Jarl.state_State_restore_ir view snapshotView hardView hardPresence
+      context Jarl.state_State_restore_ir.entryGuard = .ok false := by
+  subst index
+  have fits : previousIndex + 1 < 2^64 := range
+  simp [Jarl.state_State_restore_ir,recoveryPredicate,recoveryValue,bind,Except.bind,
+    previousRead,indexRead,previousTermRead,termRead,hardRead,fits]
+  have nonzero : term ≠ 0 := by omega
+  have ordered : ¬ term < previousTerm := by omega
+  have bounded : ¬ hardTerm < term := by omega
+  simp [nonzero,ordered,bounded]
+
+-- The recovery state holding exactly `entries` followed by empty slots.
+def Restored (entries : List α) (padding : Nat) (hard : δ) (snapshot : Option β) : RecoveryState α β δ :=
+  ⟨⟨entries.map some ++ List.replicate padding none,entries.length⟩,hard,snapshot⟩
+
+private theorem restored_shape (entries : List α) (padding : Nat) :
+    Shape (⟨entries.map some ++ List.replicate padding none,entries.length⟩ : BufferState α)
+      (entries.length + padding) := by
+  refine ⟨by simp,by simp,?_,?_⟩
+  · intro i inside
+    refine ⟨entries[i]'inside,?_⟩
+    rw [List.getElem?_append_left (by simpa using inside)]
+    simp [inside]
+  · intro i outside bound
+    dsimp at outside
+    rw [List.getElem?_append_right (by simpa using outside)]
+    simp only [List.length_map,List.getElem?_replicate]
+    rw [if_pos (by omega)]
+
+private theorem restored_last_empty (view : α → Path → InitStore) (snapshotView : β → Path → InitStore)
+    (padding : Nat) (hard : δ) (snapshot : Option β) :
+    recoveryLast Jarl.state_State_restore_ir view snapshotView (Restored [] padding hard snapshot) =
+      .ok (selectRecord Jarl.state_State_restore_ir.last.base (fun _ => snapshot.map snapshotView)) := by
+  simp [Restored,recoveryLast,lastRecord,iterateRecords,truncationView,Jarl.state_State_restore_ir]
+  rfl
+
+private theorem restored_last_snoc (view : α → Path → InitStore) (snapshotView : β → Path → InitStore)
+    (entries : List α) (entry : α) (padding : Nat) (hard : δ) (snapshot : Option β) :
+    recoveryLast Jarl.state_State_restore_ir view snapshotView (Restored (entries ++ [entry]) padding hard snapshot) =
+      .ok (view entry ["id"]) := by
+  have lookup := last_before_truncation view (recoveryRecords snapshotView (Restored (entries ++ [entry]) padding hard snapshot))
+    (entries.map some) (List.replicate padding none) entry
+  unfold recoveryLast
+  rw [show Jarl.state_State_restore_ir.last = Jarl.state_State_truncate_ir.last by rfl]
+  have buffer : (Restored (entries ++ [entry]) padding hard snapshot).buffer =
+      ⟨(entries.map some ++ [some entry]) ++ List.replicate padding none,(entries.map some).length + 1⟩ := by
+    simp [Restored]
+  rw [buffer,lookup]
+
+private theorem restored_push (bits capacity : Nat) (entries : List α) (entry : α) (hard : δ) (snapshot : Option β)
+    (space : entries.length < capacity) (word : capacity < 2^bits) :
+    Jarl.state_State_push bits capacity (Restored entries (capacity - entries.length) hard snapshot).buffer entry =
+      .returned (.ok ()) (Restored (entries ++ [entry]) (capacity - (entries ++ [entry]).length) hard snapshot).buffer := by
+  have shape := restored_shape entries (capacity - entries.length)
+  rw [show entries.length + (capacity - entries.length) = capacity by omega] at shape
+  show Jarl.state_State_push bits capacity ⟨entries.map some ++ List.replicate (capacity - entries.length) none,entries.length⟩ entry = _
+  rw [append_exact bits capacity _ entry shape space word]
+  obtain ⟨remaining,padding⟩ : ∃ remaining, capacity - entries.length = remaining + 1 := ⟨capacity - entries.length - 1,by omega⟩
+  have rest : capacity - (entries ++ [entry]).length = remaining := by simp only [List.length_append,List.length_singleton];omega
+  simp only [Restored,padding,rest]
+  simp [List.set_append_right,List.replicate_succ,List.map_append,List.append_assoc]
+
+private theorem recovery_loop_accepts (bits capacity : Nat) (view : α → Path → InitStore)
+    (snapshotView : β → Path → InitStore) (hardView : δ → InitStore) (hardPresence : δ → Path → Bool)
+    (hard : δ) (snapshot : Option β) (base final : InitStore) (iterator : ι) (word : capacity < 2^bits)
+    (finish : ∀ entries : List α,
+      recoveryLast Jarl.state_State_restore_ir view snapshotView (Restored entries (capacity - entries.length) hard snapshot) = .ok final →
+      recoveryPredicate Jarl.state_State_restore_ir view snapshotView hardView hardPresence
+        ⟨Restored entries (capacity - entries.length) hard snapshot,base,(fun _ => .absent),(fun _ => .absent)⟩
+        Jarl.state_State_restore_ir.finalGuard = .ok false) :
+    ∀ (rest entries : List α) (middle : InitStore) (fuel : Nat),
+      recoveryLast Jarl.state_State_restore_ir view snapshotView (Restored entries (capacity - entries.length) hard snapshot) = .ok middle →
+      OrderedEntries view (hardView hard) middle rest final →
+      entries.length + rest.length ≤ capacity → rest.length < fuel →
+      RecoveryReturns (recoveryLoop Jarl.state_State_restore_ir bits capacity view snapshotView hardView hardPresence base fuel
+        (Restored entries (capacity - entries.length) hard snapshot) iterator : RecoveryRun α β δ σ ι)
+        (.ok (Restored (entries ++ rest) (capacity - (entries ++ rest).length) hard snapshot)) := by
+  intro rest
+  induction rest with
+  | nil =>
+    intro entries middle fuel fetched chain _ budget
+    obtain ⟨fuel,rfl⟩ : ∃ previous, fuel = previous + 1 := ⟨fuel - 1,by simp at budget;omega⟩
+    have same := ordered_nil view (hardView hard) middle final chain
+    subst middle
+    simp only [recoveryLoop,recovery_returns_next]
+    refine ⟨none,iterator,?_⟩
+    simp only [recovery_returns_dropIterator,recoveryFinish,finish entries fetched,List.append_nil]
+    exact .returned _
+  | cons entry rest ih =>
+    intro entries middle fuel fetched chain room budget
+    obtain ⟨fuel,rfl⟩ : ∃ previous, fuel = previous + 1 := ⟨fuel - 1,by simp at budget;omega⟩
+    obtain ⟨remaining,previousIndex,index,previousTerm,term,hardTerm,previousRead,indexRead,previousTermRead,termRead,hardRead,
+      successor,range,positive,monotone,upper⟩ := ordered_head view (hardView hard) middle final entry rest chain
+    simp only [recoveryLoop,recovery_returns_next]
+    refine ⟨some entry,iterator,?_⟩
+    dsimp only
+    rw [fetched]
+    dsimp only
+    rw [entry_guard_accepts view snapshotView hardView hardPresence
+      ⟨Restored entries (capacity - entries.length) hard snapshot,base,middle,view entry Jarl.state_State_restore_ir.last.recordField⟩
+      previousIndex index previousTerm term hardTerm previousRead indexRead previousTermRead termRead hardRead
+      successor range positive monotone upper]
+    dsimp only
+    have space : entries.length < capacity := by simp at room;omega
+    rw [show appendBuffer Jarl.state_State_restore_ir.append bits capacity
+        (Restored entries (capacity - entries.length) hard snapshot).buffer entry =
+        Jarl.state_State_push bits capacity (Restored entries (capacity - entries.length) hard snapshot).buffer entry by rfl,
+      restored_push bits capacity entries entry hard snapshot space word]
+    simp only [recoveryAppend]
+    have continued := ih (entries ++ [entry]) (view entry ["id"]) fuel
+      (restored_last_snoc view snapshotView entries entry _ hard snapshot) remaining
+      (by simp at room ⊢;omega) (by simp at budget;omega)
+    rw [show (entries ++ [entry]) ++ rest = entries ++ entry :: rest by simp] at continued
+    exact continued
+
+-- Completeness of restore: every validated checkpoint (nonzero snapshot id,
+-- snapshot term at most the hard term, no vote at term zero, an ordered entry
+-- chain rooted at the snapshot that fits the capacity, and commit between the
+-- snapshot index and the last index) has a normally returning execution that
+-- yields exactly those entries, for any iterator handle the source yields.
+theorem restoration_accepts (bits : Nat) (sizes : String → Nat)
+    (view : α → Path → InitStore) (snapshotView : β → Path → InitStore)
+    (hardView : δ → InitStore) (hardPresence : δ → Path → Bool)
+    (hard : δ) (snapshot : Option β) (source : σ) (iterator : ι)
+    (entries : List α) (last : InitStore) (baseIndex baseTerm hardTerm commit : Nat)
+    (word : sizes "CAP" < 2^bits)
+    (baseIndexRead : recordWord (selectRecord Jarl.state_State_restore_ir.last.base (fun _ => snapshot.map snapshotView)) ["index"] = some baseIndex)
+    (baseTermRead : recordWord (selectRecord Jarl.state_State_restore_ir.last.base (fun _ => snapshot.map snapshotView)) ["term"] = some baseTerm)
+    (hardTermRead : recordWord (hardView hard) ["term"] = some hardTerm)
+    (commitRead : recordWord (hardView hard) ["commit"] = some commit)
+    (snapshotNonzero : snapshot.isSome → baseIndex ≠ 0 ∧ baseTerm ≠ 0)
+    (termBound : baseTerm ≤ hardTerm)
+    (noVote : hardTerm = 0 → hardPresence hard ["voted_for"] = false)
+    (chain : OrderedEntries view (hardView hard)
+      (selectRecord Jarl.state_State_restore_ir.last.base (fun _ => snapshot.map snapshotView)) entries last)
+    (room : entries.length ≤ sizes "CAP")
+    (lower : baseIndex ≤ commit) (upper : commit ≤ baseIndex + entries.length) :
+    RecoveryReturns (Jarl.state_State_restore bits sizes view snapshotView hardView hardPresence hard snapshot source : RecoveryRun α β δ σ ι)
+      (.ok (Restored entries (sizes "CAP" - entries.length) hard snapshot)) := by
+  have restoredHard : ∀ (list : List α) padding, (Restored list padding hard snapshot).hard = hard := fun _ _ => rfl
+  have initialGuard : Jarl.state_State_restore_ir.initialGuard =
+      .or (.or (.and .snapshotPresent (.or (.compare "eq" (.base ["index"]) (.constant 0)) (.compare "eq" (.base ["term"]) (.constant 0))))
+        (.compare "gt" (.base ["term"]) (.hard ["term"]))) (.and (.compare "eq" (.hard ["term"]) (.constant 0)) (.hardPresent ["voted_for"])) := rfl
+  have finalGuard : Jarl.state_State_restore_ir.finalGuard =
+      .or (.compare "lt" (.hard ["commit"]) (.base ["index"])) (.compare "gt" (.hard ["commit"]) (.callLast ["index"])) := rfl
+  have initialOk : recoveryPredicate Jarl.state_State_restore_ir view snapshotView hardView hardPresence
+      ⟨⟨⟨List.replicate (sizes "CAP") none,0⟩,hard,snapshot⟩,
+        selectRecord Jarl.state_State_restore_ir.last.base (fun _ => snapshot.map snapshotView),
+        (fun _ => .absent),(fun _ => .absent)⟩ Jarl.state_State_restore_ir.initialGuard = .ok false := by
+    rw [initialGuard]
+    by_cases zero : hardTerm = 0
+    · cases snapshot <;> simp_all [recoveryPredicate,recoveryValue,bind,Except.bind]
+    · cases snapshot <;> simp_all [recoveryPredicate,recoveryValue,bind,Except.bind]
+  have lastIndex := ordered_last_index view (hardView hard) _ entries last baseIndex baseIndexRead chain
+  have finish : ∀ list : List α,
+      recoveryLast Jarl.state_State_restore_ir view snapshotView (Restored list (sizes "CAP" - list.length) hard snapshot) = .ok last →
+      recoveryPredicate Jarl.state_State_restore_ir view snapshotView hardView hardPresence
+        ⟨Restored list (sizes "CAP" - list.length) hard snapshot,
+          selectRecord Jarl.state_State_restore_ir.last.base (fun _ => snapshot.map snapshotView),(fun _ => .absent),(fun _ => .absent)⟩
+        Jarl.state_State_restore_ir.finalGuard = .ok false := by
+    intro list fetched
+    rw [finalGuard]
+    simp [recoveryPredicate,recoveryValue,bind,Except.bind,pure,Except.pure,restoredHard,commitRead,baseIndexRead,fetched,lastIndex]
+    have above : ¬ commit < baseIndex := by omega
+    have below : ¬ baseIndex + entries.length < commit := by omega
+    simp [above,below]
+  have loop := recovery_loop_accepts (σ := σ) bits (sizes "CAP") view snapshotView hardView hardPresence hard snapshot
+    (selectRecord Jarl.state_State_restore_ir.last.base (fun _ => snapshot.map snapshotView)) last iterator word finish
+    entries [] _ (sizes "CAP" + 1) (restored_last_empty view snapshotView _ hard snapshot) chain (by simpa using room) (by omega)
+  have slotsInit : initializeFields Jarl.state_State_restore_ir.constructorFields sizes Jarl.state_State_restore_ir.append.slotsPath =
+      .slots (List.replicate (sizes "CAP") none) := by
+    simp [Jarl.state_State_restore_ir,initializeFields,initialCell]
+  have lengthInit : initializeFields Jarl.state_State_restore_ir.constructorFields sizes Jarl.state_State_restore_ir.append.lengthPath =
+      .unsigned "usize" 0 := by
+    simp [Jarl.state_State_restore_ir,initializeFields,initialCell]
+  unfold Jarl.state_State_restore restoreState
+  dsimp only
+  rw [slotsInit,lengthInit]
+  dsimp only
+  rw [if_neg (by simp)]
+  have initialOk' : recoveryPredicate Jarl.state_State_restore_ir view snapshotView hardView hardPresence
+      ⟨⟨⟨List.replicate (sizes "CAP") none,0⟩,hard,snapshot⟩,
+        selectRecord Jarl.state_State_restore_ir.last.base
+          (recoveryRecords snapshotView (⟨⟨List.replicate (sizes "CAP") none,0⟩,hard,snapshot⟩ : RecoveryState α β δ)),
+        (fun _ => .absent),(fun _ => .absent)⟩ Jarl.state_State_restore_ir.initialGuard = .ok false := initialOk
+  simp only [List.map_replicate,initialOk',recovery_returns_intoIterator]
+  exact ⟨iterator,loop⟩
+
 end Storage

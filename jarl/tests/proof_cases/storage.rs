@@ -43,6 +43,10 @@ fn storage_shape_holds_on_32_bit_and_rejects_changed_effects() {
         ("base.index == 0 || base.term == 0", "false"),
         ("hard.commit < base.index", "false"),
         ("hard.commit > state.last().index", "false"),
+        // Strengthened guards reject valid checkpoints; restoration_accepts fails.
+        ("entry.id.term < last.term", "entry.id.term <= last.term"),
+        ("base.term > hard.term", "base.term >= hard.term"),
+        ("hard.commit > state.last().index", "hard.commit >= state.last().index"),
         ("self.len += 1;", "self.len += 2;"),
         ("self.len == CAP", "self.len != CAP"),
         ("if i < self.len", "if i <= self.len"),

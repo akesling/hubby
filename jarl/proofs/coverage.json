@@ -6888,7 +6888,7 @@
         "R05"
       ],
       "status": "component_evidence",
-      "note": "Complete original restore and constructor/append/last/iterator/base helpers in proofs/storage: arbitrary iterator responses and explicit external/destructor boundaries, successful shape and exact metadata retention, sufficient interpreter fuel, concrete snapshot-index/commit/last-index bounds, snapshot/term-zero-vote validity, consecutive live-slot indices and positive nondecreasing terms bounded by hard term, and source-place contracts. Buffer histories include restoration. Log-order preservation through other mutators, durable/protocol reachability, committed-prefix refinement and physical source/ownership/unwinding correspondence remain open.",
+      "note": "Complete original restore and constructor/append/last/iterator/base helpers in proofs/storage: arbitrary iterator responses and explicit external/destructor boundaries, successful shape and exact metadata retention, sufficient interpreter fuel, concrete snapshot-index/commit/last-index bounds, snapshot/term-zero-vote validity, consecutive live-slot indices and positive nondecreasing terms bounded by hard term, and source-place contracts, and completeness: every validated checkpoint (nonzero snapshot id, bounded terms, no vote at term zero, an ordered chain that fits, commit between snapshot index and last index) has a normally returning run yielding exactly those entries. Buffer histories include restoration. Log-order preservation through other mutators, durable/protocol reachability, committed-prefix refinement and physical source/ownership/unwinding correspondence remain open.",
       "root_apis": [
         "crate::state::<State < V , S , CAP >>::restore"
       ],
@@ -6962,6 +6962,12 @@
         {
           "project": "proofs/storage/project.json",
           "theorem": "Storage.restoration_log_representation",
+          "function": "state_State_restore",
+          "evidence": "artifacts/provium/proofs/storage/verified.json"
+        },
+        {
+          "project": "proofs/storage/project.json",
+          "theorem": "Storage.restoration_accepts",
           "function": "state_State_restore",
           "evidence": "artifacts/provium/proofs/storage/verified.json"
         }

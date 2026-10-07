@@ -19,7 +19,7 @@ The current obligation counts, from each `project.json`, are: capacity 2,
 consensus 10, election 4, election-safety 5 (specification), initialization 4,
 input-gating 8, log-boundary 14, membership 118, message-dispatch 2,
 message-validation 56, persistence 6, replication-contract 16, specification 18
-(specification), storage 53, storage-view 13: 329 in total. `coverage.json`
+(specification), storage 54, storage-view 13: 330 in total. `coverage.json`
 reviews 187 items and 101 conservative public roots; 40 items carry declared
 component evidence. Update this section with every checkpoint.
 
