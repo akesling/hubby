@@ -14,12 +14,12 @@ fn run() -> Result<(), String> {
     }
     if args.len() == 1 && matches!(args[0].as_str(), "--help" | "-h") {
         println!("provium capture-cargo <build.json> --out <directory>\nprovium inspect-cargo <build.json> --out <directory>\nprovium inventory <crate-directory> --out <directory>\nprovium audit-coverage <crate-directory>\nprovium verify-complete <crate-directory> (fails until complete proof support exists)\n");
-        println!("provium <compile|verify|verify-methods> <project.json> --out <directory>\n\ncompile: generate source-linked Lean and IR (no proof success claim)\nverify: regenerate, run pinned Lean with trust=0, audit all obligations\nverify-methods: check supported complete method bodies and state contracts\n\nSupported Rust: closed scalar unsigned/bool functions; checked arithmetic,\nif expressions, local lets/assignments, assertions, acyclic source-local calls.\nUnsupported Rust is rejected. See README.md for the trusted boundary.");
+        println!("provium <compile|verify|verify-methods|verify-project> <project.json> --out <directory>\n\ncompile: generate source-linked Lean and IR (no proof success claim)\nverify: regenerate, run pinned Lean with trust=0, audit all obligations\nverify-methods: check supported complete method bodies and state contracts\nverify-project: verify any project kind with the backend assert_proofs! selects\n\nSupported Rust: closed scalar unsigned/bool functions; checked arithmetic,\nif expressions, local lets/assignments, assertions, acyclic source-local calls.\nUnsupported Rust is rejected. See README.md for the trusted boundary.");
         return Ok(());
     }
     if args.len() != 4 || args[2] != "--out" {
         return Err(
-            "usage: provium <compile|verify|verify-methods|inspect-cargo|capture-cargo|inventory> <input> --out <directory>; or <audit-coverage|verify-complete> <crate-directory>"
+            "usage: provium <compile|verify|verify-methods|verify-project|inspect-cargo|capture-cargo|inventory> <input> --out <directory>; or <audit-coverage|verify-complete> <crate-directory>"
                 .into(),
         );
     }
@@ -75,6 +75,10 @@ fn run() -> Result<(), String> {
         "verify" => println!(
             "{}",
             provium::project::verify(Path::new(&args[1]), Path::new(&args[3]))?
+        ),
+        "verify-project" => println!(
+            "{}",
+            provium::suite::verify_project(Path::new(&args[1]), Path::new(&args[3]))?.details
         ),
         _ => return Err("unknown command; run provium --help".into()),
     }

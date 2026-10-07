@@ -240,7 +240,9 @@ Copy or Clone. Their returned descriptors retain the field path, owner and ticke
 of an active shared receiver loan. Successful reads imply descriptor liveness;
 each dereference checks it again. Shared authority excludes same-owner writes,
 and valid reservations exclude other-owner overlapping writes. Ending the loan
-invalidates subsequent dereferences. Caller loan preservation, physical payload
+invalidates subsequent dereferences under the Arena discipline, which never
+reuses owner IDs (`Borrowed.ended_not_revived`); `Live` over an arbitrary world
+cannot distinguish lifetimes, since every root ticket is 0. Caller loan preservation, physical payload
 representation, interior mutability and actual Rust lifetime adequacy remain
 separate obligations; these rules describe the conservative logical loan model.
 
@@ -364,7 +366,10 @@ keys; arbitrary callbacks, destructor effects and recursive forwarding remain
 unsupported. Lists denote the source slices and prefixes, not Rust allocations.
 Borrowed-slice locations can be rebased to the source array and loaded without
 silently discarding invalid locations; these logical relations do not discharge
-physical reference/lifetime refinement.
+physical reference/lifetime refinement. Each generated batch also proves
+`<method>_indices`: every pass, exclusion and required index names one of its
+actual arguments, so the semantics' total input lookup never substitutes an
+empty slice for generated code.
 
 Shared suffix-view methods support a complete record construction with copied
 metadata, a boolean-filtered optional borrow, the original optional index, and a

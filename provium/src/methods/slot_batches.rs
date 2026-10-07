@@ -605,5 +605,12 @@ pub(super) fn generate(name: &str, batch: &Batch) -> String {
     };
     let error = serde_json::to_string(&batch.error).unwrap();
     text+=&format!("def {name}_ir : SlotBatch := ⟨{helper}_ir, {}, [{schedule}], {}, {}, {error}⟩\ndef {name} [DecidableEq α] {capacity_parameter}({input_parameters} : List (Cell α)) : Except String (ArrayStore α) :=\n  runSlotBatch {name}_ir {capacity} [{values}]\ntheorem {name}_correspondence [DecidableEq α] {capacity_parameter}({input_parameters} : List (Cell α)) : runSlotBatch {name}_ir {capacity} [{values}] = {name} {}{input_parameters} := by rfl\n",batch.required,batch.exclusion_tag,batch.exclusion_input,if capacity_parameter.is_empty(){""}else{"capacity "});
+    // runSlotBatch reads inputs with a total `getD []`, so an index past the
+    // argument list would silently become an empty slice. Prove, per generated
+    // program, that every index names one of its actual arguments.
+    let arity = batch.arguments.len();
+    text += &format!(
+        "theorem {name}_indices : {name}_ir.required < {arity} ∧ {name}_ir.exclusionInput < {arity} ∧ ∀ pass ∈ {name}_ir.passes, pass.1 < {arity} := by decide\n"
+    );
     text
 }

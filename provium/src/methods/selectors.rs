@@ -164,6 +164,19 @@ impl Crate {
             &BTreeMap::new(),
             &mut fallback,
         )?;
+        // selectRecord builds the fallback without the method's const
+        // instantiation, so a capacity-parameter array would get length 0.
+        if fallback.iter().any(|field| {
+            matches!(
+                field.value,
+                constructors::Initial::EmptySlots(constructors::Capacity::Parameter(_))
+            )
+        }) {
+            return Err(
+                "selector fallback cannot contain a capacity-parameter array; its size is not instantiated"
+                    .into(),
+            );
+        }
         Ok(Method{name:name.into(),symbol:name.replace("::","_"),source:def.file.clone(),first_line:f.span().start().line,last_line:f.span().end().line,rust:tokens(f),writes:vec![],body:vec![],array:None,query:None,constructor:None,buffer:None,relocation:None,iteration:None,last:None,truncation:None,installation:None,restoration:None,getter: None, enum_projection:None,validator:None,view:None,record_at:None,lookup:None,selection:Some(Selection{optional,record_field:member.to_string(),record_type,fallback,scope:"complete shared Option record selection with checked eager derived Default; Rust field/type/borrow and frontend correspondence remain unproved"})})
     }
 }

@@ -91,6 +91,7 @@ theorem absent_not_dereferenceable : dereference (world child) reference layout 
 #provium_check Provium.State.FieldReads.Borrowed.read_refines references Provium.State.FieldReads.Borrowed.read
 #provium_check Provium.State.FieldReads.Borrowed.dereference_present references Provium.State.FieldReads.Borrowed.dereference
 #provium_check Provium.State.FieldReads.Borrowed.ended_denied references Provium.State.FieldReads.Borrowed.dereference
+#provium_check Provium.State.FieldReads.Borrowed.ended_not_revived references Provium.State.FieldReads.Borrowed.Live
 #provium_check present_reference references Provium.State.FieldReads.Borrowed.read
 #provium_check absent_reference references Provium.State.FieldReads.Borrowed.read
 #provium_check reads_payload references Provium.State.FieldReads.Borrowed.dereference
@@ -116,7 +117,7 @@ theorem absent_not_dereferenceable : dereference (world child) reference layout 
         String::from_utf8_lossy(&checked.stdout)
             .matches("PROVIUM_VERIFIED ")
             .count(),
-        21
+        22
     );
     // Corruptions must fail either the generic theorem or the concrete controls.
     for (from, to) in [

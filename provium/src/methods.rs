@@ -1313,6 +1313,9 @@ pub fn generate(methods: &[Method], namespace: &str) -> String {
     text.push_str(&format!("end {namespace}\n"));
     text
 }
+fn batch(m: &Method) -> bool {
+    m.array.as_ref().is_some_and(|shape| shape.batch.is_some())
+}
 fn identifier(s: &str) -> bool {
     !s.is_empty()
         && s.bytes()
@@ -1400,6 +1403,7 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
             format!("{}_heap", m.symbol),
             format!("{}_heap_refinement", m.symbol),
             format!("{}_loan", m.symbol),
+            format!("{}_indices", m.symbol),
         ] {
             if !identifier(&name) || !symbols.insert(name) {
                 return Err("invalid/colliding generated method symbol".into());
@@ -1512,6 +1516,12 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
         if m.relocation.is_some() {
             audit.push_str(&format!(
                 "#provium_check {}.{}_loan_moves_refinement references {}.{}_ir\n",
+                project.namespace, m.symbol, project.namespace, m.symbol
+            ));
+        }
+        if batch(m) {
+            audit.push_str(&format!(
+                "#provium_check {}.{}_indices references {}.{}_ir\n",
                 project.namespace, m.symbol, project.namespace, m.symbol
             ));
         }
@@ -1637,6 +1647,7 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
     let constructor_refinements = constructor_evidence.len();
     let target_refinements = methods.iter().filter(|m| target::numeric(m)).count();
     let array_move_refinements = methods.iter().filter(|m| m.relocation.is_some()).count();
+    let batch_index_proofs = methods.iter().filter(|m| batch(m)).count();
     let field_refinements = methods.iter().filter(|m| m.getter.is_some()).count();
     let borrowed_field_refinements = methods
         .iter()
@@ -1649,6 +1660,7 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
             + constructor_refinements
             + 2 * target_refinements
             + array_move_refinements
+            + batch_index_proofs
             + 4 * field_refinements
             + project.obligations.len()
     {

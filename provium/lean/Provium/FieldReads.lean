@@ -170,6 +170,27 @@ theorem ended_denied (ended : world reference.owner = none) :
     dereference world reference layout heap = .error (.inl .denied) := by
   simp [dereference, Live, ended]
 
+/-- `Live` alone cannot tell lifetimes apart, because every root ticket is 0.
+    Under the Arena discipline, owner IDs are never reused: once a lifetime
+    ends, a reference into it stays dead even after a later reservation. -/
+theorem ended_not_revived (arena after : Loans.Arena) (reference : Reference) (ticket : Nat)
+    (ended : arena.endLifetime reference.owner ticket = .ok after)
+    (issued : reference.owner < arena.nextOwner) (frame : Loans.Frame) (separate) :
+    ¬ Live after.world reference ∧ ¬ Live (after.reserve frame separate).world reference := by
+  have invalidated : after = arena.invalidate reference.owner := by
+    unfold Loans.Arena.endLifetime at ended
+    cases found : arena.world reference.owner with
+    | none => simp [found] at ended
+    | some loan =>
+      by_cases root : ticket = loan.stack.ticket ∧ loan.stack.isRoot = true
+      · simp [found, root] at ended; exact ended.symm
+      · simp [found, root] at ended
+  subst invalidated
+  have dead : (arena.invalidate reference.owner).world reference.owner = none := by
+    simp [Loans.Arena.invalidate, Loans.set]
+  have still := Loans.Arena.retired_not_revived arena reference.owner issued frame separate
+  exact ⟨by simp [Live, dead], by simp [Live, still]⟩
+
 -- A valid reference can be reused for reads without consuming its shared loan.
 -- Preservation across caller execution requires the caller to obey these loan
 -- checks; Rust lifetime and physical payload adequacy remain separate obligations.
