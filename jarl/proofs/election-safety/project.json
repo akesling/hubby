@@ -1,0 +1,27 @@
+{
+  "kind": "specification",
+  "schema": 1,
+  "proofs": "Model.lean",
+  "obligations": [
+    {
+      "theorem": "Jarl.ElectionSafety.election_safety",
+      "definition": "Jarl.ElectionSafety.Reachable"
+    },
+    {
+      "theorem": "Jarl.ElectionSafety.reachable_inv",
+      "definition": "Jarl.ElectionSafety.Inv"
+    },
+    {
+      "theorem": "Jarl.ElectionSafety.three_voter_election",
+      "definition": "Jarl.ElectionSafety.Reachable"
+    },
+    {
+      "theorem": "Jarl.ElectionSafety.prevote_election",
+      "definition": "Jarl.ElectionSafety.Reachable"
+    },
+    {
+      "theorem": "Jarl.ElectionSafety.majorities_intersect",
+      "definition": "Jarl.ElectionSafety.Majority"
+    }
+  ]
+}

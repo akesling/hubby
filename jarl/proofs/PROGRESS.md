@@ -12,6 +12,17 @@ verified completion can close this work; a green component suite cannot.
 M0 has been audited against `CORRECTNESS_PLAN.md`; its reviewed inputs and
 reproducible gate are recorded in `M0.md` and `m0-review.json`.
 
+## Current counts
+
+Sections below are a chronological log; their counts were correct when written.
+The current obligation counts, from each `project.json`, are: capacity 2,
+consensus 10, election 4, election-safety 5 (specification), initialization 4,
+input-gating 8, log-boundary 14, membership 118, message-dispatch 2,
+message-validation 56, persistence 6, replication-contract 16, specification 18
+(specification), storage 53, storage-view 13: 329 in total. `coverage.json`
+reviews 187 items and 101 conservative public roots; 40 items carry declared
+component evidence. Update this section with every checkpoint.
+
 Protocol frontier: discharge append/truncation/installation preconditions in
 complete protocol callers and durable histories, including snapshot provenance
 and hard-state transitions. Branch contracts for installation are checked below. Recovery, growth and truncation preserve the
@@ -1617,3 +1628,56 @@ Next work: connect constructor field values to initialized layout/heap semantics
 then derive fresh-state accessor preconditions from construction. The exploratory
 constructor-memory draft was removed when pausing; it is not implemented evidence.
 Continue under CORRECTNESS_PLAN.md and M1_M2.md, with M1 preceding M2.
+
+## Deep review, election-safety fix and first global election theorem (M1/M2)
+
+A six-part review of Jarl's runtime, its proof contracts and Provium's frontend,
+Lean library and verifier recorded 54 findings in qualifier
+(`qualifier threads --all --tag review:2026-10-07-deep`), each independently
+verified; none was refuted.
+
+- **Jarl protocol bug (S02).** In the dynamic engine a candidate whose election
+  timed out started a pre-vote while remaining Candidate. Pre-vote grants share
+  `votes` with real votes, so a delayed current-term `Voted` grant could combine
+  with next-term pre-vote grants into a quorum and elect a second leader of an
+  already-led term. `tick` now steps down before probing.
+  `tests/election_safety.rs` replays the five-voter schedule.
+- **Provium soundness.** Pure pattern matching treated fuel exhaustion and a
+  malformed variant view as a mismatch, so a later wildcard arm could produce a
+  successful wrong validation; it is now three-valued. The frontend now rejects
+  every crate shape that could make Rust's method probe disagree with a
+  by-name interpretation (trait impls for non-crate types, shadowing trait or
+  inherent methods, reserved item names), shifts typed from their count,
+  overflowing constructor literals, slice calls captured by other slices,
+  constant patterns treated as bindings, `?` conversions between error enums and
+  conditional declarations in unconfigured loads. Obligations must be theorems
+  of a consumer proof module; stale Lean objects, stale certificates and
+  non-atomic certificate writes are removed.
+- **Contract strengthening.** `Quorum.result` gives the exact strict-majority
+  meaning of the generated `Membership::quorum` under a normally returning
+  callback; `Quorum.quorums_intersect` proves any two such quorums share a
+  current voter (and an old voter when joint). `QuorumIndex.result_majority`
+  proves the generated `quorum_index` returns exactly the greatest position
+  acknowledged by such majorities, and `QuorumIndex.completes` that it never
+  panics for a nonempty voter set. The consensus minima are exact, the election
+  deadline is exactly `ticks + splitMix64(seed) % ticks`, and `State::last` is
+  characterized for every prefix shape. Provium gains `pureCallbackResult` and
+  its collection and counting lemmas.
+- **First global election theorem (abstract).** `election-safety` proves
+  historical at-most-one-leader-per-term for a model of both engines' elections
+  over a fixed voter set, by induction from initialization over arbitrary
+  histories with message loss, duplication and reordering and crashes at any
+  point, including between a durable save and its acknowledgment. Witnesses show
+  direct and pre-vote elections occur. The refinement from generated `Node`
+  transitions to this model is not yet established; see `M1_M2.md`.
+
+Validation: Provium's complete Lean gate (`scripts/verify.sh`), ordinary tests,
+Clippy and rustdoc pass. Jarl's complete proof gate passed 30 of 32 tests on the
+first run (64.8 minutes); the two failures were mutation checks newly required
+to reach Lean, which the frontend instead rejects. They now assert the specific
+frontend rejection. Every negative control now verifies its unmutated fixture
+first. Lean ran serially under a 16384 MiB cap.
+
+Open review items: restore acceptance for valid checkpoints (storage), and three
+Provium Lean-library concerns (slot-batch index bounds, `selectRecord`'s
+fallback, `FieldReads` liveness over a bare world).

@@ -1396,6 +1396,76 @@ theorem observation_complete (entries : ArrayStore α) (callback : σ)
       (membership_Membership_quorum entries callback) = some outcome :=
   predicate_observation_complete _ _ (response_budget entries callback) call drop
 
+/-- Strict majority of `voters` satisfying `answer`. -/
+def Majority (answer : Cell α → Bool) (voters : List (Cell α)) : Prop :=
+  voters.length / 2 < voters.countP answer
+
+instance (answer : Cell α → Bool) (voters : List (Cell α)) : Decidable (Majority answer voters) :=
+  inferInstanceAs (Decidable (_ < _))
+
+/-- Under a normally returning, handle-preserving callback, `quorum` reports
+    exactly a strict majority of current voters and, when joint, of old voters. -/
+theorem result (entries : ArrayStore α) (callback : σ) (answer : Cell α → Bool) :
+    pureCallbackResult answer (membership_Membership_quorum entries callback) =
+      .value (decide (Majority answer (membership_Membership_voters entries) ∧
+        (membership_Membership_is_joint entries = true →
+          Majority answer (membership_Membership_old_voters entries)))) := by
+  rw [execution, pure_count_predicates]
+  simp only [Nat.zero_add]
+  by_cases current : Majority answer (membership_Membership_voters entries)
+  · have current' : (membership_Membership_voters entries).countP answer >
+        (membership_Membership_voters entries).length / 2 := current
+    rw [if_pos (decide_eq_true current')]
+    cases joint : membership_Membership_is_joint entries with
+    | false => simp [pure_finish_value, current]
+    | true =>
+      simp only [↓reduceIte, pure_count_predicates, Nat.zero_add, pure_finish_value]
+      simp only [Majority]
+      simp only [gt_iff_lt] at current'
+      simp [current']
+  · have current' : ¬ (membership_Membership_voters entries).countP answer >
+        (membership_Membership_voters entries).length / 2 := current
+    rw [if_neg (by simpa using current')]
+    simp [pure_finish_value, current]
+
+private theorem countP_or_and (p q : α → Bool) (values : List α) :
+    values.countP p + values.countP q =
+      values.countP (fun v => p v || q v) + values.countP (fun v => p v && q v) := by
+  induction values with
+  | nil => rfl
+  | cons head rest ih =>
+    simp only [List.countP_cons]
+    cases p head <;> cases q head <;> simp <;> omega
+
+/-- Two strict majorities of one list share a member. -/
+theorem majorities_intersect (first second : α → Bool) (values : List α)
+    (one : values.length / 2 < values.countP first)
+    (two : values.length / 2 < values.countP second) :
+    ∃ value ∈ values, first value = true ∧ second value = true := by
+  have sum := countP_or_and first second values
+  have bounded : values.countP (fun v => first v || second v) ≤ values.length :=
+    List.countP_le_length
+  have shared : 0 < values.countP (fun v => first v && second v) := by omega
+  obtain ⟨value, member, both⟩ := List.countP_pos_iff.mp shared
+  simp only [Bool.and_eq_true] at both
+  exact ⟨value, member, both⟩
+
+/-- Quorum intersection for the generated `Membership::quorum`: any two
+    callback answers that both report a quorum agree on some current voter
+    and, in a joint configuration, on some old voter. Election safety applies
+    this to two candidates' vote sets in one term; connecting answers to
+    durable votes is a caller obligation. -/
+theorem quorums_intersect (entries : ArrayStore α) (one two : σ) (first second : Cell α → Bool)
+    (firstQuorum : pureCallbackResult first (membership_Membership_quorum entries one) = .value true)
+    (secondQuorum : pureCallbackResult second (membership_Membership_quorum entries two) = .value true) :
+    (∃ voter ∈ membership_Membership_voters entries, first voter = true ∧ second voter = true) ∧
+    (membership_Membership_is_joint entries = true →
+      ∃ voter ∈ membership_Membership_old_voters entries, first voter = true ∧ second voter = true) := by
+  rw [result] at firstQuorum secondQuorum
+  simp only [CallbackExit.value.injEq, decide_eq_true_eq] at firstQuorum secondQuorum
+  refine ⟨majorities_intersect first second _ firstQuorum.1 secondQuorum.1, fun joint => ?_⟩
+  exact majorities_intersect first second _ (firstQuorum.2 joint) (secondQuorum.2 joint)
+
 end Quorum
 
 namespace QuorumIndex
@@ -1478,5 +1548,89 @@ theorem observation_complete (entries : ArrayStore α) (callback : σ) (abortOnP
       ((membership_Membership_voters entries).length + (membership_Membership_old_voters entries).length + 2)
       call drop (membership_Membership_quorum_index entries callback abortOnPanic) = some outcome :=
   callback_observation_complete _ _ (response_budget entries callback abortOnPanic) call drop
+
+/-- A strict majority of `voters` has acknowledged at least position `x`. -/
+def MajorityAt (matched : Cell α → UInt64) (voters : List (Cell α)) (x : UInt64) : Prop :=
+  voters.length / 2 <
+    (voters.map (fun voter => (matched voter).toNat)).countP (fun v => decide (x.toNat ≤ v))
+
+private theorem toNat_min (a b : UInt64) : (min a b).toNat = min a.toNat b.toNat := by
+  simp [min, UInt64.le_iff_toNat_le]
+  split <;> rfl
+
+private theorem rank_majority (voters : List (Cell α)) (matched : Cell α → UInt64) (rank x : UInt64)
+    (selected : numericRank (voters.map matched) 2 = some rank) :
+    x.toNat ≤ rank.toNat ↔ MajorityAt matched voters x := by
+  have threshold := numericRank_threshold (voters.map matched) 2 rank x (by decide) selected
+  simpa only [MajorityAt, List.length_map, List.map_map, Function.comp_def] using threshold
+
+/-- The commit-rule meaning of `quorum_index`. Under any normally returning,
+    handle-preserving callback reporting `matched voter`, a completed result is
+    exactly the greatest position acknowledged by a strict majority of the
+    current voters and, in a joint configuration, also by a strict majority of
+    the old voters. Connecting `matched` to durable follower logs is a caller
+    obligation. -/
+theorem result_majority (entries : ArrayStore α) (callback : σ) (abortOnPanic : Bool)
+    (matched : Cell α → UInt64) (result : UInt64)
+    (completed : pureCallbackResult matched
+      (membership_Membership_quorum_index entries callback abortOnPanic) = .value result)
+    (x : UInt64) :
+    x.toNat ≤ result.toNat ↔ MajorityAt matched (membership_Membership_voters entries) x ∧
+      (membership_Membership_is_joint entries = true →
+        MajorityAt matched (membership_Membership_old_voters entries) x) := by
+  rw [execution, pure_collect_callbacks] at completed
+  cases first : numericRank ((membership_Membership_voters entries).map matched) 2 with
+  | none =>
+    rw [first] at completed
+    exact absurd completed (pure_finish_numeric_panic matched callback abortOnPanic)
+  | some firstRank =>
+    rw [first] at completed
+    have current := rank_majority _ matched firstRank x first
+    cases joint : membership_Membership_is_joint entries with
+    | false =>
+      simp only [joint, Bool.false_eq_true, ↓reduceIte, pure_finish_value,
+        CallbackExit.value.injEq] at completed
+      subst completed
+      simp [current]
+    | true =>
+      simp only [joint, ↓reduceIte, pure_collect_callbacks] at completed
+      cases second : numericRank ((membership_Membership_old_voters entries).map matched) 2 with
+      | none =>
+        rw [second] at completed
+        exact absurd completed (pure_finish_numeric_panic matched callback abortOnPanic)
+      | some secondRank =>
+        simp only [second, pure_finish_value, CallbackExit.value.injEq] at completed
+        subst completed
+        have old := rank_majority _ matched secondRank x second
+        rw [toNat_min, Nat.le_min, current, old]
+        simp
+
+private theorem rank_present (values : List UInt64) (nonempty : values ≠ []) :
+    ∃ rank, numericRank values 2 = some rank := by
+  obtain ⟨value, selected⟩ := Provium.OrderStatistics.rank_exists (values.map UInt64.toNat) 2
+    (by decide) (by simpa using nonempty)
+  exact ⟨UInt64.ofNat value, by simp [numericRank, selected]⟩
+
+/-- With a nonempty current voter set, `quorum_index` completes with a value
+    under every normally returning callback. Its empty-current panic and the
+    old-configuration panic are unreachable, since a joint configuration
+    always has old voters. -/
+theorem completes (entries : ArrayStore α) (callback : σ) (abortOnPanic : Bool)
+    (matched : Cell α → UInt64) (nonempty : membership_Membership_voters entries ≠ []) :
+    ∃ result, pureCallbackResult matched
+      (membership_Membership_quorum_index entries callback abortOnPanic) = .value result := by
+  rw [execution, pure_collect_callbacks]
+  obtain ⟨first, selected⟩ := rank_present ((membership_Membership_voters entries).map matched)
+    (by simpa using nonempty)
+  rw [selected]
+  cases joint : membership_Membership_is_joint entries with
+  | false => exact ⟨first, by simp [pure_finish_value]⟩
+  | true =>
+    simp only [↓reduceIte, pure_collect_callbacks]
+    obtain ⟨second, selectedOld⟩ := rank_present
+      ((membership_Membership_old_voters entries).map matched)
+      (by simpa using (SetInterpretation.joint_iff_old_nonempty entries).mp joint)
+    rw [selectedOld]
+    exact ⟨_, pure_finish_value _ _ _⟩
 
 end QuorumIndex

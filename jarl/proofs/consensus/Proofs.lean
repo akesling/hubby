@@ -98,10 +98,12 @@ private theorem joint_value (new old : Nat) (hn : new < 2^64) (ho : old < 2^64) 
   simp [JarlRules.joint_commit_index, validArgs, validWidth, Provium.get, Provium.bind,
     binary, uintOp, word, hn, ho, hm]
 
+-- Exact: the joint position is the minimum, not merely bounded by both sides
+-- (an upper bound alone would also admit always committing nothing).
 theorem joint_commit_requires_both (new old index : Nat)
     (hn : new < 2^64) (ho : old < 2^64)
     (result : JarlRules.joint_commit_index [.uint 64 new, .uint 64 old] = .ok (.uint 64 index)) :
-    index ≤ new ∧ index ≤ old := by
+    index = min new old ∧ index ≤ new ∧ index ≤ old := by
   rw [joint_value new old hn ho] at result
   simp at result
   omega
@@ -109,7 +111,7 @@ theorem joint_commit_requires_both (new old index : Nat)
 theorem follower_never_overcommits (leader matched index : Nat)
     (hl : leader < 2^64) (hm : matched < 2^64)
     (result : JarlRules.follower_commit [.uint 64 leader, .uint 64 matched] = .ok (.uint 64 index)) :
-    index ≤ leader ∧ index ≤ matched := by
+    index = min leader matched ∧ index ≤ leader ∧ index ≤ matched := by
   change JarlRules.joint_commit_index [.uint 64 leader, .uint 64 matched] = .ok (.uint 64 index) at result
   exact joint_commit_requires_both leader matched index hl hm result
 

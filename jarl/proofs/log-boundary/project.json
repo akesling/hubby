@@ -58,6 +58,14 @@
     {
       "theorem": "Boundary.last_final_slot",
       "function": "state_State_last"
+    },
+    {
+      "theorem": "Boundary.last_without_present",
+      "function": "state_State_last"
+    },
+    {
+      "theorem": "Boundary.last_skips_trailing_holes",
+      "function": "state_State_last"
     }
   ]
 }

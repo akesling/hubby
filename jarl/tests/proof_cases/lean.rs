@@ -12,6 +12,9 @@ fn jarl_source_mutations_break_the_actual_invariants() {
     let membership = fs::read_to_string(root.join("src/membership.rs")).unwrap();
     let node = fs::read_to_string(root.join("src/node.rs")).unwrap();
     for (file, from, to) in [
+        // Control: the unmutated fixture must verify, or a fixture-level
+        // failure would satisfy every mutation below.
+        ("node.rs", "", ""),
         ("membership.rs", "count > total / 2", "count >= total / 2"),
         ("membership.rs", "new.min(old)", "new.max(old)"),
         ("node.rs", "commit.min(matched)", "commit.max(matched)"),
@@ -51,6 +54,11 @@ fn jarl_source_mutations_break_the_actual_invariants() {
             &fs::read_to_string(root.join("proofs/consensus/Proofs.lean")).unwrap(),
         );
         let p = w.write("project.json", &config.to_string());
+        if from.is_empty() {
+            verify(&p, &w.out()).unwrap();
+            assert!(w.out().join("verified.json").exists());
+            continue;
+        }
         let error = verify(&p, &w.out()).unwrap_err();
         // A selector/compiler failure is not evidence that the invariant caught
         // the mutation. The changed source must reach the theorem checker.

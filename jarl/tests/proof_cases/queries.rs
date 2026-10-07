@@ -41,6 +41,9 @@ fn each_missing_input_gate_breaks_the_original_source_contract() {
         "self.dirty || self.extra_reply.is_some() || self.outbox.iter().any(Option::is_some)";
     assert_eq!(original.matches(condition).count(), 1);
     for replacement in [
+        // Control: the copied, unmutated crate must verify, or a fixture-level
+        // failure would satisfy every removed gate below.
+        condition,
         "self.extra_reply.is_some() || self.outbox.iter().any(Option::is_some)",
         "self.dirty || self.outbox.iter().any(Option::is_some)",
         "self.dirty || self.extra_reply.is_some()",
@@ -72,6 +75,10 @@ fn each_missing_input_gate_breaks_the_original_source_contract() {
         )
         .unwrap();
         let config = w.write("project.json", &project.to_string());
+        if replacement == condition {
+            provium::methods::verify(&config, &w.out()).unwrap();
+            continue;
+        }
         let error = provium::methods::verify(&config, &w.out()).unwrap_err();
         assert!(error.contains("Lean rejected Proofs.lean"), "{error}");
         assert!(!w.out().join("verified.json").exists());

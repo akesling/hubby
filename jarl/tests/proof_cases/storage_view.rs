@@ -36,22 +36,27 @@ fn delta_contracts_reject_source_and_host_order_changes() {
     provium::methods::verify(&config, &out).unwrap();
     let state_path = work.0.join("src/state.rs");
     let state = fs::read_to_string(&state_path).unwrap();
-    for (old, new, kernel) in [
-        (".saturating_sub(1)", ".saturating_sub(0)", true),
+    // Each mutation must fail for its stated reason, never an unrelated Cargo
+    // failure: either the theorem checker rejects it, or the frontend's
+    // fail-closed shape check names the construct it no longer admits.
+    for (old, new, expected) in [
+        (".saturating_sub(1)", ".saturating_sub(0)", "Lean rejected Proofs.lean"),
         (
             "filter(|_| snapshot_changed)",
             "filter(|_| !snapshot_changed)",
-            false,
+            "view filter must test its boolean input",
         ),
-        ("truncate_from: from,", "truncate_from: None,", false),
+        (
+            "truncate_from: from,",
+            "truncate_from: None,",
+            "unsupported shared view field expression",
+        ),
     ] {
         assert!(state.contains(old));
         fs::write(&state_path, state.replacen(old, new, 1)).unwrap();
         fs::write(out.join("verified.json"), "stale").unwrap();
         let error = provium::methods::verify(&config, &out).unwrap_err();
-        if kernel {
-            assert!(error.contains("Lean rejected Proofs.lean"), "{error}");
-        }
+        assert!(error.contains(expected), "{old} -> {new}: {error}");
         assert!(!out.join("verified.json").exists());
     }
     fs::write(&state_path, state).unwrap();
@@ -66,7 +71,11 @@ fn delta_contracts_reject_source_and_host_order_changes() {
     )
     .unwrap();
     fs::write(out.join("verified.json"), "stale").unwrap();
-    assert!(provium::methods::verify(&config, &out).is_err());
+    let error = provium::methods::verify(&config, &out).unwrap_err();
+    assert!(
+        error.contains("expected builtin lookup flatten"),
+        "reversed entries: {error}"
+    );
     assert!(!out.join("verified.json").exists());
     fs::write(&ready_path, ready).unwrap();
     for (old, new) in [

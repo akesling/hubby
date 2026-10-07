@@ -142,6 +142,23 @@ theorem deadline_range (ticks elapsed deadline random : Nat)
   have := Nat.mod_lt (sample random) positive
   omega
 
+/-- SplitMix64 (https://prng.di.unimi.it/splitmix64.c): advance the state by
+    the golden-ratio increment, then apply the 30/27/31 xor-shift-multiply mix. -/
+def splitMix64 (state : Nat) : Nat :=
+  let z := (state + 0x9e3779b97f4a7c15) % 2^64
+  let z := ((z ^^^ (z / 2^30)) * 0xbf58476d1ce4e5b9) % 2^64
+  let z := ((z ^^^ (z / 2^27)) * 0x94d049bb133111eb) % 2^64
+  z ^^^ (z / 2^31)
+
+-- Exact, not just the range: removing or changing the jitter fails this.
+theorem deadline_exact (ticks elapsed deadline random : Nat)
+    (positive : 0 < ticks) (safe : ticks ≤ 2^63)
+    (he : elapsed < 2^64) (hd : deadline < 2^64) (hr : random < 2^64) :
+    JarlElection.node_Node_reset_election_election_deadline
+      [.uint 64 ticks, .uint 64 elapsed, .uint 64 deadline, .uint 64 random] =
+      .ok (.uint 64 (ticks + splitMix64 random % ticks)) :=
+  (computation ticks elapsed deadline random positive safe he hd hr).2.1
+
 theorem random_advanced (ticks elapsed deadline random : Nat)
     (positive : 0 < ticks) (safe : ticks ≤ 2^63)
     (he : elapsed < 2^64) (hd : deadline < 2^64) (hr : random < 2^64) :

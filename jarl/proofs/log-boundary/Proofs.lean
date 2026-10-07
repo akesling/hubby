@@ -153,4 +153,53 @@ theorem last_final_slot (state : TraversalStore (Path → InitStore))
     simp
   simp only [JarlBoundary.state_State_last, lastRecord, executed]
   simp [JarlBoundary.state_State_last_ir, hit]
+
+private theorem places_none (path : Path) (start : Nat) (holes : List (Option α))
+    (empty : ∀ hole ∈ holes, hole = none) : presentPlaces path start holes = [] := by
+  induction holes generalizing start with
+  | nil => rfl
+  | cons hole rest ih =>
+    have this : hole = none := empty hole (by simp)
+    subst this
+    simp only [presentPlaces]
+    exact ih _ (fun h member => empty h (by simp [member]))
+
+/-- A retained prefix with no present entry yields the snapshot boundary, for
+    any length; `last_empty` is the zero-length case. -/
+theorem last_without_present (state : TraversalStore (Path → InitStore))
+    (holes suffix : List (Option (Path → InitStore)))
+    (length : state.lengths ["len"] = holes.length) (empty : ∀ hole ∈ holes, hole = none)
+    (slots : state.lookups.slots ["entries"] = holes ++ suffix) :
+    JarlBoundary.state_State_last state = .ok (JarlBoundary.state_State_base state.lookups.records) := by
+  have bound : state.lengths ["len"] ≤ (state.lookups.slots ["entries"]).length := by
+    simp [length, slots]
+  have iter := iterator_exact state bound
+  rw [length, slots, List.take_left' rfl, places_none _ _ _ empty] at iter
+  have executed : iterateRecords JarlBoundary.state_State_last_ir.iteration state = .ok [] := iter
+  simp only [JarlBoundary.state_State_last, lastRecord, executed]
+  simp [JarlBoundary.state_State_last_ir, JarlBoundary.state_State_base,
+    JarlBoundary.state_State_base_ir]
+
+/-- Holes after the final present entry of the retained prefix are skipped:
+    `last` returns that entry's id. -/
+theorem last_skips_trailing_holes (state : TraversalStore (Path → InitStore))
+    (front holes suffix : List (Option (Path → InitStore))) (entry : Path → InitStore)
+    (length : state.lengths ["len"] = front.length + 1 + holes.length)
+    (empty : ∀ hole ∈ holes, hole = none)
+    (slots : state.lookups.slots ["entries"] = (front ++ [some entry] ++ holes) ++ suffix) :
+    JarlBoundary.state_State_last state = .ok (entry ["id"]) := by
+  have bound : state.lengths ["len"] ≤ (state.lookups.slots ["entries"]).length := by
+    simp [length, slots]; omega
+  have iter := iterator_exact state bound
+  rw [length, slots, List.take_left' (by simp; omega), places_append, places_append,
+    places_none _ _ _ empty] at iter
+  simp only [Nat.zero_add, presentPlaces, List.append_nil] at iter
+  have executed : iterateRecords JarlBoundary.state_State_last_ir.iteration state =
+      .ok (presentPlaces ["entries"] 0 front ++ [⟨["entries"], front.length⟩]) := iter
+  have hit : (state.lookups.slots ["entries"])[front.length]? = some (some entry) := by
+    rw [slots, List.getElem?_append_left (by simp), List.getElem?_append_left (by simp),
+      List.getElem?_append_right (by omega)]
+    simp
+  simp only [JarlBoundary.state_State_last, lastRecord, executed]
+  simp [JarlBoundary.state_State_last_ir, hit]
 end Boundary

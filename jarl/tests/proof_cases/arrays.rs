@@ -226,6 +226,23 @@ fn original_membership_mutations_break_the_array_contracts() {
         );
         assert!(!out.join("verified.json").exists());
     }
+    // quorum_index's final minimum and stable early return admit no other
+    // shape: the numeric-fold frontend names each rejected construct, so these
+    // mutations never reach Lean (QuorumIndex.result_majority pins the rest).
+    for (from, to, expected) in [
+        ("new.min(old)", "new.max(old)", "expected builtin lookup min"),
+        (
+            "if !self.is_joint() {",
+            "if self.is_joint() {",
+            "numeric early return needs negated source query",
+        ),
+    ] {
+        assert!(original.contains(from));
+        fs::write(&source, original.replace(from, to)).unwrap();
+        let error = provium::methods::verify(&path, &out).unwrap_err();
+        assert!(error.contains(expected), "{from} -> {to}: {error}");
+        assert!(!out.join("verified.json").exists());
+    }
 }
 
 #[test]

@@ -16,6 +16,10 @@
       "function": "node_Node_reset_election_election_deadline"
     },
     {
+      "theorem": "Election.deadline_exact",
+      "function": "node_Node_reset_election_election_deadline"
+    },
+    {
       "theorem": "Election.random_advanced",
       "function": "node_Node_reset_election_random"
     }

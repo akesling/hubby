@@ -430,4 +430,46 @@ theorem numeric_words_budget (program : NumericFold) (entries : ArrayStore α)
   rw [runNumericWords_refines _ _ _ _ _ _ width capacity divisor_fits]
   exact numeric_fold_budget program entries callback abortOnPanic
 
+/-! Pure callback evaluation: one admissible environment for stating what a
+    callback fold computes; general responses remain `observeCallback`. -/
+
+/-- Outcome of a callback interaction when every call returns normally with
+    `answer key`, leaving the handle unchanged, and every destructor returns
+    normally. This is one admissible environment, not a claim that Rust
+    callbacks are pure; general response sequences remain `observeCallback`. -/
+def pureCallbackResult (answer : Cell α → β) : CallbackRun α σ β ρ → CallbackExit ρ
+  | .returned result => result
+  | .call key callback resume => pureCallbackResult answer (resume (.value (answer key) callback))
+  | .drop _ resume => pureCallbackResult answer (resume .returned)
+
+theorem pure_collect_callbacks (answer : Cell α → β) (keys : List (Cell α)) (callback : σ)
+    (next : List β → σ → CallbackRun α σ β ρ) :
+    pureCallbackResult answer (collectCallbacks keys callback next) =
+      pureCallbackResult answer (next (keys.map answer) callback) := by
+  induction keys generalizing next with
+  | nil => rfl
+  | cons key rest ih =>
+    simp only [collect_callbacks_head, pureCallbackResult, List.map_cons]
+    exact ih (fun values final => next (answer key :: values) final)
+
+theorem pure_finish_value (answer : Cell α → β) (callback : σ) (result : ρ) :
+    pureCallbackResult answer (finishCallback callback (.value result) : CallbackRun α σ β ρ) =
+      .value result := rfl
+
+theorem pure_finish_numeric_panic (answer : Cell α → UInt64) (callback : σ) (abortOnPanic : Bool) :
+    pureCallbackResult answer (finishNumericPanic callback abortOnPanic : CallbackRun α σ UInt64 UInt64) ≠
+      .value result := by
+  cases abortOnPanic <;> simp [finishNumericPanic, finishCallback, pureCallbackResult]
+
+theorem pure_count_predicates (answer : Cell α → Bool) (keys : List (Cell α)) (callback : σ)
+    (count : Nat) (next : Nat → σ → PredicateRun α σ) :
+    pureCallbackResult answer (countPredicates keys callback count next) =
+      pureCallbackResult answer (next (count + keys.countP answer) callback) := by
+  induction keys generalizing count with
+  | nil => rfl
+  | cons key rest ih =>
+    simp only [predicate_count_head, pureCallbackResult, ih, List.countP_cons]
+    congr 2
+    cases answer key <;> simp [Nat.add_assoc, Nat.add_comm]
+
 end Provium.State

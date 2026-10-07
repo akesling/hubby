@@ -4494,6 +4494,42 @@
           "theorem": "Quorum.observation_complete",
           "function": "membership_Membership_quorum",
           "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/consensus/project.json",
+          "theorem": "JarlProofs.majority_strict",
+          "function": "majority",
+          "evidence": "artifacts/provium/proofs/consensus/verified.json"
+        },
+        {
+          "project": "proofs/consensus/project.json",
+          "theorem": "JarlProofs.majority_cardinality_overlap",
+          "function": "majority",
+          "evidence": "artifacts/provium/proofs/consensus/verified.json"
+        },
+        {
+          "project": "proofs/consensus/project.json",
+          "theorem": "JarlProofs.majority_intersection",
+          "function": "majority",
+          "evidence": "artifacts/provium/proofs/consensus/verified.json"
+        },
+        {
+          "project": "proofs/consensus/project.json",
+          "theorem": "JarlProofs.joint_transition_intersection",
+          "function": "majority",
+          "evidence": "artifacts/provium/proofs/consensus/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "Quorum.result",
+          "function": "membership_Membership_quorum",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "Quorum.quorums_intersect",
+          "function": "membership_Membership_quorum",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
         }
       ],
       "context": "production"
@@ -4559,6 +4595,30 @@
         {
           "project": "proofs/membership/project.json",
           "theorem": "QuorumIndex.observation_complete",
+          "function": "membership_Membership_quorum_index",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/consensus/project.json",
+          "theorem": "JarlProofs.majority_position_in_bounds",
+          "function": "majority_position",
+          "evidence": "artifacts/provium/proofs/consensus/verified.json"
+        },
+        {
+          "project": "proofs/consensus/project.json",
+          "theorem": "JarlProofs.joint_commit_requires_both",
+          "function": "joint_commit_index",
+          "evidence": "artifacts/provium/proofs/consensus/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "QuorumIndex.result_majority",
+          "function": "membership_Membership_quorum_index",
+          "evidence": "artifacts/provium/proofs/membership/verified.json"
+        },
+        {
+          "project": "proofs/membership/project.json",
+          "theorem": "QuorumIndex.completes",
           "function": "membership_Membership_quorum_index",
           "evidence": "artifacts/provium/proofs/membership/verified.json"
         }
@@ -4979,10 +5039,17 @@
         "C07",
         "C08"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open.",
+      "status": "component_evidence",
+      "note": "Expression slice only (proofs/consensus can_commit_term): commitment requires an entry from the current term. The quorum_index call, id_at lookup and commit_to effects of the complete body remain untranslated.",
       "root_apis": [],
-      "contracts": [],
+      "contracts": [
+        {
+          "project": "proofs/consensus/project.json",
+          "theorem": "JarlProofs.current_term_required",
+          "function": "can_commit_term",
+          "evidence": "artifacts/provium/proofs/consensus/verified.json"
+        }
+      ],
       "context": "production"
     },
     "crate::node::<Node < V , S , N , CAP >>::append": {
@@ -4993,10 +5060,17 @@
         "C07",
         "C08"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open.",
+      "status": "component_evidence",
+      "note": "Expression slice only (proofs/consensus follower_commit): the follower commit position is exactly min(leader commit, matched index). The complete append body, its log effects and callers remain untranslated.",
       "root_apis": [],
-      "contracts": [],
+      "contracts": [
+        {
+          "project": "proofs/consensus/project.json",
+          "theorem": "JarlProofs.follower_never_overcommits",
+          "function": "follower_commit",
+          "evidence": "artifacts/provium/proofs/consensus/verified.json"
+        }
+      ],
       "context": "production"
     },
     "crate::node::<Node < V , S , N , CAP >>::available": {
@@ -5126,10 +5200,23 @@
         "C07",
         "C08"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open.",
+      "status": "component_evidence",
+      "note": "Guarded assignment prefix only (proofs/consensus commit_index): commitment never regresses and a sequence of updates is monotone. refresh_membership and the dirty-state effects of the complete body remain untranslated.",
       "root_apis": [],
-      "contracts": [],
+      "contracts": [
+        {
+          "project": "proofs/consensus/project.json",
+          "theorem": "JarlProofs.commit_never_regresses",
+          "function": "commit_index",
+          "evidence": "artifacts/provium/proofs/consensus/verified.json"
+        },
+        {
+          "project": "proofs/consensus/project.json",
+          "theorem": "JarlProofs.commit_sequence_monotone",
+          "function": "commit_index",
+          "evidence": "artifacts/provium/proofs/consensus/verified.json"
+        }
+      ],
       "context": "production"
     },
     "crate::node::<Node < V , S , N , CAP >>::committed": {
@@ -5479,6 +5566,12 @@
           "project": "proofs/election/project.json",
           "theorem": "Election.random_advanced",
           "function": "node_Node_reset_election_random",
+          "evidence": "artifacts/provium/proofs/election/verified.json"
+        },
+        {
+          "project": "proofs/election/project.json",
+          "theorem": "Election.deadline_exact",
+          "function": "node_Node_reset_election_election_deadline",
           "evidence": "artifacts/provium/proofs/election/verified.json"
         }
       ],
@@ -6639,6 +6732,18 @@
         {
           "project": "proofs/log-boundary/project.json",
           "theorem": "Boundary.last_final_slot",
+          "function": "state_State_last",
+          "evidence": "artifacts/provium/proofs/log-boundary/verified.json"
+        },
+        {
+          "project": "proofs/log-boundary/project.json",
+          "theorem": "Boundary.last_without_present",
+          "function": "state_State_last",
+          "evidence": "artifacts/provium/proofs/log-boundary/verified.json"
+        },
+        {
+          "project": "proofs/log-boundary/project.json",
+          "theorem": "Boundary.last_skips_trailing_holes",
           "function": "state_State_last",
           "evidence": "artifacts/provium/proofs/log-boundary/verified.json"
         }

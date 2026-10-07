@@ -50,7 +50,15 @@ fn composed_replacement_verifies_on_32_bit_and_rejects_changed_lookup_and_cut() 
         assert_eq!(source.matches(original).count(), 1);
         fs::write(&path, source.replace(original, changed)).unwrap();
         let error = provium::methods::verify(&config, &w.out()).unwrap_err();
-        assert!(error.contains("Lean rejected"), "{error}");
+        // The rejection must come from a Jarl contract, not from generated code
+        // or the Provium library. The imported storage contracts elaborate
+        // before Proofs.lean and constrain the same functions, so this check
+        // cannot attribute the rejection to the replication theorems alone.
+        assert!(
+            error.contains("Lean rejected Proofs.lean")
+                || error.contains("Lean rejected StorageContracts.lean"),
+            "{original} -> {changed}: {error}"
+        );
         assert!(!w.out().join("verified.json").exists());
     }
 }
