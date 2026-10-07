@@ -16,6 +16,17 @@ inductive Access where
   | index (slot : Nat)
   deriving Repr, DecidableEq
 
+/-- Patterns of `match`, `if let` and `matches!`: the validator patterns plus
+    `None` and record (struct and tuple) destructuring. -/
+inductive Pattern where
+  | any | bind (slot : Nat)
+  | variant (name tag : String) (fields : List (String × Pattern))
+  | record (name : String) (fields : List (String × Pattern))
+  | present (value : Pattern)
+  | absent
+  | alternatives (patterns : List Pattern)
+  deriving Repr
+
 inductive Expr where
   | literal (value : PureValue)
   | read (slot : Nat)
@@ -30,11 +41,34 @@ inductive Expr where
   | write (slot : Nat) (value : Expr)
   | assign (slot : Nat) (path : List Access) (value : Expr)
   | branch (condition yes no : Expr)
-  | choose (value : Expr) (arms : List (PurePattern × Expr))
+  | choose (value : Expr) (arms : List (Pattern × Expr))
   | range (slot : Nat) (start stop : Expr) (body : Expr)
   | ret (value : Expr)
   | scope (body : Expr)
   | panic (reason : String)
+  /-- `block label body` ends normally when `body` exits to `label`; loops,
+      `break` and `continue` lower to labeled blocks and exits. -/
+  | block (label : Nat) (body : Expr)
+  | exit (label : Nat) (value : Expr)
+  /-- Repeats `body` until it exits; each iteration consumes one unit of fuel. -/
+  | loop (body : Expr)
+  | length (array : Expr)
+  /-- A call the machine does not interpret (a generic payload's `Clone`, a
+      function-pointer hook), answered by the machine's oracle. -/
+  | external (name : String) (arguments : List Expr)
+  /-- `as` conversion (truncating) or, when `checked`, `try_from` (`Option`). -/
+  | convert (kind : String) (checked : Bool) (value : Expr)
+  /-- `array[start..stop].rotate_left(amount)` as a new array value. -/
+  | rotate (array start stop amount : Expr)
+  /-- `[value; count]` for a `Copy` value. -/
+  | replicate (value count : Expr)
+  /-- `array[start..stop].sort_unstable()` on unsigned integers. -/
+  | sort (array start stop : Expr)
+  /-- Call a function of the machine's table in a new frame: the receiver in
+      slot 0, the arguments after it. A `&mut self` call writes the callee's
+      final receiver back to the caller's place. -/
+  | invoke (name : String) (receiver : Expr) (writeBack : Option (Nat × List Access))
+      (arguments : List Expr)
   deriving Repr
 
 inductive Fault where
@@ -46,7 +80,19 @@ inductive Fault where
     the `return` are retained. -/
 inductive Exit where
   | returned (value : PureValue) (env : PureEnv)
+  | exit (label : Nat) (value : PureValue) (env : PureEnv)
   | fault (reason : Fault)
+
+/-- The target's `usize` width, the build's overflow-checks profile, and the
+    answers to calls the machine does not interpret. -/
+structure Target where
+  bits : Nat
+  checked : Bool
+  oracle : String → List PureValue → Except Fault PureValue
+
+/-- A target together with the program's function table. -/
+structure Machine extends Target where
+  functions : String → Option Expr
 
 abbrev Result := Except Exit (PureValue × PureEnv)
 
@@ -58,6 +104,9 @@ def width (bits : Nat) : String → Nat
   | "u32" => 32
   | "u64" => 64
   | "usize" => bits
+  -- Rust's integer fallback type; modeled for non-negative values, so a
+  -- result below zero faults instead of becoming negative.
+  | "i32" => 31
   | _ => 0
 
 def bound (bits : Nat) (kind : String) : Nat := 2 ^ width bits kind
@@ -197,18 +246,75 @@ def update (env : PureEnv) : List Access → PureValue → PureValue → Except 
     | _ => .error (.fault .representation)
   | _, _, _ => .error (.fault .representation)
 
-/-- Ordered arm selection with the same three-valued matching as `pureSelect`:
-    a fault in any arm tried before a match is propagated, never skipped. -/
-def select (fuel : Nat) (arms : List (PurePattern × Expr)) (value : PureValue) (env : PureEnv) :
+/-- Insert into an ascending list of unsigned values; recursion is structural
+    so kernel reduction can evaluate it. -/
+def insertSorted (value : Nat) : List Nat → List Nat
+  | [] => [value]
+  | head :: tail => if value ≤ head then value :: head :: tail else head :: insertSorted value tail
+
+def sortNumbers : List Nat → List Nat
+  | [] => []
+  | head :: tail => insertSorted head (sortNumbers tail)
+
+/-- The unsigned values of a slice, all of one kind, or `none`. -/
+def numbers (kind : String) : List PureValue → Option (List Nat)
+  | [] => some []
+  | .number k n :: rest => if k = kind then (numbers kind rest).map (n :: ·) else none
+  | _ :: _ => none
+
+/-- Three-valued matching as in `pureMatch`: a match, a mismatch, or a fault
+    (exhausted fuel, or a matching constructor that lacks a pattern's field). -/
+def matchPattern : Nat → Pattern → PureValue → PureEnv → Except PureFault (Option PureEnv)
+  | 0, _, _, _ => .error .exhausted
+  | fuel+1, pattern, value, env => match pattern with
+    | .any => .ok (some env)
+    | .bind slot => .ok (some (pureSet env slot value))
+    | .present pattern => match value with
+      | .present value => matchPattern fuel pattern value env
+      | _ => .ok none
+    | .absent => match value with
+      | .absent => .ok (some env)
+      | _ => .ok none
+    | .variant owner tag patterns => match value with
+      | .variant actual variant fields =>
+        if actual != owner || variant != tag then .ok none
+        else if patterns.any (fun pair => (fields.find? (fun field => field.1 == pair.1)).isNone)
+        then .error .representation
+        else patterns.foldlM (fun found pair => match found with
+          | none => .ok none
+          | some env => match fields.find? (fun field => field.1 == pair.1) with
+            | some field => matchPattern fuel pair.2 field.2 env
+            | none => .error .representation) (some env)
+      | _ => .ok none
+    -- Recursion stays structural on `fuel` (no helper), so kernel reduction
+    -- can evaluate matches.
+    | .record owner patterns => match value with
+      | .record actual fields =>
+        if actual != owner then .ok none
+        else if patterns.any (fun pair => (fields.find? (fun field => field.1 == pair.1)).isNone)
+        then .error .representation
+        else patterns.foldlM (fun found pair => match found with
+          | none => .ok none
+          | some env => match fields.find? (fun field => field.1 == pair.1) with
+            | some field => matchPattern fuel pair.2 field.2 env
+            | none => .error .representation) (some env)
+      | _ => .ok none
+    | .alternatives patterns => patterns.foldlM (fun found pattern => match found with
+      | some env => .ok (some env)
+      | none => matchPattern fuel pattern value env) none
+
+/-- Ordered arm selection: the first matching arm wins, and a fault in any arm
+    tried before it is propagated, never skipped. -/
+def select (fuel : Nat) (arms : List (Pattern × Expr)) (value : PureValue) (env : PureEnv) :
     Except PureFault (Option (Expr × PureEnv)) :=
   arms.foldlM (fun found arm => match found with
     | some hit => .ok (some hit)
-    | none => match pureMatch fuel arm.1 value env with
+    | none => match matchPattern fuel arm.1 value env with
       | .ok (some env) => .ok (some (arm.2, env))
       | .ok none => .ok none
       | .error reason => .error reason) none
 
-def eval (bits : Nat) (checked : Bool) : Nat → Expr → PureEnv → Result
+def eval (m : Machine) : Nat → Expr → PureEnv → Result
   | 0, _, _ => .error (.fault .exhausted)
   | fuel + 1, expression, env => match expression with
     | .literal value => .ok (value, env)
@@ -216,97 +322,187 @@ def eval (bits : Nat) (checked : Bool) : Nat → Expr → PureEnv → Result
       | some value => .ok (value, env)
       | none => .error (.fault .representation)
     | .field value name => do
-      let (value, env) ← eval bits checked fuel value env
+      let (value, env) ← eval m fuel value env
       match pureField value name with
       | some value => return (value, env)
       | none => .error (.fault .representation)
     | .index array position => do
-      let (array, env) ← eval bits checked fuel array env
-      let (position, env) ← eval bits checked fuel position env
+      let (array, env) ← eval m fuel array env
+      let (position, env) ← eval m fuel position env
       match array with
       | .array values => do
         let value ← indexValue values position
         return (value, env)
       | _ => .error (.fault .representation)
     | .present value => do
-      let (value, env) ← eval bits checked fuel value env
+      let (value, env) ← eval m fuel value env
       return (.present value, env)
     | .record name fields => do
       let (values, env) ← fields.foldlM (fun (values, env) (field, value) => do
-        let (value, env) ← eval bits checked fuel value env
+        let (value, env) ← eval m fuel value env
         return (values ++ [(field, value)], env)) ([], env)
       return (.record name values, env)
     | .variant name tag fields => do
       let (values, env) ← fields.foldlM (fun (values, env) (field, value) => do
-        let (value, env) ← eval bits checked fuel value env
+        let (value, env) ← eval m fuel value env
         return (values ++ [(field, value)], env)) ([], env)
       return (.variant name tag values, env)
     | .negate value => do
-      let (.boolean value, env) ← eval bits checked fuel value env
+      let (.boolean value, env) ← eval m fuel value env
         | .error (.fault .representation)
       return (.boolean (!value), env)
     | .binary op left right => do
-      let (left, env) ← eval bits checked fuel left env
+      let (left, env) ← eval m fuel left env
       if op = "&&" || op = "||" then
         let .boolean value := left | .error (.fault .representation)
         if (op = "&&" && !value) || (op = "||" && value) then
           return (.boolean value, env)
         else
-          let (.boolean value, env) ← eval bits checked fuel right env
+          let (.boolean value, env) ← eval m fuel right env
             | .error (.fault .representation)
           return (.boolean value, env)
       else
-        let (right, env) ← eval bits checked fuel right env
-        let value ← binary bits checked fuel op left right
+        let (right, env) ← eval m fuel right env
+        let value ← binary m.bits m.checked fuel op left right
         return (value, env)
     | .sequence first second => do
-      let (_, env) ← eval bits checked fuel first env
-      eval bits checked fuel second env
+      let (_, env) ← eval m fuel first env
+      eval m fuel second env
     | .write slot value => do
-      let (value, env) ← eval bits checked fuel value env
+      let (value, env) ← eval m fuel value env
       return (.unit, pureSet env slot value)
     | .assign slot path value => do
-      let (value, env) ← eval bits checked fuel value env
+      let (value, env) ← eval m fuel value env
       match env slot with
       | none => .error (.fault .representation)
       | some current => do
         let updated ← update env path current value
         return (.unit, pureSet env slot updated)
     | .branch condition yes no => do
-      let (.boolean condition, env) ← eval bits checked fuel condition env
+      let (.boolean condition, env) ← eval m fuel condition env
         | .error (.fault .representation)
-      eval bits checked fuel (if condition then yes else no) env
+      eval m fuel (if condition then yes else no) env
     | .choose value arms => do
-      let (value, env) ← eval bits checked fuel value env
+      let (value, env) ← eval m fuel value env
       match select fuel arms value env with
-      | .ok (some (body, env)) => eval bits checked fuel body env
+      | .ok (some (body, env)) => eval m fuel body env
       | .ok none => .error (.fault .representation)
       | .error .exhausted => .error (.fault .exhausted)
       | .error _ => .error (.fault .representation)
     | .range slot start stop body => do
-      let (.number kind first, env) ← eval bits checked fuel start env
+      let (.number kind first, env) ← eval m fuel start env
         | .error (.fault .representation)
-      let (.number other last, env) ← eval bits checked fuel stop env
+      let (.number other last, env) ← eval m fuel stop env
         | .error (.fault .representation)
       if kind ≠ other then .error (.fault .representation) else
       (List.range' first (last - first)).foldlM (fun (_, env) i =>
-        eval bits checked fuel body (pureSet env slot (.number kind i))) (.unit, env)
+        eval m fuel body (pureSet env slot (.number kind i))) (.unit, env)
     | .ret value => do
-      let (value, env) ← eval bits checked fuel value env
+      let (value, env) ← eval m fuel value env
       .error (.returned value env)
-    | .scope body => match eval bits checked fuel body env with
+    | .scope body => match eval m fuel body env with
       | .error (.returned value env) => .ok (value, env)
       | result => result
     | .panic reason => .error (.fault (.panic reason))
+    | .block label body => match eval m fuel body env with
+      | .error (.exit target value env) =>
+        if target = label then .ok (value, env) else .error (.exit target value env)
+      | result => result
+    | .exit label value => do
+      let (value, env) ← eval m fuel value env
+      .error (.exit label value env)
+    | .loop body => do
+      let (_, env) ← eval m fuel body env
+      eval m fuel (.loop body) env
+    | .length array => do
+      let (array, env) ← eval m fuel array env
+      match array with
+      | .array values => return (.number "usize" values.length, env)
+      | _ => .error (.fault .representation)
+    | .external name arguments => do
+      let (values, env) ← arguments.foldlM (fun (values, env) argument => do
+        let (value, env) ← eval m fuel argument env
+        return (values ++ [value], env)) ([], env)
+      match m.oracle name values with
+      | .ok value => return (value, env)
+      | .error reason => .error (.fault reason)
+    | .convert kind checked value => do
+      let (.number _ n, env) ← eval m fuel value env
+        | .error (.fault .representation)
+      if width m.bits kind = 0 then .error (.fault .representation)
+      else if checked then
+        return ((if n < bound m.bits kind then .present (.number kind n) else .absent), env)
+      else return (.number kind (n % bound m.bits kind), env)
+    | .rotate array start stop amount => do
+      let (array, env) ← eval m fuel array env
+      let (.number _ first, env) ← eval m fuel start env
+        | .error (.fault .representation)
+      let (.number _ last, env) ← eval m fuel stop env
+        | .error (.fault .representation)
+      let (.number _ mid, env) ← eval m fuel amount env
+        | .error (.fault .representation)
+      let .array values := array | .error (.fault .representation)
+      if last < first ∨ values.length < last then .error (.fault .bounds)
+      else if last - first < mid then .error (.fault (.panic "rotate_left"))
+      else
+        let part := (values.drop first).take (last - first)
+        return (.array (values.take first ++ (part.drop mid ++ part.take mid) ++ values.drop last), env)
+    | .sort array start stop => do
+      let (array, env) ← eval m fuel array env
+      let (.number _ first, env) ← eval m fuel start env
+        | .error (.fault .representation)
+      let (.number _ last, env) ← eval m fuel stop env
+        | .error (.fault .representation)
+      let .array values := array | .error (.fault .representation)
+      if last < first ∨ values.length < last then .error (.fault .bounds)
+      else
+        let part := (values.drop first).take (last - first)
+        let kind := match part with
+          | .number k _ :: _ => k
+          | _ => "usize"
+        match numbers kind part with
+        | none => .error (.fault .representation)
+        | some ns =>
+          let sorted := (sortNumbers ns).map (PureValue.number kind)
+          return (.array (values.take first ++ sorted ++ values.drop last), env)
+    | .invoke name receiver writeBack arguments => do
+      let (self, env) ← eval m fuel receiver env
+      let (values, env) ← arguments.foldlM (fun (values, env) argument => do
+        let (value, env) ← eval m fuel argument env
+        return (values ++ [value], env)) ([], env)
+      match m.functions name with
+      | none => .error (.fault .representation)
+      | some body =>
+        let frame := (values.zipIdx 1).foldl (fun frame (value, slot) => pureSet frame slot value)
+          (pureSet (fun _ => none) 0 self)
+        let outcome : Except Exit (PureValue × PureEnv) := match eval m fuel body frame with
+          | .ok result => .ok result
+          | .error (.returned value final) => .ok (value, final)
+          | .error (.exit _ _ _) => .error (.fault .representation)
+          | .error (.fault reason) => .error (.fault reason)
+        let (value, final) ← outcome
+        match writeBack with
+        | none => return (value, env)
+        | some (slot, path) => match final 0, env slot with
+          | some updated, some current => do
+            let replaced ← update env path current updated
+            return (value, pureSet env slot replaced)
+          | _, _ => .error (.fault .representation)
+    | .replicate value count => do
+      let (value, env) ← eval m fuel value env
+      let (.number _ n, env) ← eval m fuel count env
+        | .error (.fault .representation)
+      return (.array (List.replicate n value), env)
 
 /-- Run a method body with its receiver in slot 0 and parameters in slots
     1, 2, ... The result is the returned value and the final receiver; a fault
     carries no state, since partially mutated receivers are not modeled here. -/
-def run (bits : Nat) (checked : Bool) (fuel : Nat) (body : Expr) (receiver : PureValue) (arguments : List PureValue) :
+def run (m : Machine) (fuel : Nat) (body : Expr) (receiver : PureValue) (arguments : List PureValue) :
     Except Fault (PureValue × PureValue) :=
   let env := (arguments.zipIdx 1).foldl (fun env (value, slot) => pureSet env slot value)
     (pureSet (fun _ => none) 0 receiver)
-  match eval bits checked fuel body env with
+  match eval m fuel body env with
+  | .error (.exit _ _ _) => .error .representation
   | .ok (value, env) => match env 0 with
     | some receiver => .ok (value, receiver)
     | none => .error .representation

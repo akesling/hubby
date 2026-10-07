@@ -62,7 +62,7 @@ pub(super) fn generate(
     for method in methods.iter().filter(|m| m.imperative.is_some()) {
         let name = &method.symbol;
         output.push_str(&format!(
-            "def {name}_build (fuel : Nat) (receiver : PureValue) (arguments : List PureValue) : Except Provium.Imperative.Fault (PureValue × PureValue) :=\n  {name} target_usize_bits target_overflow_checked fuel receiver arguments\n"
+            "def {name}_build (oracle : String → List PureValue → Except Provium.Imperative.Fault PureValue) (fuel : Nat) (receiver : PureValue) (arguments : List PureValue) : Except Provium.Imperative.Fault (PureValue × PureValue) :=\n  {name} ⟨target_usize_bits, target_overflow_checked, oracle⟩ fuel receiver arguments\n"
         ));
     }
     output.push_str(&format!("end {namespace}\n"));

@@ -1243,6 +1243,7 @@ fn executable(body: &[Statement], indent: usize) -> String {
 }
 pub fn generate(methods: &[Method], namespace: &str) -> String {
     let mut text=format!("-- Generated from complete Rust method bodies; no sliced statements.\nimport Provium.State\nimport Provium.Loans\nimport Provium.ArrayMoves\nimport Provium.ScalarSource\nimport Provium.FieldReads\nimport Provium.ConstructorSource\nimport Provium.NumericFolds\n{}namespace {namespace}\nopen Provium.State\n", if methods.iter().any(|m| m.imperative.is_some()) { "import Provium.Imperative\n" } else { "" });
+    text.push_str(&imperative::table(methods));
     for method in methods {
         let name = &method.symbol;
         if method.getter.is_some() {

@@ -2833,7 +2833,6 @@ inductive PurePattern where
   | any | bind (slot : Nat)
   | variant (name tag : String) (fields : List (String × PurePattern))
   | present (value : PurePattern)
-  | absent
   | alternatives (patterns : List PurePattern)
   deriving Repr
 inductive PureExpr where
@@ -2881,9 +2880,6 @@ def pureMatch : Nat → PurePattern → PureValue → PureEnv → Except PureFau
     | .bind slot => .ok (some (pureSet env slot value))
     | .present pattern => match value with
       | .present value => pureMatch fuel pattern value env
-      | _ => .ok none
-    | .absent => match value with
-      | .absent => .ok (some env)
       | _ => .ok none
     | .variant owner tag patterns => match value with
       | .variant actual variant fields =>

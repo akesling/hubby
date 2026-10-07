@@ -109,29 +109,48 @@ It currently requires a Rust 2021 crate buildable without external dependencies
 by its rustc invocation. This restriction applies to the *subject translation*,
 not to whether a consumer can depend on Provium through Cargo.
 
-A state-method project may also list `imperative_methods`: qualified
-`&self`/`&mut self` methods lowered by the imperative backend instead of by
+A state-method project may also list `imperative_methods`: qualified methods or
+associated functions lowered by the imperative backend instead of by
 shape-directed selection (`methods` may then be empty). Each generated
-`<name> bits checked fuel receiver arguments` runs the complete body in
-`Provium.Imperative`, a value-semantics machine: the receiver is one record value
-in slot 0, parameters follow it, and an assignment replaces a field or array
-element of a slot's value. `checked` is the overflow profile: with overflow
-checks, `+`, `-`, `*` and out-of-range shifts fault as Rust's debug arithmetic
-panics; without them they wrap and shift amounts are masked. Division by zero
-and out-of-range indexing fault in both profiles. `<name>_build` instantiates
-the target width and profile of the verified build. Supported syntax: `let`
-(with optional type), assignment and compound assignment to locals, receiver
-fields and array elements, `if`/`if let`/`match` over `Option`, unit and tuple
-variants with identifier or `_` subpatterns, `return`, unsigned arithmetic,
-comparisons and bitwise operations, the wrapping/saturating/checked arithmetic
-methods, `min`/`max`, `is_some`/`is_none`, struct and variant construction,
-derived equality, and calls to the receiver's own inherent methods, which are
-inlined. Fields the body never reads may have any type, including generic
-parameters. Loops, closures, `?`, references, trait calls and match guards are
-rejected. A fault carries no receiver: partially mutated state under unwinding
-is not modeled. The correspondence between the record value and the Rust
-layout, and the frontend's typing and lowering, are trusted; a differential
-test compares native runs with kernel-reduced results.
+`<name> target fuel receiver arguments` runs the complete body in
+`Provium.Imperative`, a value-semantics machine. Every value lives in a slot:
+the receiver in slot 0, then the ordinary arguments, then the impl's const
+parameters (for example `N` and `CAP`) as `usize` values. An assignment
+replaces a field or array element of a slot's value. The `Target` supplies the
+`usize` width, the overflow profile and an oracle: with overflow checks, `+`,
+`-`, `*` and out-of-range shifts fault as Rust's debug arithmetic panics;
+without them they wrap and shift amounts are masked. Division by zero,
+out-of-range indexing and slicing fault in both profiles. `<name>_build`
+instantiates the verified build's width and profile.
+
+Calls to the crate's own functions and methods, on any crate type, are compiled
+once into the project's `imperative_functions` table and run in a new frame;
+a `&mut self` call writes the callee's receiver back to its place. Functions
+taking closures (`impl Fn*`, `&mut dyn FnMut`) or returning `impl Iterator`
+are inlined at each call instead, and closures are inlined where they are
+called, in the frame where they were written. Iterator chains over arrays,
+slices and integer ranges (`iter`, `flatten`, `rev`, `map`, `filter`,
+`filter_map`, `enumerate`, `take_while`, `copied`, `cloned`) lower to explicit
+loops consumed by `for`, `next`, `next_back`, `last`, `position`, `any`, `all`,
+`find`, `count`, `max` or `min`; iterator-valued locals are re-created at each
+use, which Rust's borrow rules make equivalent. Also supported: `loop`,
+`while` and labeled `break`/`continue`, `?` on `Option` and same-error
+`Result`, `let … else`, `match` with tuple, struct and variant patterns and
+or-patterns, tuples and their lexicographic comparison, casts and
+`try_from`, `Option`/`Result` combinators, array `fill`, `map`, `get`,
+`contains`, slice `sort_unstable` and `rotate_left`, `matches!`, `assert!`,
+`unreachable!`, derived `Clone`/`Default`/equality, and integer locals whose
+type is inferred from later uses (falling back to `i32`, modeled for
+non-negative values). `Clone` of a generic payload and calls through function
+pointers go to the oracle; theorems hold for every oracle.
+
+Payload destructors are not modeled: the lowering assumes they return normally
+and leave the tracked values unchanged. A fault carries no receiver, so
+partially mutated state under unwinding is not modeled. The correspondence
+between record values and Rust layouts, and the frontend's typing and lowering,
+are trusted; differential tests compare native runs with Lean evaluation
+(kernel-reduced in Provium's tests, compiled `#eval` over random Jarl
+schedules in Jarl's).
 
 Backends interpret standard methods (`Option::as_ref`, `take`, slice sorts,
 derived `Default`) and receiver-local helpers by name, so the loader rejects

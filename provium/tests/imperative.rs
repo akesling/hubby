@@ -95,10 +95,9 @@ fn receiver_bodies_lower_with_inlined_calls_and_reject_unsupported_rust() {
     assert_eq!(imperative.parameters, 1);
     assert!(imperative.mutable_receiver);
     assert_eq!(imperative.inlined, ["Node::reset_election"]);
+    // `reset_election` is compiled once into the function table and called.
     for op in [
-        ".scope",
-        "wrapping_mul",
-        "\">>\"",
+        ".invoke \"Node::reset_election\" (.read 0) (some (0, []))",
         ".assign 0 [.field \"role\"]",
         ".variant \"Role\" \"Follower\" []",
     ] {
@@ -107,6 +106,13 @@ fn receiver_bodies_lower_with_inlined_calls_and_reject_unsupported_rust() {
             "missing {op}: {}",
             imperative.expression
         );
+    }
+    let [(name, body)] = imperative.functions.as_slice() else {
+        panic!("{:?}", imperative.functions)
+    };
+    assert_eq!(name, "Node::reset_election");
+    for op in ["wrapping_mul", "\">>\"", ".assign 0 [.field \"elapsed\"]"] {
+        assert!(body.contains(op), "missing {op}: {body}");
     }
     let grant = w.lower("Node::grant").unwrap().imperative.unwrap();
     assert!(grant.expression.contains(".index "), "{}", grant.expression);
@@ -119,22 +125,22 @@ fn receiver_bodies_lower_with_inlined_calls_and_reject_unsupported_rust() {
         (
             "self.elapsed = 0;",
             "self.elapsed = (|x: u64| x)(0);",
-            "unsupported call target",
-        ),
-        (
-            "self.elapsed = 0;",
-            "for _ in 0..3 {}",
             "unsupported expression",
         ),
         (
             "self.elapsed = 0;",
-            "self.payload = None;",
-            "Copy is not modeled",
+            "while let Some(_) = self.prevoting {}",
+            "while let is unsupported",
+        ),
+        (
+            "self.elapsed = 0;",
+            "let r = &mut self.elapsed;",
+            "&mut expressions are unsupported",
         ),
         (
             "self.leader = leader;",
-            "self.leader = leader.map(|x| x);",
-            "opaque method call map",
+            "self.leader = leader.map_or_else(|| None, Some);",
+            "opaque method call map_or_else",
         ),
         ("fn follow(&mut self", "fn follow(&self", "immutable place"),
         (
@@ -300,7 +306,7 @@ fn main() {
             (value.clone(), result)
         };
         proofs.push_str(&format!(
-            "theorem native_{i} : Subject.{function} 64 true 64 ({receiver}) [{arguments}] = .ok ({value}, {after}) := by rfl\n"
+            "theorem native_{i} : Subject.{function} ⟨64, true, fun _ _ => .error .representation⟩ 64 ({receiver}) [{arguments}] = .ok ({value}, {after}) := by rfl\n"
         ));
         obligations
             .push(serde_json::json!({"theorem": format!("native_{i}"), "function": function}));
@@ -318,4 +324,195 @@ fn main() {
     let error = provium::methods::verify(&config, &w.0.join("out")).unwrap_err();
     assert!(error.contains("Lean rejected Proofs.lean"), "{error}");
     assert!(!w.0.join("out/verified.json").exists());
+}
+
+const TABLE: &str = r#"
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Item { pub key: u64, pub live: bool }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Fail { Empty, Full }
+pub struct Table<const K: usize> { items: [Option<Item>; K], len: usize, total: u64 }
+impl<const K: usize> Table<K> {
+    fn keys(&self) -> impl Iterator<Item = &Item> { self.items[..self.len].iter().flatten() }
+    fn find(&self, key: u64) -> Option<usize> {
+        self.items.iter().position(|i| i.is_some_and(|i| i.key == key))
+    }
+    fn insert(&mut self, key: u64) -> Result<usize, Fail> {
+        if self.len == K { return Err(Fail::Full); }
+        if let Some(at) = self.find(key) { return Ok(at); }
+        self.items[self.len] = Some(Item { key, live: true });
+        self.len += 1;
+        self.total = self.total.saturating_add(key);
+        Ok(self.len - 1)
+    }
+    fn largest(&self) -> Result<u64, Fail> {
+        let best = self.keys().filter(|i| i.live).map(|i| i.key).max().ok_or(Fail::Empty)?;
+        Ok(best)
+    }
+    fn retire(&mut self, below: u64) -> usize {
+        let mut count = 0;
+        for item in &mut self.items[..self.len] {
+            if item.is_some_and(|i| i.key < below) {
+                *item = None;
+                count += 1;
+            }
+        }
+        count
+    }
+    fn summary(&self) -> (u64, usize) {
+        let mut n = 0;
+        let mut sum = 0u64;
+        for (index, item) in self.items.iter().enumerate() {
+            if index >= self.len { break; }
+            if let Some(i) = item {
+                if !i.live { continue; }
+                sum = sum.wrapping_add(i.key);
+                n += 1;
+            }
+        }
+        (sum, n)
+    }
+    fn median(&mut self) -> Option<u64> {
+        let mut keys = [0; K];
+        let mut c = 0;
+        for i in self.keys() {
+            keys[c] = i.key;
+            c += 1;
+        }
+        if c == 0 { return None; }
+        keys[..c].sort_unstable();
+        let (low, high) = (keys[0], keys[c - 1]);
+        if (low, c) >= (high, 2) { self.total = 0; }
+        Some(keys[c / 2])
+    }
+    fn step(&mut self, key: u64) -> Result<u64, Fail> {
+        let slot = self.insert(key)?;
+        let flip = |i: Option<Item>| i.map(|mut x| { x.live = !x.live; x });
+        if key % 3 == 0 { self.items[slot] = flip(self.items[slot]); }
+        let (sum, n) = self.summary();
+        let retired = if key % 5 == 0 { self.retire(key / 2) } else { 0 };
+        let median = self.median().unwrap_or(0);
+        Ok(sum.wrapping_add(n as u64).wrapping_add(retired as u64).wrapping_add(median))
+    }
+}
+"#;
+
+#[test]
+#[ignore = "requires pinned Lean; scripts/verify.sh runs this"]
+fn loops_iterators_closures_and_errors_agree_with_native_runs() {
+    let w = Work::new(TABLE);
+    let main = format!(
+        "{TABLE}\n{}",
+        r#"
+fn show(t: &Table<4>) -> String {
+    let item = |i: &Option<Item>| match i {
+        None => ".absent".to_string(),
+        Some(i) => format!("(.present (.record \"Item\" [(\"key\", .number \"u64\" {}), (\"live\", .boolean {})]))", i.key, i.live),
+    };
+    format!(".record \"Table\" [(\"items\", .array [{}]), (\"len\", .number \"usize\" {}), (\"total\", .number \"u64\" {})]",
+        t.items.iter().map(item).collect::<Vec<_>>().join(", "), t.len, t.total)
+}
+fn main() {
+    let mut seed = 7u64;
+    for _ in 0..8 {
+        let mut t = Table::<4> { items: [None; 4], len: 0, total: 0 };
+        for _ in 0..7 {
+            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            let key = (seed >> 33) % 20;
+            let before = show(&t);
+            let r = t.step(key);
+            let result = match r {
+                Ok(v) => format!(".variant \"Result\" \"Ok\" [(\"0\", .number \"u64\" {v})]"),
+                Err(e) => format!(".variant \"Result\" \"Err\" [(\"0\", .variant \"Fail\" \"{e:?}\" [])]"),
+            };
+            println!("{before}|{key}|{result}|{}", show(&t));
+        }
+    }
+}
+"#
+    );
+    fs::write(w.0.join("native.rs"), &main).unwrap();
+    let binary = w.0.join("native");
+    let compiled = std::process::Command::new("rustc")
+        .args([
+            "--edition=2021",
+            "-C",
+            "overflow-checks=yes",
+            "-A",
+            "dead_code",
+        ])
+        .arg(w.0.join("native.rs"))
+        .arg("-o")
+        .arg(&binary)
+        .output()
+        .unwrap();
+    assert!(
+        compiled.status.success(),
+        "{}",
+        String::from_utf8_lossy(&compiled.stderr)
+    );
+    let native = std::process::Command::new(binary).output().unwrap();
+    assert!(native.status.success());
+    let lines = String::from_utf8(native.stdout).unwrap();
+    let mut lean = String::from(
+        "import Generated\nopen Provium.State Provium.Imperative\n\
+         partial def same : PureValue → PureValue → Bool\n\
+         | .unit, .unit => true\n\
+         | .boolean a, .boolean b => a == b\n\
+         | .number k a, .number l b => k == l && a == b\n\
+         | .absent, .absent => true\n\
+         | .present a, .present b => same a b\n\
+         | .array a, .array b => a.length == b.length && (a.zip b).all (fun (x, y) => same x y)\n\
+         | .record n a, .record m b => n == m && a.length == b.length && (a.zip b).all (fun (x, y) => x.1 == y.1 && same x.2 y.2)\n\
+         | .variant o t a, .variant p u b => o == p && t == u && a.length == b.length && (a.zip b).all (fun (x, y) => x.1 == y.1 && same x.2 y.2)\n\
+         | _, _ => false\n\
+         def target : Target := ⟨64, true, fun _ _ => .error .representation⟩\n\
+         def check (i : Nat) (actual : Except Fault (PureValue × PureValue)) (result after : PureValue) : IO Unit :=\n\
+         match actual with\n\
+         | .ok (r, a) => if same r result && same a after then IO.println s!\"DIFF ok {i}\" else IO.println s!\"DIFF mismatch {i} {repr r} {repr a}\"\n\
+         | .error f => IO.println s!\"DIFF fault {i} {repr f}\"\n",
+    );
+    let mut count = 0;
+    for (i, line) in lines.lines().enumerate() {
+        let [before, key, result, after] = line.split('|').collect::<Vec<_>>()[..] else {
+            panic!("{line}")
+        };
+        lean.push_str(&format!(
+            "#eval check {i} (Subject.Table_step target 100000 ({before}) [.number \"u64\" {key}, .number \"usize\" 4]) ({result}) ({after})\n"
+        ));
+        count += 1;
+    }
+    assert_eq!(count, 56);
+    fs::write(
+        w.0.join("Proofs.lean"),
+        "import Generated\ntheorem mentions : Subject.Table_step = Subject.Table_step := rfl\n",
+    )
+    .unwrap();
+    let config = w.0.join("project.json");
+    fs::write(&config, serde_json::to_vec(&serde_json::json!({"crate_root": "lib.rs", "namespace": "Subject", "methods": [], "imperative_methods": ["Table::step"], "proofs": "Proofs.lean", "obligations": [{"theorem": "mentions", "function": "Table_step"}]})).unwrap()).unwrap();
+    let out = w.0.join("out");
+    provium::methods::verify(&config, &out).unwrap();
+    fs::write(out.join("Diff.lean"), lean).unwrap();
+    let run = std::process::Command::new("elan")
+        .args(["run", "leanprover/lean4:v4.33.1", "lean", "Diff.lean"])
+        .current_dir(&out)
+        .env("LEAN_PATH", &out)
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&run.stdout);
+    assert!(
+        run.status.success(),
+        "{stdout}{}",
+        String::from_utf8_lossy(&run.stderr)
+    );
+    let bad = stdout
+        .lines()
+        .filter(|l| l.starts_with("DIFF") && !l.starts_with("DIFF ok"))
+        .take(3)
+        .collect::<Vec<_>>();
+    assert!(bad.is_empty(), "{bad:?}");
+    assert_eq!(
+        stdout.lines().filter(|l| l.starts_with("DIFF ok")).count(),
+        count
+    );
 }
