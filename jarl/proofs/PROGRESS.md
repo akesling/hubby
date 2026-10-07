@@ -18,9 +18,9 @@ Sections below are a chronological log; their counts were correct when written.
 The current obligation counts, from each `project.json`, are: capacity 2,
 consensus 10, election 4, election-safety 5 (specification), initialization 4,
 input-gating 8, log-boundary 14, membership 118, message-dispatch 2,
-message-validation 56, persistence 6, replication-contract 16, specification 18
-(specification), storage 54, storage-view 13: 330 in total. `coverage.json`
-reviews 187 items and 101 conservative public roots; 40 items carry declared
+message-validation 56, node-election 2, persistence 6, replication-contract 16,
+specification 18 (specification), storage 54, storage-view 13: 332 in total. `coverage.json`
+reviews 187 items and 101 conservative public roots; 41 items carry declared
 component evidence. Update this section with every checkpoint.
 
 Protocol frontier: discharge append/truncation/installation preconditions in
@@ -1681,3 +1681,36 @@ first. Lean ran serially under a 16384 MiB cap.
 Open review items: restore acceptance for valid checkpoints (storage), and three
 Provium Lean-library concerns (slot-batch index bounds, `selectRecord`'s
 fallback, `FieldReads` liveness over a bare world).
+
+## Restore completeness and the imperative backend (M2)
+
+- **Restore accepts valid checkpoints.** `Storage.restoration_accepts` proves
+  the converse of the existing restore contracts: every checkpoint with a
+  nonzero snapshot id, snapshot term at most the hard term, no vote at term
+  zero, an ordered entry chain that fits the capacity and commit between the
+  snapshot index and the last index has a normally returning run yielding
+  exactly its entries. The storage mutation test strengthens three guards,
+  which this theorem rejects. This closes the last open review finding.
+- **Imperative backend.** Provium gains `Provium.Imperative`, a value-semantics
+  machine for complete `&self`/`&mut self` bodies (assignment into receiver
+  fields and array elements, early return, matches, inlined same-receiver
+  calls, checked or wrapping arithmetic per the build's overflow profile), and
+  a frontend selected by a project's new `imperative_methods` list. Unread
+  receiver fields may have any type, so `Node` with its generic payloads is one
+  record value. `update` and `equal` recurse structurally so kernel reduction
+  can evaluate them; `PurePattern` gains an `absent` case for `None` patterns.
+  A differential test compares 16 native runs with kernel-reduced results.
+- **First whole-body `Node` contracts.** `node-election` proves the exact
+  resulting receiver record of `Node::reset_election` and of `Node::follow`
+  (with `reset_election` inlined) for every fuel above the body depth, target
+  width and overflow profile, so every unnamed field is unchanged. A mutation
+  test changes seven details of the two bodies; each fails in Lean.
+- **Kernel arithmetic hazard.** The kernel reduces `x + c` and `x * c` by
+  recursion on `c`; a symbolic value combined with a 64-bit literal in that
+  order exhausts memory. The `u64` wrapping lemmas therefore put the second
+  operand first, and `advance`/`mix` are written literal-first.
+
+Next: lower `campaign`, `become_leader` and the vote handlers (which need
+const-generic `for` loops, array `fill` and `?`), then prove the refinement
+from generated `Node` transitions to the `election-safety` model.
+

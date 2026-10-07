@@ -5287,10 +5287,17 @@
         "C07",
         "C08"
       ],
-      "status": "planned",
-      "note": "Production item inventoried; complete translation, refinement and caller obligations remain open.",
+      "status": "component_evidence",
+      "note": "Complete original body, with reset_election inlined, lowered by the imperative backend over a value-semantics receiver record (proofs/node-election): exact resulting record for every leader argument (Follower role, cleared pre-vote, stored leader, leader age restarted when a leader is known, advanced generator, deadline ticks + SplitMix64 % ticks, zero elapsed) with every other field unchanged, for any fuel above the body depth, target width and overflow profile. Receiver layout correspondence, unwinding state and callers remain open.",
       "root_apis": [],
-      "contracts": [],
+      "contracts": [
+        {
+          "project": "proofs/node-election/project.json",
+          "theorem": "NodeElection.follow_exact",
+          "function": "node_Node_follow",
+          "evidence": "artifacts/provium/proofs/node-election/verified.json"
+        }
+      ],
       "context": "production"
     },
     "crate::node::<Node < V , S , N , CAP >>::grow": {
@@ -5547,7 +5554,7 @@
         "C08"
       ],
       "status": "component_evidence",
-      "note": "Existing source-linked component contracts; see proofs/README.md for assumptions and scope. No global correctness claim.",
+      "note": "Existing source-linked component contracts; see proofs/README.md for assumptions and scope. proofs/node-election also proves the exact whole-body effect on the receiver record (three fields changed, every other field unchanged) through the imperative backend. No global correctness claim.",
       "root_apis": [],
       "contracts": [
         {
@@ -5573,6 +5580,12 @@
           "theorem": "Election.deadline_exact",
           "function": "node_Node_reset_election_election_deadline",
           "evidence": "artifacts/provium/proofs/election/verified.json"
+        },
+        {
+          "project": "proofs/node-election/project.json",
+          "theorem": "NodeElection.reset_election_exact",
+          "function": "node_Node_reset_election",
+          "evidence": "artifacts/provium/proofs/node-election/verified.json"
         }
       ],
       "context": "production"

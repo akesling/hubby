@@ -126,6 +126,8 @@ mod consensus;
 mod election;
 #[path = "proof_cases/initialization.rs"]
 mod initialization;
+#[path = "proof_cases/node_election.rs"]
+mod node_election;
 #[path = "proof_cases/queries.rs"]
 mod input_gating;
 #[path = "proof_cases/arrays.rs"]

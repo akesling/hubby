@@ -1,0 +1,21 @@
+{
+  "cargo_build": "../builds.json",
+  "crate_root": "../../src/lib.rs",
+  "namespace": "Jarl",
+  "methods": [],
+  "imperative_methods": [
+    "node::Node::reset_election",
+    "node::Node::follow"
+  ],
+  "proofs": "Proofs.lean",
+  "obligations": [
+    {
+      "theorem": "NodeElection.reset_election_exact",
+      "function": "node_Node_reset_election"
+    },
+    {
+      "theorem": "NodeElection.follow_exact",
+      "function": "node_Node_follow"
+    }
+  ]
+}
