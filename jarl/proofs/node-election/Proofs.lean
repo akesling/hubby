@@ -68,12 +68,12 @@ private theorem wrapping_add_golden (bits : Nat) (checked : Bool) {random : Nat}
 /-- `reset_election` advances the generator, draws a deadline in
     `[ticks, 2 * ticks)` and restarts the elapsed count, for every fuel above
     the body's depth, target width and overflow profile. -/
-theorem reset_election_exact (bits fuel : Nat) (checked : Bool) (n : Fields) (ticks random : Nat)
+theorem reset_election_exact (target : Target) (fuel : Nat) (n : Fields) (peers capacity : PureValue) (ticks random : Nat)
     (enough : 40 ≤ fuel)
     (ticksRead : pureField n.config "election_ticks" = some (.number "u64" ticks))
     (randomValue : n.random = .number "u64" random) (range : random < 2^64)
     (positive : 0 < ticks) (safe : ticks ≤ 2^63) :
-    Jarl.node_Node_reset_election bits checked fuel n.value [] =
+    Jarl.node_Node_reset_election target fuel n.value [peers, capacity] =
       .ok (.unit, { n with
         random := .number "u64" (advance random),
         election_deadline := .number "u64" (ticks + mix (advance random) % ticks),
@@ -90,12 +90,12 @@ theorem reset_election_exact (bits fuel : Nat) (checked : Bool) (n : Fields) (ti
 
 /-- `follow` steps down: Follower role, no pre-vote, the given leader, a
     restarted leader age when a leader is known, and a fresh election timer. -/
-theorem follow_exact (bits fuel : Nat) (checked : Bool) (n : Fields) (leader : PureValue) (ticks random : Nat)
+theorem follow_exact (target : Target) (fuel : Nat) (n : Fields) (leader peers capacity : PureValue) (ticks random : Nat)
     (enough : 60 ≤ fuel)
     (ticksRead : pureField n.config "election_ticks" = some (.number "u64" ticks))
     (randomValue : n.random = .number "u64" random) (range : random < 2^64)
     (positive : 0 < ticks) (safe : ticks ≤ 2^63) :
-    Jarl.node_Node_follow bits checked fuel n.value [leader] =
+    Jarl.node_Node_follow target fuel n.value [leader, peers, capacity] =
       .ok (.unit, { n with
         role := .variant "Role" "Follower" [],
         prevoting := .absent,
@@ -111,9 +111,10 @@ theorem follow_exact (bits fuel : Nat) (checked : Bool) (n : Fields) (leader : P
     omega
   cases leader <;>
   simp (maxDischargeDepth := 8) [Jarl.node_Node_follow, Jarl.node_Node_follow_ir, Provium.Imperative.run, eval,
+    Jarl.imperative_functions, Jarl.function_node_Node_reset_election,
     Fields.value, randomValue, set_same, set_other, field_record, bind, Except.bind, pure, Except.pure, update,
     replaceField, binary, ticksRead, wrapping_add_golden, wrapping_mul_u64, xor_u64, shift_right_u64, rem_u64,
     add_u64, mod_word, xor_word, shift_word, range, ticksWord, sumWord, positive, mix, advance_word, select,
-    pureMatch, List.foldlM]
+    matchPattern, List.foldlM]
 
 end NodeElection

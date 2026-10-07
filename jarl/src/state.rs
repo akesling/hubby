@@ -144,6 +144,12 @@ impl<V, S, const CAP: usize> State<V, S, CAP> {
         }
     }
 
+    /// Every field, for test-only serialization.
+    #[cfg(test)]
+    pub(crate) fn parts(&self) -> (&HardState, &Option<Snapshot<S>>, &[Option<Entry<V>>; CAP], usize) {
+        (&self.hard, &self.snapshot, &self.entries, self.len)
+    }
+
     pub(crate) fn full(&self) -> bool {
         self.len == CAP
     }

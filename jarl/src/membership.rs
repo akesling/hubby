@@ -121,6 +121,11 @@ impl<const MAX: usize> Membership<MAX> {
     pub fn contains(&self, id: Id) -> bool {
         self.members.iter().flatten().any(|m| m.id == id)
     }
+    /// Every slot's identity and flags, for test-only serialization.
+    #[cfg(test)]
+    pub(crate) fn members(&self) -> [Option<(Id, bool, bool, bool)>; MAX] {
+        self.members.map(|m| m.map(|m| (m.id, m.voter, m.old, m.learner)))
+    }
     pub(crate) fn peers(&self) -> [Option<Id>; MAX] {
         self.members.map(|m| m.map(|m| m.id))
     }

@@ -20,7 +20,7 @@ consensus 10, election 4, election-safety 5 (specification), initialization 4,
 input-gating 8, log-boundary 14, membership 118, message-dispatch 2,
 message-validation 56, node-election 2, persistence 6, replication-contract 16,
 specification 18 (specification), storage 54, storage-view 13: 332 in total. `coverage.json`
-reviews 187 items and 101 conservative public roots; 41 items carry declared
+reviews 190 items and 101 conservative public roots; 41 items carry declared
 component evidence. Update this section with every checkpoint.
 
 Protocol frontier: discharge append/truncation/installation preconditions in
@@ -1710,7 +1710,25 @@ fallback, `FieldReads` liveness over a bare world).
   order exhausts memory. The `u64` wrapping lemmas therefore put the second
   operand first, and `advance`/`mix` are written literal-first.
 
-Next: lower `campaign`, `become_leader` and the vote handlers (which need
-const-generic `for` loops, array `fill` and `?`), then prove the refinement
-from generated `Node` transitions to the `election-safety` model.
+- **Whole-engine lowering.** The imperative frontend now covers the language
+  of `Node`'s fixed and dynamic engines: crate calls on any type compiled once
+  into a function table (with `&mut self` write-back), closures (including
+  closures passed to `Membership::quorum`), iterator chains over arrays,
+  slices and ranges, loops with `break`/`continue`, `?`, `let … else`,
+  tuple/struct/variant and or-patterns, casts, slice sorting and rotation,
+  inferred integer locals, and oracle calls for payload `Clone` and membership
+  hooks. `Node::tick` and `Node::step` lower completely, with every callee.
+  Values of types with a `Drop` impl are rejected; payload destructors are
+  assumed to return normally.
+- **Differential check against native Jarl.** `src/node/machine.rs`
+  (test-only) records about 800 `tick`/`step` calls from random three-node
+  fixed-engine schedules with message loss, crashes and restarts, serializes
+  each receiver, input and result, and compares them with Lean's compiled
+  evaluation of the generated programs; all agree. Breaking the
+  tuple-comparison lowering makes 7 of 784 calls differ. The dynamic engine's
+  hooks are not exercised (they are function pointers handed to the oracle).
+
+Next: prove refinement from the generated `tick`/`step` (fixed engine) to the
+`election-safety` model, starting with per-function effect lemmas for the
+table's functions.
 

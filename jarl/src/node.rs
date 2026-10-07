@@ -1054,3 +1054,6 @@ impl<V: Clone, S: Clone, const N: usize, const CAP: usize> Node<V, S, N, CAP> {
         self.send(peer, Outbound::Replicate);
     }
 }
+
+#[cfg(test)]
+mod machine;
