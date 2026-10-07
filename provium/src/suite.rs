@@ -152,3 +152,24 @@ fn discover(dir: &Path, projects: &mut Vec<PathBuf>) -> Result<(), String> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::remove_certificates;
+    use std::fs;
+
+    #[test]
+    fn removed_projects_lose_their_certificates() {
+        let root = std::env::temp_dir().join(format!("provium-suite-{}", std::process::id()));
+        let renamed = root.join("proofs/old-name");
+        fs::create_dir_all(&renamed).unwrap();
+        fs::write(renamed.join("verified.json"), "stale success").unwrap();
+        fs::write(renamed.join("manifest.json"), "evidence").unwrap();
+        remove_certificates(&root.join("proofs")).unwrap();
+        assert!(!renamed.join("verified.json").exists());
+        assert!(renamed.join("manifest.json").exists());
+        // A missing evidence directory is not an error.
+        remove_certificates(&root.join("absent")).unwrap();
+        fs::remove_dir_all(&root).unwrap();
+    }
+}

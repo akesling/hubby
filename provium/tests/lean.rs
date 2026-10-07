@@ -86,6 +86,34 @@ fn kernel_rejects_admits_unrelated_claims_and_stale_success() {
         assert!(error.contains(expected),"{error}");
         assert!(!w.out().join("verified.json").exists());
     }
+    // A generated theorem cannot stand in for a consumer obligation: nobody
+    // proved it, although it mentions the function and uses no axioms.
+    w.write(
+        "Proofs.lean",
+        &format!("import Generated\ntheorem checked : {claim} := by rfl\n"),
+    );
+    let mut config: serde_json::Value = serde_json::from_slice(&fs::read(&p).unwrap()).unwrap();
+    config["obligations"] =
+        serde_json::json!([{"theorem": "Subject.f_correspondence", "function": "f"}]);
+    fs::write(&p, config.to_string()).unwrap();
+    let error = verify(&p, &w.out()).unwrap_err();
+    assert!(error.contains("Provium-owned module"), "{error}");
+    assert!(!w.out().join("verified.json").exists());
+}
+
+#[test]
+fn compile_clears_stale_lean_objects() {
+    let w = Work::new();
+    let p = project(&w, false);
+    w.write("source.rs", "fn f(x:u8)->u8{x}");
+    fs::create_dir_all(w.out().join("Provium")).unwrap();
+    for stale in ["Proofs.olean", "Contracts.ilean", "Provium/Old.olean"] {
+        fs::write(w.out().join(stale), "stale object").unwrap();
+    }
+    compile(&p, &w.out()).unwrap();
+    for stale in ["Proofs.olean", "Contracts.ilean", "Provium/Old.olean"] {
+        assert!(!w.out().join(stale).exists(), "{stale} survived");
+    }
 }
 
 #[test]

@@ -275,6 +275,8 @@ impl Compiler {
                 | BinOp::Ge(_)
                 | BinOp::And(_)
                 | BinOp::Or(_) => Some(Ty::Bool),
+                // A shift has its left operand's type; the count says nothing.
+                BinOp::Shl(_) | BinOp::Shr(_) => self.hint(&e.left, env),
                 _ => self.hint(&e.left, env).or_else(|| self.hint(&e.right, env)),
             },
             _ => None,

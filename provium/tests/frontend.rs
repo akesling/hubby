@@ -161,6 +161,9 @@ fn rejects_unsupported_or_ambiguous_semantics() {
         "fn f(x:u8)->u8{x.rotate_left(1)}",
         "fn f(x:u8)->u8{let y=1; x}",
         "fn f(x:u8)->u8{assert!(x>0,\"message\");x}",
+        // rustc types an unconstrained `1 << s` as i32, not as the count's u32.
+        "fn f(s:u32)->bool{(1<<s)>0}",
+        "fn f(x:u8,s:u32)->u8{x<<s}",
     ] {
         assert!(
             Compiler::parse(source, 64)
@@ -170,6 +173,10 @@ fn rejects_unsupported_or_ambiguous_semantics() {
         );
     }
     assert!(Compiler::parse("fn f()->u8{0}", 16).is_err());
+    // A shift typed by its expected result remains supported.
+    Compiler::parse("fn f(s:u32)->u32{1<<s}", 64)
+        .and_then(Compiler::compile)
+        .unwrap();
 }
 
 #[test]
