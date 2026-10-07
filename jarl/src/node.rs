@@ -358,6 +358,10 @@ impl<V: Clone, S: Clone, const N: usize, const CAP: usize> Node<V, S, N, CAP> {
                 .checked_add(1)
                 .ok_or(Error::Exhausted)?;
             if self.hooks.is_some() {
+                // A probe abandons any campaign in the current term. Pre-vote
+                // grants share `votes` with real votes, so remaining a Candidate
+                // would let a delayed current-term grant join them in a quorum.
+                self.role = Role::Follower;
                 self.prevoting = Some(term);
                 self.votes.fill(false);
                 self.votes[self.local] = true;
