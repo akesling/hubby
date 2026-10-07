@@ -97,15 +97,19 @@ impl<const N: usize> Config<N> {
 /// A local operation could not be performed. The node remains usable.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Error {
-    /// Invalid membership, timing, or zero log capacity.
+    /// Invalid membership, timing, or log capacity (zero for `Node`, fewer than
+    /// four slots for `Cluster`), or an empty proposal batch.
     Config,
-    /// Malformed or inconsistent persisted state.
+    /// Malformed or inconsistent persisted state. `State::restore` instead
+    /// returns `Full` when the checkpoint has more entries than its capacity.
     State,
     /// Persist pending state and drain messages before the next operation.
     Busy,
     /// Proposals require leadership. The known leader, if any, is provided.
     NotLeader(Option<Id>),
-    /// Log capacity is exhausted. Compact applied entries or increase capacity.
+    /// Log capacity is exhausted; compact applied entries or increase capacity.
+    /// Membership operations also return it when the peer union would exceed
+    /// `MAX`, which compaction and log growth cannot fix.
     Full,
     /// The requested snapshot position is not in the committed log.
     NotCommitted,
@@ -113,7 +117,8 @@ pub enum Error {
     Exhausted,
     /// Envelope identities or message contents are invalid.
     Message,
-    /// A membership change must finish committing before another can begin.
+    /// A membership change must finish committing before another can begin,
+    /// or a new leader has not yet committed an entry from its own term.
     Reconfiguring,
     /// A new voter must first catch up as a learner.
     NotCaughtUp,

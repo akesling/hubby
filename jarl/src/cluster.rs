@@ -100,6 +100,7 @@ pub struct Cluster<V, S, const MAX: usize, const CAP: usize> {
 
 impl<V: Clone, S: Clone, const MAX: usize, const CAP: usize> Cluster<V, S, MAX, CAP> {
     /// Start or recover a node. An identity outside the configuration is passive.
+    /// `CAP` must be at least four, leaving room for the protocol reserve.
     pub fn new(settings: Settings, saved: ClusterState<V, S, MAX, CAP>) -> Result<Self, Error> {
         if CAP < 4 {
             return Err(Error::Config);
@@ -227,12 +228,11 @@ impl<V: Clone, S: Clone, const MAX: usize, const CAP: usize> Cluster<V, S, MAX, 
         if self.role() != Role::Leader {
             return Err(Error::NotLeader(self.leader()));
         }
+        // The latest configuration record is committed exactly when no record
+        // lies above the commit index, so it is also the committed membership.
         let (index, membership) = self.node.membership_at(self.state().last().index);
         let hard = self.state().hard();
-        if membership.is_joint()
-            || index > hard.commit
-            || self.node.membership_at(hard.commit).1 != membership
-        {
+        if membership.is_joint() || index > hard.commit {
             return Err(Error::Reconfiguring);
         }
         // Establish leadership in this term before making configuration decisions.
@@ -269,9 +269,12 @@ impl<V: Clone, S: Clone, const MAX: usize, const CAP: usize> Cluster<V, S, MAX, 
     }
 
     /// Begin joint consensus with a stable target configuration. Each newly
-    /// promoted voter must already be a learner caught up through the current
-    /// last log entry. The old/new union must fit `MAX`. Poll `membership` and
-    /// call `finish_reconfiguration` after the joint record commits.
+    /// promoted voter must already be a learner that has acknowledged the
+    /// leader's last log entry at the moment of this call, so pause proposals
+    /// until it catches up; otherwise this returns `NotCaughtUp`. The old/new
+    /// union must fit `MAX` (else `Full`). Poll `committed_membership().is_joint()`
+    /// and call `finish_reconfiguration` after the joint record commits;
+    /// `membership()` becomes joint as soon as the record is appended.
     pub fn reconfigure(&mut self, target: Membership<MAX>) -> Result<LogId, Error> {
         self.change_available()?;
         if target.is_joint() {

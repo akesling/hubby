@@ -83,10 +83,14 @@ Use the following sequence on the leader:
    genesis configuration. A joiner remains passive until its log promotes it.
 2. Wait for that configuration to commit and for each prospective voter to catch
    up through `state().last().index`. `matched(id)` exposes its acknowledgment.
+   The check is exact at the moment of the call: pause application proposals
+   until every prospective voter has acknowledged the leader's last entry.
 3. `reconfigure(Membership::new(&voters, &learners)?)` appends a joint configuration.
    New voters must already be caught-up learners. Elections and commitment now
    require separate majorities of the old and new voter sets.
-4. Once the joint entry commits, call `finish_reconfiguration()`. Persist and
+4. Once the joint entry commits (`committed_membership().is_joint()`; note that
+   `membership()` turns joint as soon as the entry is appended), call
+   `finish_reconfiguration()`. Persist and
    replicate the final configuration, and confirm its returned `LogId` is
    durably committed before acknowledging the administrative operation.
 

@@ -8,6 +8,12 @@ use crate::{Entry, HardState, Node, Snapshot, State};
 ///
 /// Unchanged entries and snapshot contents are not included. The transaction must
 /// become durable in full before acknowledging its [`Ready`] token.
+///
+/// If `entries()` is nonempty, `truncate_from` is `Some` and equals the first
+/// entry's index. Applying the same transaction twice is therefore idempotent,
+/// but applying an earlier transaction after a later one truncates the later
+/// entries, which may already count toward a commit quorum: an asynchronous
+/// backend must never let a canceled save overtake a later one.
 pub struct Write<'a, V, S> {
     /// New term, vote, and committed position.
     pub hard: HardState,

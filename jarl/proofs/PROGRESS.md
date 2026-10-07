@@ -20,7 +20,7 @@ is not a source-level Raft correctness proof.
 
 ## Source accounting (M0, C01–C12, P12)
 
-- `coverage.json` reviews 184 syntactic items in Jarl's production module tree.
+- `coverage.json` reviews 187 syntactic items in Jarl's production module tree.
 - Provium independently regenerates file/item hashes and unresolved call spellings.
   Jarl's ordinary tests reject stale sources or missing classifications.
 - New fields, variants, methods and late effects invalidate the review. Exact

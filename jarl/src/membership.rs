@@ -13,10 +13,28 @@ struct Member {
 /// Construct stable configurations with [`Self::new`]. Joint configurations
 /// require both voting majorities. Each identity occupies one slot even if it
 /// votes in both configurations. Never reuse an identity after losing its state.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+///
+/// Equality compares the voter, old-voter and learner sets, not slot layout:
+/// the same configuration built from identities in a different order is equal.
+#[derive(Clone, Copy, Debug)]
 pub struct Membership<const MAX: usize> {
     members: [Option<Member>; MAX],
 }
+
+impl<const MAX: usize> PartialEq for Membership<MAX> {
+    fn eq(&self, other: &Self) -> bool {
+        // Identities are unique within a configuration, so equal member counts
+        // plus inclusion of every member with its flags is set equality.
+        let count = |m: &Self| m.members.iter().flatten().count();
+        count(self) == count(other)
+            && self
+                .members
+                .iter()
+                .flatten()
+                .all(|m| other.members.iter().flatten().any(|o| o == m))
+    }
+}
+impl<const MAX: usize> Eq for Membership<MAX> {}
 
 impl<const MAX: usize> Membership<MAX> {
     /// Create a stable, nonempty voter set with optional nonvoting learners.
@@ -183,6 +201,23 @@ impl<const MAX: usize> Membership<MAX> {
 mod tests {
     use super::*;
     use std::vec::Vec;
+    #[test]
+    fn equality_compares_sets_not_slot_layout() {
+        let a = Membership::<4>::new(&[Id(1), Id(2)], &[Id(3)]).unwrap();
+        let b = Membership::<4>::new(&[Id(2), Id(1)], &[Id(3)]).unwrap();
+        assert_eq!(a, b);
+        assert_ne!(a, Membership::<4>::new(&[Id(1), Id(2)], &[]).unwrap());
+        assert_ne!(a, Membership::<4>::new(&[Id(1), Id(3)], &[Id(2)]).unwrap());
+        // Holes left by finalization do not affect equality.
+        let joint = Membership::<4>::new(&[Id(1), Id(2)], &[])
+            .unwrap()
+            .joint(Membership::new(&[Id(2), Id(3)], &[]).unwrap())
+            .unwrap();
+        assert_eq!(
+            joint.finalized(),
+            Membership::<4>::new(&[Id(3), Id(2)], &[]).unwrap()
+        );
+    }
     #[test]
     fn quorums_match_independent_counts_for_every_three_peer_configuration() {
         for old in 1u8..8 {
