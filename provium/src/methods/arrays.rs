@@ -389,7 +389,12 @@ impl Crate {
     }
 }
 pub(super) fn generate(method: &Method) -> String {
-    let name = &method.symbol;
+    generate_named(method, &method.symbol)
+}
+/// Generate `method` under the Lean name `name`. Callers that embed a helper
+/// under another name use this instead of rewriting generated text, which
+/// could also rewrite quoted field paths that contain the original symbol.
+pub(super) fn generate_named(method: &Method, name: &str) -> String {
     if let Some(fold) = method.array.as_ref().and_then(|s| s.numeric.as_ref()) {
         return super::numeric_folds::generate(name, fold);
     }

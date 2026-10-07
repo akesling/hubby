@@ -372,9 +372,7 @@ pub(super) fn generate(name: &str, fold: &Fold) -> String {
         ("second", &fold.second),
         ("guard", &fold.guard),
     ] {
-        output.push_str(
-            &arrays::generate(method).replace(&method.symbol, &format!("{name}_{suffix}")),
-        );
+        output.push_str(&arrays::generate_named(method, &format!("{name}_{suffix}")));
     }
     output.push_str(&format!("def {name}_ir : NumericFold := {{ first := {name}_first_ir, second := {name}_second_ir, secondRequired := {name}_guard_ir, divisor := {}, divisorProper := (by decide) }}\ndef {name} (entries : ArrayStore α) (callback : σ) (abortOnPanic : Bool) : CallbackRun α σ UInt64 UInt64 := runNumericFold {name}_ir entries callback abortOnPanic\ntheorem {name}_correspondence (entries : ArrayStore α) (callback : σ) (abortOnPanic : Bool) : runNumericFold {name}_ir entries callback abortOnPanic = {name} entries callback abortOnPanic := by rfl\n",fold.divisor));
     output

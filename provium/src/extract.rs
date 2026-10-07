@@ -63,7 +63,7 @@ fn navigate(expr: Expr, step: &str) -> Result<Vec<Expr>, String> {
         }
         "let" => {
             if let Expr::Block(b) = expr {
-                let matches = b
+                let named = b
                     .block
                     .stmts
                     .iter()
@@ -72,15 +72,31 @@ fn navigate(expr: Expr, step: &str) -> Result<Vec<Expr>, String> {
                             syn::Pat::Ident(p)
                                 if parts[1..].contains(&p.ident.to_string().as_str()) =>
                             {
-                                l.init.as_ref().map(|i| *i.expr.clone())
+                                Some((p.ident.to_string(), l.init.as_ref()))
                             }
                             _ => None,
                         },
                         _ => None,
                     })
                     .collect::<Vec<_>>();
-                if parts.len() > 1 && matches.len() == parts.len() - 1 {
-                    return Ok(matches);
+                // Every requested name must be bound exactly once: counting
+                // matches alone lets a shadowed name mask a missing one.
+                let distinct = parts[1..]
+                    .iter()
+                    .collect::<std::collections::BTreeSet<_>>()
+                    .len()
+                    == parts.len() - 1;
+                let each_once = parts[1..]
+                    .iter()
+                    .all(|name| named.iter().filter(|(bound, _)| bound == name).count() == 1);
+                if parts.len() > 1 && distinct && each_once {
+                    return named
+                        .into_iter()
+                        .map(|(name, init)| {
+                            init.map(|i| *i.expr.clone())
+                                .ok_or_else(|| format!("let {name} has no initializer"))
+                        })
+                        .collect();
                 }
             }
         }
@@ -299,8 +315,11 @@ pub fn extract(source: &str, path: &str, slice: &Slice) -> Result<Evidence, Stri
             expression = syn::parse2(quote!(if #test { #value } else { #target }))
                 .map_err(|e| e.to_string())?;
         }
-        // A slice abstracts free scalar locations, never lexical binders or
-        // macros whose names might have different meanings in the host crate.
+        // A slice abstracts free scalar locations, never lexical binders,
+        // macros or free-function calls whose names might have different
+        // meanings in the host crate. Slices are joined into one abstracted
+        // file, so a call could only resolve to another slice chosen by its
+        // user-supplied name, never to the crate function Rust calls.
         struct Binders {
             found: bool,
         }
@@ -311,11 +330,14 @@ pub fn extract(source: &str, path: &str, slice: &Slice) -> Result<Evidence, Stri
             fn visit_macro(&mut self, _: &'ast syn::Macro) {
                 self.found = true;
             }
+            fn visit_expr_call(&mut self, _: &'ast syn::ExprCall) {
+                self.found = true;
+            }
         }
         let mut binders = Binders { found: false };
         binders.visit_expr(&expression);
         if binders.found {
-            return Err("slices cannot contain binding patterns or macros; translate a closed function instead".into());
+            return Err("slices cannot contain binding patterns, macros or function calls; translate a closed function instead".into());
         }
         abstractor.visit_expr_mut(&mut expression);
         bodies.push(tokens(&expression));
@@ -341,4 +363,59 @@ pub fn extract(source: &str, path: &str, slice: &Slice) -> Result<Evidence, Stri
             "selected scalar expression under explicitly declared binding types; enclosing control flow, provenance, and effects are not proved"
         },
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{extract, Binding, Slice};
+
+    #[test]
+    fn slices_reject_calls_that_would_bind_to_other_slices() {
+        let source = "fn clamp(x: u64) -> u64 { if x > 10 { 10 } else { x } }
+            struct S { a: u64 }
+            impl S { fn get(&self) -> u64 { clamp(self.a) } }";
+        let slice = Slice {
+            source: "lib.rs".into(),
+            method: "S::get".into(),
+            name: "get_value".into(),
+            select: vec!["tail".into()],
+            bindings: vec![Binding {
+                rust: "self.a".into(),
+                name: "a".into(),
+                ty: "u64".into(),
+            }],
+            result: "u64".into(),
+            guarded_assignment_prefix: false,
+        };
+        let error = extract(source, "lib.rs", &slice).unwrap_err();
+        assert!(error.contains("function calls"), "{error}");
+    }
+
+    #[test]
+    fn let_selectors_require_each_named_binding_once() {
+        let slice = |source: &str, select: &str| {
+            let slice = Slice {
+                source: "lib.rs".into(),
+                method: "S::get".into(),
+                name: "get_value".into(),
+                select: vec![select.into()],
+                bindings: vec![Binding {
+                    rust: "self.a".into(),
+                    name: "a".into(),
+                    ty: "u64".into(),
+                }],
+                result: "u64".into(),
+                guarded_assignment_prefix: false,
+            };
+            extract(
+                &format!("struct S {{ a: u64 }} impl S {{ fn get(&self) -> u64 {{ {source} }} }}"),
+                "lib.rs",
+                &slice,
+            )
+        };
+        // `x` is shadowed and `y` does not exist: two matches for two names.
+        assert!(slice("let x = self.a; let x = self.a + 1; x", "let:x:y").is_err());
+        assert!(slice("let x = self.a; let y = self.a + 1; x", "let:x:x").is_err());
+        assert!(slice("let x = self.a + 1; let y = self.a + 1; y", "let:x:y").is_ok());
+    }
 }

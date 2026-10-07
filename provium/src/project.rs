@@ -94,8 +94,11 @@ fn identifier(name: &str) -> bool {
     })
 }
 pub fn read(path: &Path) -> Result<Project, String> {
-    let project: Project = serde_json::from_slice(&io(fs::read(path))?)
-        .map_err(|e| format!("invalid project file: {e}"))?;
+    parse(&io(fs::read(path))?)
+}
+fn parse(bytes: &[u8]) -> Result<Project, String> {
+    let project: Project =
+        serde_json::from_slice(bytes).map_err(|e| format!("invalid project file: {e}"))?;
     if usize::from(project.source.is_some())
         + usize::from(!project.slices.is_empty())
         + usize::from(project.scalar_method.is_some())
@@ -122,32 +125,74 @@ pub fn read(path: &Path) -> Result<Project, String> {
     }
     Ok(project)
 }
-pub(crate) fn prepare_output(output: &Path) -> Result<(), String> {
-    // Cargo owns target directories. Check before even invalidating artifacts.
+/// Whether `output`, resolved against `cwd`, lies under a Cargo `target/` tree.
+/// Relative paths are resolved first: a relative output whose ancestors do not
+/// yet exist would otherwise canonicalize only `.`, skipping the working directory.
+fn beneath_target(cwd: &Path, output: &Path) -> bool {
     let in_target = |path: &Path| {
         path.components()
             .any(|part| matches!(part, std::path::Component::Normal(name) if name == "target"))
     };
-    if in_target(output)
-        || output
+    let absolute = cwd.join(output);
+    in_target(&absolute)
+        || absolute
             .ancestors()
             .find_map(|p| p.canonicalize().ok())
             .is_some_and(|p| in_target(&p))
-    {
+}
+pub(crate) fn prepare_output(output: &Path) -> Result<(), String> {
+    // Cargo owns target directories. Check before even invalidating artifacts.
+    if beneath_target(&io(std::env::current_dir())?, output) {
         return Err("Cargo exclusively owns target/; use an artifacts/ output directory".into());
     }
     // Invalidate before parsing: even a rejected edit must invalidate old success.
-    match fs::remove_file(output.join("verified.json")) {
-        Ok(()) => {}
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+    remove_if_present(&output.join("verified.json"))
+}
+fn remove_if_present(path: &Path) -> Result<(), String> {
+    match fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e.to_string()),
+    }
+}
+/// Remove compiled Lean objects left by earlier runs. Backends that compile in
+/// their output directory resolve imports through it, so an old object must
+/// never satisfy an import of this run. Symlinks are not followed.
+pub(crate) fn clear_lean_objects(directory: &Path) -> Result<(), String> {
+    let entries = match fs::read_dir(directory) {
+        Ok(entries) => entries,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
         Err(e) => return Err(e.to_string()),
+    };
+    for entry in entries {
+        let entry = io(entry)?;
+        let path = entry.path();
+        if io(entry.file_type())?.is_dir() {
+            clear_lean_objects(&path)?;
+        } else if path
+            .extension()
+            .is_some_and(|e| e == "olean" || e == "ilean")
+        {
+            io(fs::remove_file(&path))?;
+        }
     }
     Ok(())
 }
+/// Publish a success certificate atomically: readers see either no certificate
+/// or a complete one, never a partially written file.
+pub(crate) fn publish_certificate(output: &Path, bytes: impl AsRef<[u8]>) -> Result<(), String> {
+    let staged = output.join("verified.json.tmp");
+    io(fs::write(&staged, bytes))?;
+    io(fs::rename(&staged, output.join("verified.json")))
+}
 pub fn compile(project_path: &Path, output: &Path) -> Result<Manifest, String> {
     prepare_output(output)?;
-    let config_hash = hash(io(fs::read(project_path))?);
-    let project = read(project_path)?;
+    clear_lean_objects(output)?;
+    // Hash and parse the same bytes, so the recorded hash describes the
+    // configuration that was actually used.
+    let config_bytes = io(fs::read(project_path))?;
+    let config_hash = hash(&config_bytes);
+    let project = parse(&config_bytes)?;
     let base = project_path.parent().unwrap_or_else(|| Path::new("."));
     let mut sources = Vec::<Source>::new();
     let mut snapshots = Vec::<String>::new();
@@ -370,7 +415,7 @@ pub fn compile(project_path: &Path, output: &Path) -> Result<Manifest, String> {
     }
     for o in &project.obligations {
         audit.push_str(&format!(
-            "#provium_check {} references {}.{}\n",
+            "#provium_obligation {} references {}.{}\n",
             o.theorem, project.namespace, o.function
         ));
     }
@@ -515,11 +560,30 @@ pub fn verify(project_path: &Path, output: &Path) -> Result<String, String> {
         }
     }
     let certificate = serde_json::json!({ "whole_program_proved": false, "manifest_sha256": hash(io(fs::read(output.join("manifest.json")))?), "source_sha256": manifest.source_sha256, "generated_sha256": manifest.generated_sha256, "semantics_sha256": manifest.semantics_sha256, "proofs_sha256": manifest.proofs_sha256, "lean": String::from_utf8_lossy(&version.stdout).trim(), "backend_certificates": manifest.functions.len(), "invariant_obligations": manifest.obligations.len(), "audit": report, "trust_boundary": manifest.trusted_boundary });
-    io(fs::write(
-        output.join("verified.json"),
-        serde_json::to_string_pretty(&certificate).map_err(|e| e.to_string())?,
-    ))?;
+    publish_certificate(
+        &output,
+        &serde_json::to_string_pretty(&certificate).map_err(|e| e.to_string())?,
+    )?;
     Ok(format!("Verified {} generated backend certificates and {} invariant obligations.\nTranslated Rust SHA-256: {}\n{}", manifest.functions.len(), manifest.obligations.len(), manifest.source_sha256, report))
+}
+
+#[cfg(test)]
+mod output_tests {
+    use super::beneath_target;
+    use std::path::Path;
+
+    #[test]
+    fn relative_outputs_resolve_against_the_working_directory() {
+        let scratch = std::env::temp_dir().join(format!("provium-target-{}", std::process::id()));
+        let work = scratch.join("crate/target/work");
+        std::fs::create_dir_all(&work).unwrap();
+        // Neither `newout` nor `newout/inv` exists, so no ancestor canonicalizes
+        // except through the working directory.
+        assert!(beneath_target(&work, Path::new("newout/inv")));
+        assert!(beneath_target(&scratch, Path::new("crate/target/new")));
+        assert!(!beneath_target(&scratch, Path::new("crate/artifacts/new")));
+        std::fs::remove_dir_all(&scratch).unwrap();
+    }
 }
 
 #[cfg(test)]

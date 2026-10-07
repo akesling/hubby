@@ -77,6 +77,15 @@ impl Crate {
             fields: BTreeMap<Vec<String>, Field>,
             error: Option<String>,
         }
+        // Macro arguments are token streams that syn does not visit as syntax;
+        // scan them too, or a reserved name inside `assert!` would be rebound.
+        fn reserved_token(tokens: proc_macro2::TokenStream) -> bool {
+            tokens.into_iter().any(|token| match token {
+                proc_macro2::TokenTree::Ident(id) => id.to_string().starts_with("provium_field_"),
+                proc_macro2::TokenTree::Group(group) => reserved_token(group.stream()),
+                _ => false,
+            })
+        }
         impl VisitMut for Flatten<'_> {
             fn visit_ident_mut(&mut self, id: &mut syn::Ident) {
                 if id.to_string().starts_with("provium_field_") {
@@ -84,6 +93,14 @@ impl Crate {
                         "source identifier collides with reserved field parameter prefix".into(),
                     );
                 }
+            }
+            fn visit_macro_mut(&mut self, mac: &mut syn::Macro) {
+                if reserved_token(mac.tokens.clone()) {
+                    self.error = Some(
+                        "source identifier collides with reserved field parameter prefix".into(),
+                    );
+                }
+                syn::visit_mut::visit_macro_mut(self, mac);
             }
             fn visit_expr_mut(&mut self, expr: &mut Expr) {
                 if matches!(expr, Expr::Field(_)) {

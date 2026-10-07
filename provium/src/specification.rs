@@ -36,6 +36,7 @@ fn identifier(value: &str) -> bool {
 /// `specification_only`; no Rust source is translated by this entry point.
 pub fn verify(project: &Path, output: &Path) -> Result<String, String> {
     prepare_output(output)?;
+    crate::project::clear_lean_objects(output)?;
     let read = |path: &Path| fs::read(path).map_err(|e| format!("{}: {e}", path.display()));
     let config = read(project)?;
     let request: Project = serde_json::from_slice(&config).map_err(|e| e.to_string())?;
@@ -124,11 +125,10 @@ pub fn verify(project: &Path, output: &Path) -> Result<String, String> {
         "check_sha256":hash(audit), "obligations":request.obligations.len(), "audit":report,
         "trust_boundary":"Handwritten model consistency only. No Rust execution, compiler correspondence, protocol safety, or progress theorem is certified."
     });
-    fs::write(
-        output.join("verified.json"),
+    crate::project::publish_certificate(
+        &output,
         serde_json::to_vec_pretty(&certificate).map_err(|e| e.to_string())?,
-    )
-    .map_err(|e| e.to_string())?;
+    )?;
     Ok(format!(
         "Verified {} specification obligations; no source correspondence claim.\n{report}",
         request.obligations.len()

@@ -31,6 +31,40 @@ fn optional(ty: &Type) -> bool {
 fn unsigned(ty: &Type) -> bool {
     ["u8", "u16", "u32", "u64", "usize"].contains(&tokens(ty).as_str())
 }
+impl Crate {
+    /// The value of an integer literal initializing a field of type `ty`, if it
+    /// is representable there. `#![allow(overflowing_literals)]` lets rustc
+    /// accept `300` for a `u8` field, which then wraps; never model that as 300.
+    /// Unconfigured crates use 16-bit `usize`, the smallest Rust supports.
+    pub(super) fn field_literal(&self, ty: &Type, literal: &syn::LitInt) -> Result<u64, String> {
+        let rust_type = tokens(ty);
+        if !literal.suffix().is_empty() && literal.suffix() != rust_type {
+            return Err(format!(
+                "constructor literal suffix {} differs from field type {rust_type}",
+                literal.suffix()
+            ));
+        }
+        let bits = match rust_type.as_str() {
+            "u8" => 8,
+            "u16" => 16,
+            "u32" => 32,
+            "u64" => 64,
+            "usize" => self
+                .cfg
+                .as_ref()
+                .and_then(crate::cfg::Configuration::pointer_width)
+                .unwrap_or(16),
+            _ => return Err("constructor literal does not match a builtin field".into()),
+        };
+        let value: u64 = literal.base10_parse().map_err(|e| e.to_string())?;
+        if bits < 64 && value >> bits != 0 {
+            return Err(format!(
+                "constructor literal {value} does not fit field type {rust_type}"
+            ));
+        }
+        Ok(value)
+    }
+}
 fn none(e: &Expr) -> bool {
     matches!(e,Expr::Path(p) if p.qself.is_none() && p.attrs.is_empty() && p.path.is_ident("None"))
 }
@@ -262,7 +296,7 @@ impl Crate {
             let value = match &l.lit {
                 syn::Lit::Int(i) if unsigned(ty) => Initial::Unsigned {
                     rust_type: tokens(ty),
-                    value: i.base10_parse().map_err(|e| e.to_string())?,
+                    value: self.field_literal(ty, i)?,
                 },
                 syn::Lit::Bool(b) if tokens(ty) == "bool" => Initial::Boolean(b.value),
                 _ => return Err("constructor literal does not match a builtin field".into()),

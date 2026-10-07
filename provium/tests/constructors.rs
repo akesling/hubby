@@ -62,6 +62,11 @@ fn hidden_initialization_effects_and_shadowed_builtins_are_rejected() {
         format!("{SOURCE} trait Default {{}}"),
         format!("{SOURCE} mod core;"),
         SOURCE.replace("len:0", "len:external()"),
+        // rustc accepts and wraps these under `allow(overflowing_literals)`.
+        "#![allow(overflowing_literals)] struct State { v:u8 } impl State { fn new()->Self { Self { v:300 } } }".to_string(),
+        // Unconfigured crates use the smallest Rust usize width.
+        SOURCE.replace("len:0", "len:65536"),
+        SOURCE.replace("len:0", "len:0u64"),
     ] {
         assert!(Source::new(&source).lower().is_err(), "accepted {source}");
     }

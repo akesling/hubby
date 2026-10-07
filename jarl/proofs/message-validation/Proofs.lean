@@ -85,9 +85,9 @@ theorem campaign_range (campaign term : Nat) (bounded : campaign < 2^64) :
   have range : ¬18446744073709551616 ≤ campaign := Nat.not_le_of_gt bounded
   have first : pureEval 255 campaignHead (pureSet (fun _ => none) 0 (preVoted campaign term)) =
       .error (.returned (.boolean (decide (campaign > 0)))) := by
-    simp [campaignHead,Jarl.node_Node_valid_ir,pureEval,pureMatch,pureSet,
+    simp [campaignHead,Jarl.node_Node_valid_ir,pureEval,pureMatch,pureSelect,List.any,pureSet,
       preVoted,word,pureBinary,pureBound,range,
-      List.findSome?,List.find?,List.foldlM,bind,Option.bind,Except.bind,pure,Except.pure]
+      List.find?,List.foldlM,bind,Except.bind,pure,Except.pure]
   unfold Jarl.node_Node_valid pureValidate
   rw [body_shape,pure_sequence_error 255 campaignHead campaignTail _ _ first]
 
@@ -109,10 +109,10 @@ theorem vote_range (term index lastTerm : Nat)
   · by_cases izero : index = 0 <;> by_cases lzero : lastTerm = 0 <;>
       by_cases ordered : lastTerm ≤ term <;>
       simp (config := {maxSteps := 100000}) [Jarl.node_Node_valid,
-        Jarl.node_Node_valid_ir,pureValidate,pureEval,pureMatch,pureSet,
+        Jarl.node_Node_valid_ir,pureValidate,pureEval,pureMatch,pureSelect,List.any,pureSet,
         pureFields,pureField,pureBinary,pureBound,message,word,logId,
         tbound,ibound,lbound,tzero,izero,lzero,ordered,Nat.pos_iff_ne_zero,
-        List.findSome?,List.find?,List.foldlM,bind,Option.bind,Except.bind,pure,Except.pure]
+        List.find?,List.foldlM,bind,Option.bind,Except.bind,pure,Except.pure]
 
 set_option maxRecDepth 10000
 set_option maxHeartbeats 2000000
@@ -132,10 +132,10 @@ theorem prevote_range (term index lastTerm : Nat)
   · by_cases izero : index = 0 <;> by_cases lzero : lastTerm = 0 <;>
       by_cases ordered : lastTerm ≤ term <;>
       simp (config := {maxSteps := 100000}) [Jarl.node_Node_valid,
-        Jarl.node_Node_valid_ir,pureValidate,pureEval,pureMatch,pureSet,
+        Jarl.node_Node_valid_ir,pureValidate,pureEval,pureMatch,pureSelect,List.any,pureSet,
         pureFields,pureField,pureBinary,pureBound,message,word,logId,
         tbound,ibound,lbound,tzero,izero,lzero,ordered,Nat.pos_iff_ne_zero,
-        List.findSome?,List.find?,List.foldlM,bind,Option.bind,Except.bind,pure,Except.pure]
+        List.find?,List.foldlM,bind,Option.bind,Except.bind,pure,Except.pure]
 
 set_option maxRecDepth 10000
 set_option maxHeartbeats 2000000
@@ -155,10 +155,10 @@ theorem heartbeat_range (term index lastTerm : Nat)
   · by_cases izero : index = 0 <;> by_cases lzero : lastTerm = 0 <;>
       by_cases ordered : lastTerm ≤ term <;>
       simp (config := {maxSteps := 100000}) [Jarl.node_Node_valid,
-        Jarl.node_Node_valid_ir,pureValidate,pureEval,pureMatch,pureSet,
+        Jarl.node_Node_valid_ir,pureValidate,pureEval,pureMatch,pureSelect,List.any,pureSet,
         pureFields,pureField,pureBinary,pureBound,message,word,logId,
         tbound,ibound,lbound,tzero,izero,lzero,ordered,Nat.pos_iff_ne_zero,
-        List.findSome?,List.find?,List.foldlM,bind,Option.bind,Except.bind,pure,Except.pure]
+        List.find?,List.foldlM,bind,Option.bind,Except.bind,pure,Except.pure]
 
 set_option maxRecDepth 10000
 set_option maxHeartbeats 2000000
@@ -177,10 +177,10 @@ theorem snapshot_range (term index lastTerm : Nat) (payload : PureValue)
   · by_cases izero : index = 0 <;> by_cases lzero : lastTerm = 0 <;>
       by_cases ordered : lastTerm ≤ term <;>
       simp (config := {maxSteps := 100000}) [Jarl.node_Node_valid,
-        Jarl.node_Node_valid_ir,pureValidate,pureEval,pureMatch,pureSet,
+        Jarl.node_Node_valid_ir,pureValidate,pureEval,pureMatch,pureSelect,List.any,pureSet,
         pureFields,pureField,pureBinary,pureBound,message,word,logId,
         tbound,ibound,lbound,tzero,izero,lzero,ordered,Nat.pos_iff_ne_zero,
-        List.findSome?,List.find?,List.foldlM,bind,Option.bind,Except.bind,pure,Except.pure]
+        List.find?,List.foldlM,bind,Option.bind,Except.bind,pure,Except.pure]
 
 set_option maxRecDepth 10000
 set_option maxHeartbeats 2000000
@@ -190,9 +190,9 @@ theorem voted_range (term : Nat) (fields : List (String × PureValue)) (bounded 
   have range : ¬18446744073709551616 ≤ term := Nat.not_le_of_gt bounded
   by_cases empty : term = 0 <;>
     simp [Jarl.node_Node_valid,Jarl.node_Node_valid_ir,
-      pureValidate,pureEval,pureMatch,pureSet,pureBinary,pureBound,message,word,
-      range,empty,Nat.pos_iff_ne_zero,List.findSome?,List.find?,List.foldlM,
-      bind,Option.bind,Except.bind,pure,Except.pure]
+      pureValidate,pureEval,pureMatch,pureSelect,List.any,pureSet,pureBinary,pureBound,message,word,
+      range,empty,Nat.pos_iff_ne_zero,List.find?,List.foldlM,
+      bind,Except.bind,pure,Except.pure]
 
 theorem replicated_range (term : Nat) (rejection : PureValue) (bounded : term < 2^64)
     (kind : rejection = .absent ∨ rejection = .present (.variant "Rejection" "Full" [])) :
@@ -201,9 +201,9 @@ theorem replicated_range (term : Nat) (rejection : PureValue) (bounded : term < 
   have range : ¬18446744073709551616 ≤ term := Nat.not_le_of_gt bounded
   rcases kind with rfl | rfl <;> by_cases empty : term = 0 <;>
     simp [Jarl.node_Node_valid,Jarl.node_Node_valid_ir,
-      pureValidate,pureEval,pureMatch,pureSet,pureBinary,pureBound,message,word,
-      range,empty,Nat.pos_iff_ne_zero,List.findSome?,List.find?,List.foldlM,
-      bind,Option.bind,Except.bind,pure,Except.pure]
+      pureValidate,pureEval,pureMatch,pureSelect,List.any,pureSet,pureBinary,pureBound,message,word,
+      range,empty,Nat.pos_iff_ne_zero,List.find?,List.foldlM,
+      bind,Except.bind,pure,Except.pure]
 
 theorem conflict_range (term nextIndex : Nat)
     (termBound : term < 2^64) (nextBound : nextIndex < 2^64) :
@@ -214,9 +214,9 @@ theorem conflict_range (term nextIndex : Nat)
   have nbound : ¬18446744073709551616 ≤ nextIndex := Nat.not_le_of_gt nextBound
   by_cases empty : term = 0 <;> by_cases zeroIndex : nextIndex = 0 <;>
     simp [Jarl.node_Node_valid,Jarl.node_Node_valid_ir,
-      pureValidate,pureEval,pureMatch,pureSet,pureBinary,pureBound,message,word,
-      tbound,nbound,empty,zeroIndex,Nat.pos_iff_ne_zero,List.findSome?,List.find?,List.foldlM,
-      bind,Option.bind,Except.bind,pure,Except.pure]
+      pureValidate,pureEval,pureMatch,pureSelect,List.any,pureSet,pureBinary,pureBound,message,word,
+      tbound,nbound,empty,zeroIndex,Nat.pos_iff_ne_zero,List.find?,List.foldlM,
+      bind,Except.bind,pure,Except.pure]
 
 
 
@@ -255,10 +255,10 @@ theorem append_range (term previousIndex previousTerm index entryTerm : Nat) (pa
       simp_all only [Nat.zero_add]
     all_goals
       simp (config := {maxSteps := 20000}) [Jarl.node_Node_valid,
-        Jarl.node_Node_valid_ir,pureValidate,pureEval,pureMatch,pureSet,
+        Jarl.node_Node_valid_ir,pureValidate,pureEval,pureMatch,pureSelect,List.any,pureSet,
         pureFields,pureField,pureBinary,pureEqual,pureBound,message,word,logId,entry,
         *,Nat.pos_iff_ne_zero,
-        List.findSome?,List.find?,List.foldlM,bind,Option.bind,Except.bind,pure,Except.pure]
+        List.find?,List.foldlM,bind,Option.bind,Except.bind,pure,Except.pure]
 theorem append_accepted (term previousIndex previousTerm index entryTerm : Nat) (payload : PureValue)
     (termBound : term < 2^64) (previousIndexBound : previousIndex < 2^64)
     (previousTermBound : previousTerm < 2^64) (indexBound : index < 2^64)
@@ -297,7 +297,7 @@ def afterNone (env : PureEnv) : PureEnv := pureSet (pureSet env 37 .absent) 32 (
 theorem none_iteration (extra : Nat) (env : PureEnv) :
     pureEval (extra+8) batchLoopBody (pureSet env 37 .absent) = .ok (.unit,afterNone env) := by
   simp [batchLoopBody,batchLoop,batchArm,validationArms,Jarl.node_Node_valid_ir,
-    pureEval,pureMatch,pureSet,afterNone,List.findSome?,
+    pureEval,pureMatch,pureSelect,pureSet,afterNone,
     bind,Except.bind,pure,Except.pure]
 
 theorem after_none_idempotent (env : PureEnv) : afterNone (afterNone env) = afterNone env := by
@@ -338,10 +338,10 @@ theorem empty_batch_any_length (term index lastTerm count : Nat)
   · by_cases izero : index = 0 <;> by_cases lzero : lastTerm = 0 <;>
       by_cases ordered : lastTerm ≤ term <;> by_cases empty : count = 0 <;>
       simp (config := {maxSteps := 20000}) (disch := first | decide | exact Eq.refl _) [Jarl.node_Node_valid,
-        Jarl.node_Node_valid_ir,pureValidate,pure_eval_step,pureMatch,pureSet,
+        Jarl.node_Node_valid_ir,pureValidate,pure_eval_step,pureMatch,pureSelect,List.any,pureSet,
         pureFields,pureField,pureBinary,pureBound,message,word,logId,
         tbound,ibound,lbound,tzero,izero,lzero,ordered,empty,Nat.pos_iff_ne_zero,
-        List.findSome?,List.find?,List.foldlM,bind,Option.bind,Except.bind,pure,Except.pure,
+        List.find?,List.foldlM,bind,Option.bind,Except.bind,pure,Except.pure,
         ]
     all_goals
       have rule := each_none_scan count
@@ -351,12 +351,41 @@ theorem empty_batch_any_length (term index lastTerm count : Nat)
       · simp [pureSet,empty]
 
 
+-- Name the loop body's pieces so symbolic evaluation treats the guard operands
+-- after the short-circuiting `ended` read as atoms instead of unfolding them.
+def entryBody : PureExpr := match batchLoopBody with
+  | .sequence (.choose _ ((_, body) :: _)) _ => body
+  | _ => .literal .unit
+def noneBody : PureExpr := match batchLoopBody with
+  | .sequence (.choose _ (_ :: (_, body) :: _)) _ => body
+  | _ => .literal .unit
+theorem loop_body_shape : batchLoopBody =
+    .sequence (.choose (.read 37) [(.present (.bind 38), entryBody), (.any, noneBody)])
+      (.literal .unit) := by rfl
+def entryGuard : PureExpr := match entryBody with
+  | .sequence (.branch (.binary "||" (.binary "||" (.binary "||" _ guard) _) _) _ _) _ => guard
+  | _ => .literal .unit
+def entrySuccessor : PureExpr := match entryBody with
+  | .sequence (.branch (.binary "||" (.binary "||" _ successor) _) _ _) _ => successor
+  | _ => .literal .unit
+def entryOrder : PureExpr := match entryBody with
+  | .sequence (.branch (.binary "||" _ order) _ _) _ => order
+  | _ => .literal .unit
+def entryAdvance : PureExpr := match entryBody with
+  | .sequence _ advance => advance
+  | _ => .literal .unit
+theorem entry_shape : entryBody =
+    .sequence (.branch (.binary "||" (.binary "||" (.binary "||" (.read 32) entryGuard)
+        entrySuccessor) entryOrder) (.sequence (.ret (.literal (.boolean false))) (.literal .unit))
+      (.literal .unit)) entryAdvance := by rfl
+
 theorem entry_after_end (extra : Nat) (env : PureEnv) (value : PureValue)
     (ended : env 32 = some (.boolean true)) :
     pureEval (extra+32) batchLoopBody (pureSet env 37 (.present value)) =
       .error (.returned (.boolean false)) := by
-  simp [batchLoopBody,batchLoop,batchArm,validationArms,Jarl.node_Node_valid_ir,
-    pureEval,pureMatch,pureSet,ended,List.findSome?,bind,Except.bind,pure,Except.pure]
+  rw [loop_body_shape]
+  simp [pureEval,pureSelect,pureMatch,List.foldlM,entry_shape,pureSet,ended,
+    bind,Except.bind,pure,Except.pure]
 
 theorem hole_scan (env : PureEnv) (value initialResult : PureValue) (rest : List PureValue) :
     (.absent :: .present value :: rest).foldlM (fun (_,env) value =>
@@ -391,10 +420,10 @@ theorem leading_hole_rejected (term index lastTerm : Nat) (value : PureValue) (r
   · by_cases izero : index = 0 <;> by_cases lzero : lastTerm = 0 <;>
       by_cases ordered : lastTerm ≤ term <;>
       simp (config := {maxSteps := 20000}) (disch := first | decide | exact Eq.refl _) [Jarl.node_Node_valid,
-        Jarl.node_Node_valid_ir,pureValidate,pure_eval_step,pureMatch,pureSet,
+        Jarl.node_Node_valid_ir,pureValidate,pure_eval_step,pureMatch,pureSelect,List.any,pureSet,
         pureFields,pureField,pureBinary,pureBound,message,word,logId,
         tbound,ibound,lbound,tzero,izero,lzero,ordered,Nat.pos_iff_ne_zero,
-        List.findSome?,List.find?,List.foldlM,bind,Option.bind,Except.bind,pure,Except.pure]
+        List.find?,List.foldlM,bind,Option.bind,Except.bind,pure,Except.pure]
     all_goals
       have rule := each_hole value rest
       simp [batchLoop,batchArm,validationArms,Jarl.node_Node_valid_ir] at rule
@@ -469,9 +498,9 @@ theorem some_iteration (env : PureEnv) (term previousIndex previousTerm index en
     all_goals simp_all only
     all_goals
       simp (config := {maxSteps := 20000}) [batchLoopBody,batchLoop,batchArm,validationArms,
-        Jarl.node_Node_valid_ir,pureEval,pureMatch,pureSet,pureFields,pureField,
+        Jarl.node_Node_valid_ir,pureEval,pureMatch,pureSelect,pureSet,pureFields,pureField,
         pureBinary,pureEqual,pureBound,word,logId,entry,afterEntry,scanEnv,admissibleEntry,
-        *,Nat.pos_iff_ne_zero,List.findSome?,List.find?,bind,Option.bind,Except.bind,pure,Except.pure]
+        *,Nat.pos_iff_ne_zero,List.find?,bind,Option.bind,Except.bind,pure,Except.pure]
 
 
 
@@ -602,10 +631,10 @@ theorem batch_range (term index previousTerm : Nat) (slots : List (Option BatchE
   · by_cases izero : index = 0 <;> by_cases pzero : previousTerm = 0 <;>
       by_cases ordered : previousTerm ≤ term <;>
       simp (config := {maxSteps := 20000}) (disch := first | decide | exact Eq.refl _) [Jarl.node_Node_valid,
-        Jarl.node_Node_valid_ir,pureValidate,pure_eval_step,pureMatch,pureSet,
+        Jarl.node_Node_valid_ir,pureValidate,pure_eval_step,pureMatch,pureSelect,List.any,pureSet,
         pureFields,pureField,pureBinary,pureBound,message,word,logId,
         tbound,ibound,pbound,tzero,izero,pzero,ordered,Nat.pos_iff_ne_zero,
-        List.findSome?,List.find?,List.foldlM,bind,Option.bind,Except.bind,pure,Except.pure]
+        List.find?,List.foldlM,bind,Option.bind,Except.bind,pure,Except.pure]
     all_goals
       have rule := each_scan_model term slots ⟨index,previousTerm,0,false⟩
       simp [batchLoop,batchArm,validationArms,Jarl.node_Node_valid_ir] at rule

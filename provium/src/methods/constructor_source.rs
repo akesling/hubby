@@ -110,7 +110,7 @@ impl Walk<'_> {
                     format!(
                         ".atom (.unsigned {:?} {})",
                         tokens(ty),
-                        value.base10_parse::<u64>().map_err(|e| e.to_string())?
+                        self.krate.field_literal(ty, value)?
                     ),
                     1,
                 )),

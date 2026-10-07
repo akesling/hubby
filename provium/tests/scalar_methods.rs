@@ -79,6 +79,14 @@ fn complete_projections_keep_late_faults_and_all_destinations() {
         ),
         SOURCE.replace("a:u64", "a:usize"),
         SOURCE.replace("&mut self", "self"),
+        // A reserved name inside macro tokens would be rebound to the field.
+        format!(
+            "const provium_field_a:u64=5;{}",
+            SOURCE.replace(
+                "self.b=self.a/ self.b;",
+                "assert!(provium_field_a>0);self.b=self.a/ self.b;"
+            )
+        ),
     ] {
         let result = Crate::load(&w.source(&bad))
             .and_then(|c| c.scalar_projections("State::update"))

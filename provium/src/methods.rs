@@ -138,6 +138,112 @@ pub struct Crate {
     drops: Vec<String>,
     array_iterator_shadow: bool,
     trait_methods: std::collections::BTreeSet<String>,
+    /// Methods declared by traits defined in this crate, with their trait.
+    crate_trait_methods: Vec<(String, String)>,
+    /// Self types of every trait impl in this crate.
+    trait_impl_targets: Vec<Type>,
+    /// Names that an identifier pattern would resolve to as a value (consts,
+    /// statics, unit structs and imports) instead of introducing a binding.
+    value_names: std::collections::BTreeSet<String>,
+}
+/// Names a crate item must not take: primitive, prelude and standard-root names
+/// that the backends interpret as builtin. A crate item with such a name (a
+/// `mod Option`, a `fn Some`, a `struct u64`) could silently replace the
+/// builtin meaning of a path that a backend matches by spelling.
+const RESERVED_NAMES: &[&str] = &[
+    "core",
+    "std",
+    "alloc",
+    "Option",
+    "Some",
+    "None",
+    "Result",
+    "Ok",
+    "Err",
+    "Default",
+    "Clone",
+    "Copy",
+    "PartialEq",
+    "Eq",
+    "PartialOrd",
+    "Ord",
+    "Iterator",
+    "IntoIterator",
+    "DoubleEndedIterator",
+    "Drop",
+    "Fn",
+    "FnMut",
+    "FnOnce",
+    "From",
+    "Into",
+    "TryFrom",
+    "TryInto",
+    "AsRef",
+    "AsMut",
+    "bool",
+    "char",
+    "str",
+    "u8",
+    "u16",
+    "u32",
+    "u64",
+    "u128",
+    "usize",
+    "i8",
+    "i16",
+    "i32",
+    "i64",
+    "i128",
+    "isize",
+    "f32",
+    "f64",
+];
+/// Inherent associated functions with these names take precedence over the
+/// derived/standard trait methods the backends assume (for example an inherent
+/// `Record::default` hides a derived `Default`), so they are rejected outright.
+const DERIVED_METHOD_NAMES: &[&str] = &[
+    "default",
+    "clone",
+    "clone_from",
+    "eq",
+    "ne",
+    "cmp",
+    "partial_cmp",
+    "hash",
+    "fmt",
+    "drop",
+];
+/// `#[cfg_attr(test, ...)]`: its attributes apply only to test builds.
+fn test_attribute(a: &syn::Attribute) -> bool {
+    a.path().is_ident("cfg_attr")
+        && a.parse_args_with(
+            syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated,
+        )
+        .is_ok_and(|args| {
+            args.first().is_some_and(|predicate| {
+                predicate.path().is_ident("test") && matches!(predicate, syn::Meta::Path(_))
+            })
+        })
+}
+fn item_attrs(item: &Item) -> &[syn::Attribute] {
+    match item {
+        Item::Const(i) => &i.attrs,
+        Item::Enum(i) => &i.attrs,
+        Item::ExternCrate(i) => &i.attrs,
+        Item::Fn(i) => &i.attrs,
+        Item::ForeignMod(i) => &i.attrs,
+        Item::Impl(i) => &i.attrs,
+        Item::Macro(i) => &i.attrs,
+        Item::Mod(i) => &i.attrs,
+        Item::Static(i) => &i.attrs,
+        Item::Struct(i) => &i.attrs,
+        Item::Trait(i) => &i.attrs,
+        Item::TraitAlias(i) => &i.attrs,
+        Item::Type(i) => &i.attrs,
+        Item::Union(i) => &i.attrs,
+        Item::Use(i) => &i.attrs,
+        _ => &[],
+    }
 }
 fn tokens(t: &impl ToTokens) -> String {
     t.to_token_stream().to_string()
@@ -206,9 +312,58 @@ impl Crate {
             drops: vec![],
             array_iterator_shadow: false,
             trait_methods: std::collections::BTreeSet::new(),
+            crate_trait_methods: vec![],
+            trait_impl_targets: vec![],
+            value_names: std::collections::BTreeSet::new(),
         };
         krate.file(root, "", true)?;
+        krate.check_method_resolution()?;
         Ok(krate)
+    }
+    /// Backends resolve receiver-local helpers by inherent name and interpret
+    /// standard methods (`Option::as_ref`, `take`, slice sorts, ...) by spelling.
+    /// Rust's method probe can instead select a trait method, for example one
+    /// implemented for `&mut Self` or for `Option<T>` with a by-value receiver
+    /// (https://doc.rust-lang.org/reference/expressions/method-call-expr.html).
+    /// Reject every crate shape that could make those spellings resolve elsewhere:
+    /// trait impls may only target crate-defined nominal types, crate trait
+    /// methods may not share a name with an inherent method, and inherent
+    /// functions may not hide derived/standard trait methods.
+    fn check_method_resolution(&self) -> Result<(), String> {
+        for target in &self.trait_impl_targets {
+            let crate_type = match target {
+                Type::Path(p) if p.qself.is_none() && p.path.segments.len() == 1 => {
+                    let name = p.path.segments[0].ident.to_string();
+                    self.structs.contains_key(&name) || self.enums.contains_key(&name)
+                }
+                _ => false,
+            };
+            if !crate_type {
+                return Err(format!(
+                    "trait impl for {} could change method resolution of builtin or receiver calls; only crate-defined nominal types are supported",
+                    tokens(target)
+                ));
+            }
+        }
+        for (name, definition) in &self.methods {
+            let method = name.rsplit("::").next().unwrap_or(name);
+            if DERIVED_METHOD_NAMES.contains(&method) {
+                return Err(format!(
+                    "inherent {name} hides a derived/standard trait method; rename it"
+                ));
+            }
+            if let Some((trait_name, _)) = self
+                .crate_trait_methods
+                .iter()
+                .find(|(_, trait_method)| trait_method == method)
+            {
+                return Err(format!(
+                    "trait {trait_name} method {method} shares a name with inherent {}::{method}; method resolution would be ambiguous to this frontend",
+                    definition.receiver
+                ));
+            }
+        }
+        Ok(())
     }
     fn file(&mut self, path: &Path, module: &str, root: bool) -> Result<(), String> {
         let path = path.canonicalize().map_err(|e| e.to_string())?;
@@ -251,8 +406,54 @@ impl Crate {
                 };
                 item
             } else {
+                // Without a compilation configuration nothing can decide which
+                // conditional declaration rustc compiles; admit only cfg(test).
+                let conditional = item_attrs(&item).iter().any(|a| {
+                    (a.path().is_ident("cfg") || a.path().is_ident("cfg_attr"))
+                        && !test_only(std::slice::from_ref(a))
+                        && !test_attribute(a)
+                });
+                if conditional {
+                    return Err(format!(
+                        "{}: conditional declarations require a compilation configuration (use load_configured)",
+                        path.display()
+                    ));
+                }
                 item
             };
+            let declared = match &item {
+                Item::Mod(i) if !test_only(&i.attrs) => Some(&i.ident),
+                Item::Fn(i) if !test_only(&i.attrs) => Some(&i.sig.ident),
+                Item::Struct(i) if !test_only(&i.attrs) => Some(&i.ident),
+                Item::Enum(i) if !test_only(&i.attrs) => Some(&i.ident),
+                Item::Union(i) if !test_only(&i.attrs) => Some(&i.ident),
+                Item::Const(i) if !test_only(&i.attrs) => Some(&i.ident),
+                Item::Static(i) if !test_only(&i.attrs) => Some(&i.ident),
+                Item::Trait(i) if !test_only(&i.attrs) => Some(&i.ident),
+                Item::Type(i) if !test_only(&i.attrs) => Some(&i.ident),
+                _ => None,
+            };
+            if let Some(ident) = declared {
+                if RESERVED_NAMES.iter().any(|name| ident == name) {
+                    return Err(format!(
+                        "crate item {ident} shadows a primitive/prelude/standard name"
+                    ));
+                }
+            }
+            match &item {
+                Item::Const(i) if !test_only(&i.attrs) => {
+                    self.value_names.insert(i.ident.to_string());
+                }
+                Item::Static(i) if !test_only(&i.attrs) => {
+                    self.value_names.insert(i.ident.to_string());
+                }
+                Item::Struct(i)
+                    if !test_only(&i.attrs) && matches!(i.fields, syn::Fields::Unit) =>
+                {
+                    self.value_names.insert(i.ident.to_string());
+                }
+                _ => {}
+            }
             match item {
                 Item::Mod(m) if !test_only(&m.attrs) => {
                     attrs(&m.attrs)?;
@@ -272,32 +473,62 @@ impl Crate {
                     self.file(if flat.exists() { &flat } else { &nested }, &child, false)?;
                 }
                 Item::Use(u) if !test_only(&u.attrs) => {
-                    fn check(tree: &syn::UseTree) -> Result<(), String> {
+                    // A reserved name may be imported only from its canonical
+                    // standard location (re-importing the item it already
+                    // names). `use core::fmt::Result` would rebind `Result`.
+                    fn canonical(prefix: &[String], name: &str) -> bool {
+                        let Some((root, path)) = prefix.split_first() else {
+                            return false;
+                        };
+                        if root != "core" && root != "std" {
+                            return false;
+                        }
+                        let path = path.join("::");
+                        matches!(
+                            (path.as_str(), name),
+                            ("iter", "Iterator" | "IntoIterator" | "DoubleEndedIterator")
+                                | ("default", "Default")
+                                | ("clone", "Clone")
+                                | ("marker", "Copy")
+                                | ("cmp", "PartialEq" | "Eq" | "PartialOrd" | "Ord")
+                                | ("ops", "Drop" | "Fn" | "FnMut" | "FnOnce")
+                                | (
+                                    "convert",
+                                    "From" | "Into" | "TryFrom" | "TryInto" | "AsRef" | "AsMut"
+                                )
+                                | ("option", "Option")
+                                | ("result", "Result")
+                                | ("option::Option", "Some" | "None")
+                                | ("result::Result", "Ok" | "Err")
+                        )
+                    }
+                    fn check(tree: &syn::UseTree, prefix: &mut Vec<String>) -> Result<(), String> {
                         match tree {
                             syn::UseTree::Rename(_) | syn::UseTree::Glob(_) => {
                                 Err("renamed/glob imports require qualified resolution".into())
                             }
                             syn::UseTree::Name(n)
-                                if [
-                                    "None", "Option", "bool", "u8", "u16", "u32", "u64", "i32",
-                                    "usize", "Result", "Ok", "Err", "Some",
-                                ]
-                                .iter()
-                                .any(|s| n.ident == *s) =>
+                                if RESERVED_NAMES.iter().any(|s| n.ident == *s)
+                                    && !canonical(prefix, &n.ident.to_string()) =>
                             {
                                 Err("shadowed primitive/prelude names are unsupported".into())
                             }
-                            syn::UseTree::Path(p) => check(&p.tree),
+                            syn::UseTree::Path(p) => {
+                                prefix.push(p.ident.to_string());
+                                let result = check(&p.tree, prefix);
+                                prefix.pop();
+                                result
+                            }
                             syn::UseTree::Group(g) => {
                                 for t in &g.items {
-                                    check(t)?
+                                    check(t, prefix)?
                                 }
                                 Ok(())
                             }
                             _ => Ok(()),
                         }
                     }
-                    check(&u.tree)?;
+                    check(&u.tree, &mut vec![])?;
                     fn imports(
                         tree: &syn::UseTree,
                         prefix: &[String],
@@ -420,6 +651,8 @@ impl Crate {
                     for item in &t.items {
                         if let syn::TraitItem::Fn(method) = item {
                             self.trait_methods.insert(method.sig.ident.to_string());
+                            self.crate_trait_methods
+                                .push((t.ident.to_string(), method.sig.ident.to_string()));
                         }
                     }
                     if t.items.iter().any(|i| matches!(i,syn::TraitItem::Fn(f) if ["iter","flatten","any"].iter().any(|n|f.sig.ident==*n))) {
@@ -438,6 +671,15 @@ impl Crate {
                         return Err(
                             "impl generic parameter shadows a primitive/prelude type".into()
                         );
+                    }
+                    if i.trait_.is_some() {
+                        if !matches!(&*i.self_ty, Type::Path(_)) {
+                            return Err(format!(
+                                "trait impl for {} could change method resolution of builtin or receiver calls; only crate-defined nominal types are supported",
+                                tokens(&*i.self_ty)
+                            ));
+                        }
+                        self.trait_impl_targets.push(*i.self_ty.clone());
                     }
                     let receiver = base_type(&i.self_ty)?;
                     attrs(&i.attrs)?;
@@ -1314,7 +1556,7 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
     }
     for o in &project.obligations {
         audit.push_str(&format!(
-            "#provium_check {} references {}.{}\n",
+            "#provium_obligation {} references {}.{}\n",
             o.theorem, project.namespace, o.function
         ))
     }
@@ -1387,7 +1629,10 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
         )?);
     }
     report.push_str(&workspace.check("Proofs.lean", Some("Proofs.olean"))?);
-    report.push_str(&workspace.check("Check.lean", None)?);
+    // Count audit markers only in Check.lean's output: a library or proof
+    // module could otherwise log the marker text and pad the count.
+    let audited = workspace.check("Check.lean", None)?;
+    report.push_str(&audited);
     let initialized_refinements = methods.iter().filter(|m| initialized::supported(m)).count();
     let constructor_refinements = constructor_evidence.len();
     let target_refinements = methods.iter().filter(|m| target::numeric(m)).count();
@@ -1398,7 +1643,7 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
         .filter(|m| m.getter.as_ref().is_some_and(|g| g.borrowed))
         .count();
     let copied_field_refinements = field_refinements - borrowed_field_refinements;
-    if report.matches("PROVIUM_VERIFIED ").count()
+    if audited.matches("PROVIUM_VERIFIED ").count()
         != methods.len()
             + 4 * initialized_refinements
             + constructor_refinements
@@ -1445,6 +1690,8 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
     if let Some(build) = &cargo_build {
         build.revalidate()?;
     }
+    // Publish every compiled module, so the published Generated and Proofs can
+    // be imported: Generated transitively imports each library module.
     for object in [
         "Provium/State.olean",
         "Provium/Loans.olean",
@@ -1452,6 +1699,10 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
         "Provium/ScalarSource.olean",
         "Provium/FieldReads.olean",
         "Provium/ConstructorSource.olean",
+        "Provium/OrderStatistics.olean",
+        "Provium/Semantics.olean",
+        "Provium/RankArithmetic.olean",
+        "Provium/NumericFolds.olean",
         "Provium/Audit.olean",
         "Generated.olean",
         "Proofs.olean",
@@ -1461,10 +1712,10 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
     for library in &libraries {
         workspace.publish(&library.artifact.replace(".lean", ".olean"), &out)?;
     }
-    let manifest = serde_json::json!({"format":1,"compiler_sha256":hash(fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"scope":"complete explicit method bodies in supported Lean semantics; frontend, field resolution, borrowing/layout refinement and host durability remain trusted; not whole-program correctness", "lean_toolchain":TOOLCHAIN,"rustc":String::from_utf8_lossy(&rustc.stdout).trim(),"rust_target":cargo_build.as_ref().map(|b| b.capture.subject.request.target.clone()).or(project.rust_target),"rust_target_cfg":cfg_text,"target_usize_bits":pointer_bits,"arithmetic_profile":arithmetic_profile,"cargo_build":cargo_build.as_ref().map(build::Build::evidence),"typecheck_args":typecheck_args,"config_sha256":hash(config_bytes),"sources":inputs,"proof_modules":libraries.iter().map(|library| serde_json::json!({"name":library.module,"path":library.path,"artifact":library.artifact,"sha256":hash(&library.source)})).collect::<Vec<_>>(),"methods":methods,"source_interpretations":source_evidence,"constructor_source_interpretations":constructor_evidence,"unproved_methods":krate.inventory().into_iter().filter(|n|!project.methods.contains(n)).collect::<Vec<_>>(),"artifacts":artifacts.iter().map(|(p,t)|(p,hash(t))).collect::<BTreeMap<_,_>>(),"obligations":project.obligations,"audit":report});
+    let manifest = serde_json::json!({"format":1,"compiler_sha256":hash(fs::read(std::env::current_exe().map_err(|e|e.to_string())?).map_err(|e|e.to_string())?),"scope":"complete explicit method bodies in supported Lean semantics; frontend, field resolution, borrowing/layout refinement and host durability remain trusted; not whole-program correctness", "lean_toolchain":TOOLCHAIN,"rustc":String::from_utf8_lossy(&rustc.stdout).trim(),"rust_target":cargo_build.as_ref().map(|b| b.capture.subject.request.target.clone()).or(project.rust_target),"rust_target_cfg":cfg_text,"target_usize_bits":pointer_bits,"arithmetic_profile":arithmetic_profile,"arithmetic_profile_source":if cargo_build.is_some(){"cargo_build"}else{"synthetic_typecheck: Provium's own -C overflow-checks=yes invocation; says nothing about consumer builds"},"cargo_build":cargo_build.as_ref().map(build::Build::evidence),"typecheck_args":typecheck_args,"config_sha256":hash(config_bytes),"sources":inputs,"proof_modules":libraries.iter().map(|library| serde_json::json!({"name":library.module,"path":library.path,"artifact":library.artifact,"sha256":hash(&library.source)})).collect::<Vec<_>>(),"methods":methods,"source_interpretations":source_evidence,"constructor_source_interpretations":constructor_evidence,"unproved_methods":krate.inventory().into_iter().filter(|n|!project.methods.contains(n)).collect::<Vec<_>>(),"artifacts":artifacts.iter().map(|(p,t)|(p,hash(t))).collect::<BTreeMap<_,_>>(),"obligations":project.obligations,"audit":report});
     let bytes = serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?;
     fs::write(out.join("manifest.json"), &bytes).map_err(|e| e.to_string())?;
-    fs::write(out.join("verified.json"),serde_json::to_vec_pretty(&serde_json::json!({"manifest_sha256":hash(bytes),"whole_program_proved":false,"complete_method_bodies":methods.len(),"initialized_slot_refinements":initialized_refinements+field_refinements,"copied_field_refinements":copied_field_refinements,"borrowed_field_refinements":borrowed_field_refinements,"loan_refinements":initialized_refinements+array_move_refinements+field_refinements,"array_move_refinements":array_move_refinements,"source_language_refinements":initialized_refinements+constructor_refinements+field_refinements,"constructor_source_refinements":constructor_refinements,"target_word_refinements":target_refinements,"build_word_refinements":target_refinements,"rust_source_preservation_proved":false,"obligations":project.obligations.len()})).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;
+    crate::project::publish_certificate(&out,serde_json::to_vec_pretty(&serde_json::json!({"manifest_sha256":hash(bytes),"whole_program_proved":false,"complete_method_bodies":methods.len(),"initialized_slot_refinements":initialized_refinements+field_refinements,"copied_field_refinements":copied_field_refinements,"borrowed_field_refinements":borrowed_field_refinements,"loan_refinements":initialized_refinements+array_move_refinements+field_refinements,"array_move_refinements":array_move_refinements,"source_language_refinements":initialized_refinements+constructor_refinements+field_refinements,"constructor_source_refinements":constructor_refinements,"target_word_refinements":target_refinements,"build_word_refinements":target_refinements,"rust_source_preservation_proved":false,"obligations":project.obligations.len()})).map_err(|e|e.to_string())?)?;
     Ok(format!("Verified {} complete method bodies and {} obligations in supported Lean semantics. Whole-program proof remains incomplete.\n{report}",methods.len(),project.obligations.len()))
 }
 

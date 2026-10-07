@@ -540,6 +540,20 @@ impl Crate {
         if tokens(&sig.output) != format!("-> Result < Self , {error_type} >") {
             return Err("recovery result must be Result<Self, Error>".into());
         }
+        // `?` converts the helper's error with `From`. Only the reflexive core
+        // `impl<T> From<T> for T` is free of user code, so the append helper
+        // must fail with exactly the restoration's error enum.
+        let (append_error_type, _) = append
+            .error
+            .split_once("::")
+            .ok_or("append helper needs a source error type and variant")?;
+        let append_module = &self.methods[&append_method].module;
+        if self.resolve(append_module, append_error_type, 0)? != error_resolved {
+            return Err(
+                "recovery append error must be the restoration's error enum; `?` would apply a From conversion"
+                    .into(),
+            );
+        }
         let hard_expr = tokens(&hard_assign.left);
         let snapshot_expr = tokens(&snapshot_assign.left);
         let expected=format!("{{let mut {state_name}=Self::{constructor_ident}();{hard_expr}={hard_name};{snapshot_expr}={snapshot_name};let {base_name}={state_name}.{}();if {}{{return {};}}for {entry_name} in {source_name}{{let {last_name}={state_name}.{}();if {}{{return {};}}{state_name}.{}({entry_name})?;}}if {}{{return {};}}Ok({state_name})}}",base_call.method,tokens(&initial_guard.cond),tokens(error),last_call.method,tokens(&entry_guard.cond),tokens(error),self.methods[&append_method].item.sig.ident,tokens(&final_guard.cond),tokens(error));

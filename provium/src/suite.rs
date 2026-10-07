@@ -63,6 +63,9 @@ pub fn verify_suite(crate_root: &Path, proofs: &Path) -> Result<Vec<ProjectRepor
     if directory.starts_with(&output) || output.starts_with(&directory) {
         return Err("proof inputs and generated evidence must have separate directories".into());
     }
+    // Certificates of projects that were removed, renamed or moved must not
+    // survive as success markers beside fresh evidence for this suite.
+    remove_certificates(&output.join(directory.strip_prefix(&root).map_err(|e| e.to_string())?))?;
     let mut projects = vec![];
     discover(&directory, &mut projects)?;
     if projects.is_empty() {
@@ -113,6 +116,23 @@ pub fn verify_suite(crate_root: &Path, proofs: &Path) -> Result<Vec<ProjectRepor
         .into_iter()
         .map(|(project, out)| verify_project(&project, &out))
         .collect()
+}
+fn remove_certificates(dir: &Path) -> Result<(), String> {
+    let entries = match fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(e) => return Err(format!("{}: {e}", dir.display())),
+    };
+    for entry in entries {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let kind = entry.file_type().map_err(|e| e.to_string())?;
+        if kind.is_dir() {
+            remove_certificates(&entry.path())?;
+        } else if entry.file_name() == "verified.json" {
+            fs::remove_file(entry.path()).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
 }
 fn discover(dir: &Path, projects: &mut Vec<PathBuf>) -> Result<(), String> {
     for entry in fs::read_dir(dir).map_err(|e| format!("{}: {e}", dir.display()))? {

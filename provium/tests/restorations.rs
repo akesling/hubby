@@ -99,6 +99,13 @@ fn original_recovery_retains_predicates_helpers_and_owned_cleanup() {
             .replace("let last=state.last();", "let base=state.last();")
             .replace("last.index.checked_add", "base.index.checked_add")
             .replace("entry.id.term<last.term", "entry.id.term<base.term"),
+        // `?` would call a user From conversion between distinct error enums.
+        format!(
+            "enum PushError{{Full}} impl From<PushError> for Error{{fn from(_:PushError)->Error{{panic!(\"converted\")}}}}{}",
+            SOURCE
+                .replace("->Result<(),Error>{if self.full()", "->Result<(),PushError>{if self.full()")
+                .replace("return Err(Error::Full);}self.slots", "return Err(PushError::Full);}self.slots")
+        ),
     ] {
         assert!(
             Work::new(&source).lower("State::restore").is_err(),

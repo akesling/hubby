@@ -399,6 +399,19 @@ impl Compiler<'_> {
                 if mutable {
                     return Err("mutable match binding is unsupported".into());
                 }
+                // An identifier naming a const, static, unit struct or import
+                // is a value comparison in Rust, not a fresh catch-all binding.
+                if self.krate.value_names.contains(&name)
+                    || self
+                        .krate
+                        .imports
+                        .keys()
+                        .any(|(_, imported)| *imported == name)
+                {
+                    return Err(format!(
+                        "identifier pattern {name} names a value in scope; constant patterns are unsupported"
+                    ));
+                }
                 let slot = self.bind(name, ty.clone(), false);
                 format!(".bind {slot}")
             }

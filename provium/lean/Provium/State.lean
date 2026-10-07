@@ -2868,24 +2868,44 @@ def pureField (value : PureValue) (name : String) : Option PureValue := do
   let fields ← pureFields value
   return (← fields.find? (fun pair => pair.1 == name)).2
 
--- Pattern traversal is independently bounded. Missing fields cannot bind;
--- the consumer must still establish that the overall input view is well formed.
-def pureMatch : Nat → PurePattern → PureValue → PureEnv → Option PureEnv
-  | 0, _, _, _ => none
+/- Pattern traversal is independently bounded and three-valued: `.ok (some env)`
+   is a match, `.ok none` a mismatch, and `.error` a fault. Exhaustion and a
+   matching variant view that lacks a pattern field are faults, so `choose` can
+   never fall through to a later arm that Rust would not select. The consumer
+   must still establish that the overall input view is well formed. -/
+def pureMatch : Nat → PurePattern → PureValue → PureEnv → Except PureFault (Option PureEnv)
+  | 0, _, _, _ => .error .exhausted
   | fuel+1, pattern, value, env => match pattern with
-    | .any => some env
-    | .bind slot => some (pureSet env slot value)
+    | .any => .ok (some env)
+    | .bind slot => .ok (some (pureSet env slot value))
     | .present pattern => match value with
       | .present value => pureMatch fuel pattern value env
-      | _ => none
+      | _ => .ok none
     | .variant owner tag patterns => match value with
       | .variant actual variant fields =>
-        if actual != owner || variant != tag then none else
-        patterns.foldlM (fun env pair => do
-          let field ← fields.find? (fun field => field.1 == pair.1)
-          pureMatch fuel pair.2 field.2 env) env
-      | _ => none
-    | .alternatives patterns => patterns.findSome? (fun p => pureMatch fuel p value env)
+        if actual != owner || variant != tag then .ok none
+        else if patterns.any (fun pair => (fields.find? (fun field => field.1 == pair.1)).isNone)
+        then .error .representation
+        else patterns.foldlM (fun found pair => match found with
+          | none => .ok none
+          | some env => match fields.find? (fun field => field.1 == pair.1) with
+            | some field => pureMatch fuel pair.2 field.2 env
+            | none => .error .representation) (some env)
+      | _ => .ok none
+    | .alternatives patterns => patterns.foldlM (fun found pattern => match found with
+      | some env => .ok (some env)
+      | none => pureMatch fuel pattern value env) none
+
+/- Ordered arm selection: the first matching arm wins, and a fault in any arm
+   tried before it is propagated rather than skipped. -/
+def pureSelect (fuel : Nat) (arms : List (PurePattern × PureExpr)) (value : PureValue)
+    (env : PureEnv) : Except PureFault (Option (PureExpr × PureEnv)) :=
+  arms.foldlM (fun found arm => match found with
+    | some hit => .ok (some hit)
+    | none => match pureMatch fuel arm.1 value env with
+      | .ok (some env) => .ok (some (arm.2, env))
+      | .ok none => .ok none
+      | .error reason => .error reason) none
 
 def pureBound (kind : String) : Nat :=
   if kind = "u64" then 2^64 else if kind = "i32" then 2^31 else 0
@@ -2997,10 +3017,10 @@ def pureEval : Nat → PureExpr → PureEnv → PureResult
       pureEval fuel (if condition then yes else no) env
     | .choose value arms => do
       let (value, env) ← pureEval fuel value env
-      match arms.findSome? (fun arm =>
-        (pureMatch fuel arm.1 value env).map (fun env => (arm.2,env))) with
-      | some (body, env) => pureEval fuel body env
-      | none => .error (.fault .representation)
+      match pureSelect fuel arms value env with
+      | .ok (some (body, env)) => pureEval fuel body env
+      | .ok none => .error (.fault .representation)
+      | .error reason => .error (.fault reason)
     | .each value slot body => do
       let (.array values, env) ← pureEval fuel value env
         | .error (.fault .representation)
@@ -3156,10 +3176,10 @@ theorem pure_eval_step (fuel : Nat) (expression : PureExpr) (env : PureEnv)
       pureEval (fuel-1) (if condition then yes else no) env
     | .choose value arms => do
       let (value, env) ← pureEval (fuel-1) value env
-      match arms.findSome? (fun arm =>
-        (pureMatch (fuel-1) arm.1 value env).map (fun env => (arm.2,env))) with
-      | some (body, env) => pureEval (fuel-1) body env
-      | none => .error (.fault .representation)
+      match pureSelect (fuel-1) arms value env with
+      | .ok (some (body, env)) => pureEval (fuel-1) body env
+      | .ok none => .error (.fault .representation)
+      | .error reason => .error (.fault reason)
     | .each value slot body => pureEval fuel (.each value slot body) env
     | .ret value => do
       let (value, _) ← pureEval (fuel-1) value env
@@ -3229,10 +3249,10 @@ theorem pure_eval_symbolic_step (fuel : Nat) (expression : PureExpr) (env : Pure
       pureEvalSymbolic (fuel-1) (if condition then yes else no) env
     | .choose value arms => do
       let (value, env) ← pureEvalSymbolic (fuel-1) value env
-      match arms.findSome? (fun arm =>
-        (pureMatch (fuel-1) arm.1 value env).map (fun env => (arm.2,env))) with
-      | some (body, env) => pureEvalSymbolic (fuel-1) body env
-      | none => .error (.fault .representation)
+      match pureSelect (fuel-1) arms value env with
+      | .ok (some (body, env)) => pureEvalSymbolic (fuel-1) body env
+      | .ok none => .error (.fault .representation)
+      | .error reason => .error (.fault reason)
     | .each value slot body => pureEvalSymbolic fuel (.each value slot body) env
     | .ret value => do
       let (value, _) ← pureEvalSymbolic (fuel-1) value env
@@ -3255,14 +3275,14 @@ theorem pureValidateSymbolic_eq (fuel : Nat) (body : PureExpr) (input : PureValu
 
 theorem pure_match_any (fuel : Nat) (value : PureValue) (env : PureEnv)
     (nonzero : (fuel == 0) = false) :
-    pureMatch fuel .any value env = some env := by
+    pureMatch fuel .any value env = .ok (some env) := by
   cases fuel with
   | zero => simp at nonzero
   | succ fuel => rfl
 
 theorem pure_match_bind (fuel slot : Nat) (value : PureValue) (env : PureEnv)
     (nonzero : (fuel == 0) = false) :
-    pureMatch fuel (.bind slot) value env = some (pureSet env slot value) := by
+    pureMatch fuel (.bind slot) value env = .ok (some (pureSet env slot value)) := by
   cases fuel with
   | zero => simp at nonzero
   | succ fuel => rfl
@@ -3271,7 +3291,7 @@ theorem pure_match_present (fuel : Nat) (pattern : PurePattern) (value : PureVal
     (nonzero : (fuel == 0) = false) :
     pureMatch fuel (.present pattern) value env = (match value with
       | .present value => pureMatch (fuel-1) pattern value env
-      | _ => none) := by
+      | _ => .ok none) := by
   cases fuel with
   | zero => simp at nonzero
   | succ fuel => rfl
@@ -3280,13 +3300,49 @@ theorem pure_match_variant (fuel : Nat) (owner tag : String) (patterns : List (S
     (value : PureValue) (env : PureEnv) (nonzero : (fuel == 0) = false) :
     pureMatch fuel (.variant owner tag patterns) value env = (match value with
       | .variant actual variant fields =>
-        if actual != owner || variant != tag then none else
-        patterns.foldlM (fun env pair => do
-          let field ← fields.find? (fun field => field.1 == pair.1)
-          pureMatch (fuel-1) pair.2 field.2 env) env
-      | _ => none) := by
+        if actual != owner || variant != tag then .ok none
+        else if patterns.any (fun pair => (fields.find? (fun field => field.1 == pair.1)).isNone)
+        then .error .representation
+        else patterns.foldlM (fun found pair => match found with
+          | none => .ok none
+          | some env => match fields.find? (fun field => field.1 == pair.1) with
+            | some field => pureMatch (fuel-1) pair.2 field.2 env
+            | none => .error .representation) (some env)
+      | _ => .ok none) := by
   cases fuel with
   | zero => simp at nonzero
   | succ fuel => rfl
+
+/-- Exhaustion is a fault at every pattern, never a mismatch. -/
+theorem pure_match_exhausted (pattern : PurePattern) (value : PureValue) (env : PureEnv) :
+    pureMatch 0 pattern value env = .error .exhausted := rfl
+
+/-- A fault in an arm tried before any match is reported; later arms do not run. -/
+theorem pure_select_fault (fuel : Nat) (arm : PurePattern × PureExpr)
+    (rest : List (PurePattern × PureExpr)) (value : PureValue) (env : PureEnv) (reason : PureFault)
+    (failed : pureMatch fuel arm.1 value env = .error reason) :
+    pureSelect fuel (arm :: rest) value env = .error reason := by
+  simp [pureSelect,List.foldlM,failed,bind,Except.bind]
+
+/- Regression: `match x { Some(Some(_)) => false, _ => true }` on `Some(Some(()))`.
+   With insufficient fuel, the deep first arm used to be skipped as a mismatch so
+   the wildcard returned `true`. Exhaustion is now reported instead. -/
+private def nestedPresentExample : PureExpr :=
+  .choose (.read 0) [(.present (.present .any), .literal (.boolean false)),
+    (.any, .literal (.boolean true))]
+
+theorem pure_choose_exhaustion_regression :
+    pureValidate 2 nestedPresentExample (.present (.present .unit)) = .error .exhausted ∧
+    pureValidate 3 nestedPresentExample (.present (.present .unit)) = .error .exhausted ∧
+    pureValidate 10 nestedPresentExample (.present (.present .unit)) = .ok false := by
+  refine ⟨rfl,rfl,rfl⟩
+
+/- Regression: a matching variant view lacking a pattern field is a representation
+   fault, not a mismatch that lets a later wildcard arm succeed. -/
+theorem pure_choose_missing_field_regression :
+    pureValidate 10 (.choose (.read 0)
+        [(.variant "E" "A" [("f", .any)], .literal (.boolean false)),
+         (.any, .literal (.boolean true))])
+      (.variant "E" "A" []) = .error .representation := rfl
 
 end Provium.State

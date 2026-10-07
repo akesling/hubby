@@ -394,12 +394,29 @@ impl Compiler {
                         BinOp::Ge(_) => Op::Ge,
                         _ => return fail(b, "unsupported binary operator"),
                     };
-                    let operand = self
-                        .hint(&b.left, env)
-                        .or_else(|| self.hint(&b.right, env))
-                        .or(if op.comparison() { None } else { expected });
+                    let shift = matches!(op, Op::Shl | Op::Shr);
+                    // A shift's result has its left operand's type, inferred
+                    // independently of the count: rustc types an unconstrained
+                    // `1 << s` as i32 whatever the type of `s`. Never borrow the
+                    // count's type for the shifted value.
+                    let operand = if shift {
+                        self.hint(&b.left, env).or(expected)
+                    } else {
+                        self.hint(&b.left, env)
+                            .or_else(|| self.hint(&b.right, env))
+                            .or(if op.comparison() { None } else { expected })
+                    };
                     let left = self.expr(&b.left, env, operand)?;
-                    let right = self.expr(&b.right, env, Some(left.ty))?;
+                    let right = if shift {
+                        let count =
+                            self.expr(&b.right, env, self.hint(&b.right, env).or(Some(left.ty)))?;
+                        if count.ty != left.ty {
+                            return fail(b, "only same-type shifts are supported");
+                        }
+                        count
+                    } else {
+                        self.expr(&b.right, env, Some(left.ty))?
+                    };
                     if left.ty == Ty::Bool && !matches!(op, Op::Eq | Op::Ne) {
                         return fail(b, "operator requires unsigned operands");
                     }

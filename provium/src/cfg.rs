@@ -31,6 +31,17 @@ impl Configuration {
     pub fn evaluate(&self, predicate: &Meta) -> Result<bool, String> {
         self.evaluate_at(predicate, 0)
     }
+    /// The unique `target_pointer_width`, if the configuration records one.
+    pub fn pointer_width(&self) -> Option<u32> {
+        let mut widths = self
+            .values
+            .iter()
+            .filter(|(key, _)| key == "target_pointer_width");
+        match (widths.next(), widths.next()) {
+            (Some((_, width)), None) => width.parse().ok(),
+            _ => None,
+        }
+    }
     fn evaluate_at(&self, predicate: &Meta, depth: usize) -> Result<bool, String> {
         if depth > 64 {
             return Err("cfg nesting exceeds supported depth".into());

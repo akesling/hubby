@@ -109,6 +109,17 @@ It currently requires a Rust 2021 crate buildable without external dependencies
 by its rustc invocation. This restriction applies to the *subject translation*,
 not to whether a consumer can depend on Provium through Cargo.
 
+Backends interpret standard methods (`Option::as_ref`, `take`, slice sorts,
+derived `Default`) and receiver-local helpers by name, so the loader rejects
+every crate shape that could make Rust's method probe choose something else:
+trait impls must target crate-defined nominal types (no `&mut T`, `Option<T>`,
+slices or blanket impls), crate trait methods may not share a name with an
+inherent method, inherent functions may not be named after derived trait
+methods (`default`, `clone`, `eq`, ...), and no item may take a primitive,
+prelude or standard-root name. Reserved names may be imported only from their
+canonical standard path. Without a compilation configuration, only `cfg(test)`
+declarations and `cfg_attr(test, ...)` attributes are admitted.
+
 Method verification queries cfg for that explicit rustc target/profile before
 loading source. It selects item/associated-item declarations, fields and enum
 variants using cfg/cfg_attr; disabled modules are not loaded. Original source
@@ -304,7 +315,10 @@ point and audited `_build_refinement` additionally specialize those modes to the
 actual compiler arguments and cfg. Explicit overflow flags take precedence over
 the effective debug-assertion default, independently of the Cargo profile name.
 Response files, unstable options, injected built-in mode cfg, and unsupported
-panic modes reject this interpretation. The manifest records `arithmetic_profile`.
+panic modes reject this interpretation. The manifest records `arithmetic_profile`
+and its `arithmetic_profile_source`. Only `cargo_build` projects bind it to a
+build the consumer ships; direct-rustc projects record Provium's own synthetic
+`-C overflow-checks=yes` type-check, which says nothing about consumer builds.
 Compiler-option interpretation remains trusted, with native override controls;
 this does not prove Rust allocations, panic hooks/runtime effects, or complete
 arithmetic/profile preservation for other method backends. The default rule follows
@@ -419,7 +433,9 @@ It does **not** prove the frontend's Rust-to-IR translation correct.
 Pinned Lean runs with `--trust=0` and warnings as errors. Audited theorems may use
 only `propext`, `Quot.sound`, and `Classical.choice`; sorry, custom axioms, and
 native-evaluation trust axioms are rejected. Each obligation must mention its
-selected generated function. That check cannot judge specification adequacy:
+selected generated function, and its theorem must be declared in a consumer
+proof module: listing a generated correspondence or refinement theorem as an
+obligation is rejected, since nobody proved it. That check cannot judge specification adequacy:
 tautologies and impossible preconditions still need human review. Lean proof
 files contain executable metaprograms; this verifier is not a sandbox for hostile
 proof code. Allocation, I/O, crash durability, concurrency, and liveness require
@@ -559,6 +575,10 @@ their complete source bodies. The compiler resolves each accessed declaration,
 rejects opaque calls and overloaded operations, and keeps inferred `i32` counters
 separate from `u64` fields. Record equality evaluates each operand once
 in source order. No consumer-specific protocol names occur in this backend.
+
+Match arms are selected in order, and pattern matching is three-valued: fuel
+exhaustion inside a pattern and a matching variant view that lacks a pattern
+field are faults, never a mismatch that lets a later arm run.
 
 The generated function takes explicit fuel and a structural `PureValue` input.
 Its correspondence theorem currently identifies the generated interpreter call;

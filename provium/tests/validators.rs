@@ -105,6 +105,8 @@ fn complete_pure_body_and_helper_are_retained_and_unsupported_rust_rejected() {
         format!("struct i32;{SOURCE}"),
         format!("struct Other<i32>{{value:i32}}{SOURCE}"),
         SOURCE.replace("let good=", "let Some=|value:u64|value;let good="),
+        // `Some(item)` compares against a const named `item`; it binds nothing.
+        format!("const item:u64=0;{SOURCE}"),
     ] {
         assert!(Work::new(&source).lower().is_err(), "accepted {source}")
     }
@@ -506,9 +508,9 @@ theorem arbitrary_sum (a b expected : Nat)
   have hb : ¬18446744073709551616 ≤ b := Nat.not_le_of_gt bBound
   have he : ¬18446744073709551616 ≤ expected := Nat.not_le_of_gt expectedBound
   have hs : ¬18446744073709551616 ≤ min (a+b) 18446744073709551615 := by omega
-  simp [Subject.Checker_check,Subject.Checker_check_ir,pureValidate,pureEval,pureMatch,
+  simp [Subject.Checker_check,Subject.Checker_check_ir,pureValidate,pureEval,pureMatch,pureSelect,List.any,
     pureSet,pureBinary,pureBound,ha,hb,he,hs,
-    List.findSome?,List.find?,List.foldlM,bind,Option.bind,Except.bind,pure,Except.pure]
+    List.find?,List.foldlM,bind,Except.bind,pure,Except.pure]
 "#,
     );
     obligations.push(serde_json::json!({"theorem":"arbitrary_sum","function":"Checker_check"}));
@@ -670,9 +672,9 @@ theorem arbitrary_present (a b c d : Nat)
   cases ac : (a == c) <;> cases bd : (b == d) <;>
     as_aux_lemma =>
       simp (config := {implicitDefEqProofs := false}) (disch := decide)
-        [Subject.Checker_check_ir,pureValidateSymbolic,pure_eval_symbolic_step,pure_match_bind,pure_match_present,pure_match_variant,
+        [Subject.Checker_check_ir,pureValidateSymbolic,pure_eval_symbolic_step,pure_match_bind,pure_match_present,pure_match_variant,pureSelect,List.any,
          pureSet,pureField,pureFields,pureBinary,pureBound,hna,hnb,hnc,hnd,ac,bd,
-         List.findSome?,List.find?,List.foldlM,bind,Option.bind,Except.bind,pure,Except.pure]
+         List.find?,List.foldlM,bind,Option.bind,Except.bind,pure,Except.pure]
 
 theorem arbitrary_left_absent (a b : Nat) :
     Subject.Checker_check 32 (.variant "Packet" "Compare"
@@ -681,9 +683,9 @@ theorem arbitrary_left_absent (a b : Nat) :
   rw [← pureValidateSymbolic_eq]
   simp (config := {implicitDefEqProofs := false}) (disch := decide)
     [Subject.Checker_check_ir,pureValidateSymbolic,pure_eval_symbolic_step,
-     pure_match_any,pure_match_bind,pure_match_present,pure_match_variant,
-     pureSet,List.findSome?,List.find?,List.foldlM,
-     bind,Option.bind,Except.bind,pure,Except.pure]
+     pure_match_any,pure_match_bind,pure_match_present,pure_match_variant,pureSelect,List.any,
+     pureSet,List.find?,List.foldlM,
+     bind,Except.bind,pure,Except.pure]
 
 theorem arbitrary_right_absent (a b : Nat) :
     Subject.Checker_check 32 (.variant "Packet" "Compare"
@@ -692,9 +694,9 @@ theorem arbitrary_right_absent (a b : Nat) :
   rw [← pureValidateSymbolic_eq]
   simp (config := {implicitDefEqProofs := false}) (disch := decide)
     [Subject.Checker_check_ir,pureValidateSymbolic,pure_eval_symbolic_step,
-     pure_match_any,pure_match_bind,pure_match_present,pure_match_variant,
-     pureSet,List.findSome?,List.find?,List.foldlM,
-     bind,Option.bind,Except.bind,pure,Except.pure]
+     pure_match_any,pure_match_bind,pure_match_present,pure_match_variant,pureSelect,List.any,
+     pureSet,List.find?,List.foldlM,
+     bind,Except.bind,pure,Except.pure]
 
 theorem both_absent :
     Subject.Checker_check 32 (.variant "Packet" "Compare"
@@ -703,9 +705,9 @@ theorem both_absent :
   rw [← pureValidateSymbolic_eq]
   simp (config := {implicitDefEqProofs := false}) (disch := decide)
     [Subject.Checker_check_ir,pureValidateSymbolic,pure_eval_symbolic_step,
-     pure_match_any,pure_match_bind,pure_match_present,pure_match_variant,
-     pureSet,List.findSome?,List.find?,List.foldlM,
-     bind,Option.bind,Except.bind,pure,Except.pure]
+     pure_match_any,pure_match_bind,pure_match_present,pure_match_variant,pureSelect,List.any,
+     pureSet,List.find?,List.foldlM,
+     bind,Except.bind,pure,Except.pure]
 "#).unwrap();
     let config = w.0.join("project.json");
     fs::write(
