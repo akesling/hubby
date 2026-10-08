@@ -23,6 +23,8 @@ jobs:
         with:
           persist-credentials: false
       - run: rustup component add clippy rustfmt --toolchain stable
+      # numeric_folds verifies a 32-bit target build.
+      - run: rustup target add wasm32-unknown-unknown --toolchain stable
       - name: Install the pinned Lean toolchain
         shell: bash
         run: |
