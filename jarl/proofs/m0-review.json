@@ -5,7 +5,7 @@
   "inputs": {
     "proofs/CORRECTNESS_PLAN.md": "c44373cc666e40fc10d8f8e99543b4a5ac5c186716fe5487f10b424e48d3fe0f",
     "proofs/M0.md": "e6a5cce7ba93874f2cc05315dd8a6a5a416e622f7ffb13065490fa77ec1bc60c",
-    "proofs/coverage.json": "6fd162bcadcd4ae5709f71fb0f889c2153ae034043c0bfb99e6a89a5e8fe0304",
+    "proofs/coverage.json": "52e8aa0133718fad90b13b8d544e55fb0f09de7a2eeb55ede4ec72208e375208",
     "proofs/build-matrix.json": "2349382e9b4c6e6a6d66f719403693d256904ac639e8837fdd4b94092d510bee",
     "proofs/specification/project.json": "9096092733883fa61520a225c3577f67536bee32077fb98d0aad6aa306f2bcf4",
     "proofs/specification/Model.lean": "aff1161e96237705d832a99ce43082fd3b097d2f756fe75db37d41a32f8cca42",

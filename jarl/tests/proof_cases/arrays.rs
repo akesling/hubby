@@ -230,7 +230,11 @@ fn original_membership_mutations_break_the_array_contracts() {
     // shape: the numeric-fold frontend names each rejected construct, so these
     // mutations never reach Lean (QuorumIndex.result_majority pins the rest).
     for (from, to, expected) in [
-        ("new.min(old)", "new.max(old)", "expected builtin lookup min"),
+        (
+            "new.min(old)",
+            "new.max(old)",
+            "expected builtin lookup min",
+        ),
         (
             "if !self.is_joint() {",
             "if self.is_joint() {",

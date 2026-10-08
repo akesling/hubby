@@ -12,7 +12,12 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    env:
+      # Lean's kernel needs more than Provium's 2 GiB default for the larger
+      # proof projects; standard runners have 16 GB.
+      PROVIUM_LEAN_MEMORY_MB: 8192
+    # The complete gate kernel-checks every Lean fixture serially (over an hour).
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v7
         with:
@@ -25,6 +30,9 @@ jobs:
           sh "$RUNNER_TEMP/elan-init.sh" -y --default-toolchain none
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
           "$HOME/.elan/bin/elan" toolchain install "$(cat provium/lean-toolchain)"
+      # cargo metadata --offline needs every locked package, including
+      # platform-specific ones the build never downloads.
+      - run: cargo +stable fetch --locked --manifest-path provium/Cargo.toml
       - run: provium/scripts/check.sh
         env:
           RUSTUP_TOOLCHAIN: stable

@@ -17,7 +17,7 @@
       },
       {
         "path": "src/membership.rs",
-        "sha256": "a30066ead837058f3efcdb35f038984ac0ea7a1e477af6a05db58169de92b865"
+        "sha256": "31428cf4062f95f2c1df10e98aca0b473c47bfc27bf53e64aade23dee0f25ba7"
       },
       {
         "path": "src/node.rs",
@@ -29,7 +29,7 @@
       },
       {
         "path": "src/state.rs",
-        "sha256": "d24a34c5090f73c0936fc7368ed1047f806bc1028b814061bbe057b927212ec3"
+        "sha256": "fe56c7d028ea555d063e18ab844c99442a2d1e3839437512117dad12f96a2ce3"
       }
     ],
     "items": [
@@ -1201,9 +1201,9 @@
         "id": "crate::membership::<Membership < MAX >>::finalized",
         "kind": "method",
         "source": "src/membership.rs",
-        "line": 156,
+        "line": 157,
         "column": 4,
-        "end_line": 166,
+        "end_line": 167,
         "end_column": 5,
         "public": false,
         "syntax_sha256": "b0b07caa2ac0bdbb97fbff497ea2b78d8221b5b6268eac0aa33e932b23ae742e",
@@ -1265,9 +1265,9 @@
         "id": "crate::membership::<Membership < MAX >>::joint",
         "kind": "method",
         "source": "src/membership.rs",
-        "line": 147,
+        "line": 148,
         "column": 4,
-        "end_line": 155,
+        "end_line": 156,
         "end_column": 5,
         "public": false,
         "syntax_sha256": "96d692b357fdb45af16b9435492eafdedc39f3a27797b6891173629ad6ef8984",
@@ -1303,7 +1303,7 @@
         "source": "src/membership.rs",
         "line": 124,
         "column": 4,
-        "end_line": 128,
+        "end_line": 129,
         "end_column": 5,
         "public": false,
         "syntax_sha256": "b5b29bc437ded7b881758baf1e1767097c251c18d0eaa9fb4c0d411a3372824e",
@@ -1346,9 +1346,9 @@
         "id": "crate::membership::<Membership < MAX >>::peers",
         "kind": "method",
         "source": "src/membership.rs",
-        "line": 129,
+        "line": 130,
         "column": 4,
-        "end_line": 131,
+        "end_line": 132,
         "end_column": 5,
         "public": false,
         "syntax_sha256": "bb405658b308a6b4843faadb37106e968ab150286fc62a863a28396305a95f6f",
@@ -1360,9 +1360,9 @@
         "id": "crate::membership::<Membership < MAX >>::quorum",
         "kind": "method",
         "source": "src/membership.rs",
-        "line": 189,
+        "line": 190,
         "column": 4,
-        "end_line": 202,
+        "end_line": 203,
         "end_column": 5,
         "public": false,
         "syntax_sha256": "b09f0d145f7a7b7ffb1134e7d53c7098e428eae517e8e0f9c5bdf8b1ba3c30df",
@@ -1381,9 +1381,9 @@
         "id": "crate::membership::<Membership < MAX >>::quorum_index",
         "kind": "method",
         "source": "src/membership.rs",
-        "line": 167,
+        "line": 168,
         "column": 4,
-        "end_line": 187,
+        "end_line": 188,
         "end_column": 5,
         "public": false,
         "syntax_sha256": "dd2967ba4437aa6cc04fa3bfac1c1f2c2232a7f4f6d587748a3ce265d9c021f4",
@@ -1437,9 +1437,9 @@
         "id": "crate::membership::<Membership < MAX >>::with_learners",
         "kind": "method",
         "source": "src/membership.rs",
-        "line": 132,
+        "line": 133,
         "column": 4,
-        "end_line": 146,
+        "end_line": 147,
         "end_column": 5,
         "public": false,
         "syntax_sha256": "e3223f0e7c2c6ed893566e2fdae2a80d1ab75265dc04a60f019d8a2923aad49b",
@@ -1496,7 +1496,7 @@
         "source": "src/membership.rs",
         "line": 39,
         "column": 0,
-        "end_line": 203,
+        "end_line": 204,
         "end_column": 1,
         "public": false,
         "syntax_sha256": "8cf2a48aa4f95010257cc6be1dfd8042952297d24ccb791c55941b50512e4e8a",
@@ -1530,9 +1530,9 @@
         "id": "crate::membership::tests",
         "kind": "module",
         "source": "src/membership.rs",
-        "line": 205,
+        "line": 206,
         "column": 0,
-        "end_line": 261,
+        "end_line": 262,
         "end_column": 1,
         "public": false,
         "syntax_sha256": "dbdab2d93baf3a6ac5ee3d748b520eebbbcb42106ae39f7d05dae78de9fba9b1",
@@ -2778,18 +2778,6 @@
         ]
       },
       {
-        "id": "crate::state::<State < V , S , CAP >>::parts",
-        "kind": "method",
-        "source": "src/state.rs",
-        "line": 147,
-        "column": 4,
-        "end_line": 151,
-        "end_column": 5,
-        "public": false,
-        "syntax_sha256": "89bd4a19014d8a8398770982b59c5e1700e834a0d719505735eec21d39d9c596",
-        "calls": []
-      },
-      {
         "id": "crate::state::<State < V , S , CAP >>::push",
         "kind": "method",
         "source": "src/state.rs",
@@ -2827,6 +2815,18 @@
           "method last",
           "method push"
         ]
+      },
+      {
+        "id": "crate::state::<State < V , S , CAP >>::slots",
+        "kind": "method",
+        "source": "src/state.rs",
+        "line": 147,
+        "column": 4,
+        "end_line": 151,
+        "end_column": 5,
+        "public": false,
+        "syntax_sha256": "44f752c199fc45875f11763d0840af956c6972a6c72406916f291908682c379f",
+        "calls": []
       },
       {
         "id": "crate::state::<State < V , S , CAP >>::snapshot",
@@ -2910,7 +2910,7 @@
         "end_line": 190,
         "end_column": 1,
         "public": false,
-        "syntax_sha256": "438ef649c2e670c1e4cf7d10268afb516047701972b26e7cbd3f6bb28390e9c9",
+        "syntax_sha256": "cb8c41a4895898b6fe98863a2782804a1735ba0916db7842bfd93244e8c11ba5",
         "calls": []
       },
       {
@@ -6867,17 +6867,6 @@
       ],
       "context": "production"
     },
-    "crate::state::<State < V , S , CAP >>::parts": {
-      "requirements": [
-        "C01",
-        "C12"
-      ],
-      "status": "planned",
-      "note": "Test-only (cfg(test)) serialization support for the imperative-lowering differential test in src/node/machine.rs; not part of production builds.",
-      "root_apis": [],
-      "contracts": [],
-      "context": "production"
-    },
     "crate::state::<State < V , S , CAP >>::push": {
       "requirements": [
         "C02",
@@ -7056,6 +7045,17 @@
           "evidence": "artifacts/provium/proofs/storage/verified.json"
         }
       ],
+      "context": "production"
+    },
+    "crate::state::<State < V , S , CAP >>::slots": {
+      "requirements": [
+        "C01",
+        "C12"
+      ],
+      "status": "planned",
+      "note": "Test-only (cfg(test)) serialization support for the imperative-lowering differential test in src/node/machine.rs; not part of production builds.",
+      "root_apis": [],
+      "contracts": [],
       "context": "production"
     },
     "crate::state::<State < V , S , CAP >>::snapshot": {

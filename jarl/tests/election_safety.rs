@@ -87,7 +87,10 @@ fn prevote_grants_never_count_as_votes_for_the_current_term() {
     assert!(matches!(
         delayed[..],
         [Envelope {
-            message: Message::Voted { term: 1, granted: true },
+            message: Message::Voted {
+                term: 1,
+                granted: true
+            },
             ..
         }]
     ));

@@ -12,6 +12,10 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
+    env:
+      # Lean's kernel needs more than Provium's 2 GiB default for the larger
+      # proof projects; standard runners have 16 GB.
+      PROVIUM_LEAN_MEMORY_MB: 8192
     steps:
       - uses: actions/checkout@v7
         with:

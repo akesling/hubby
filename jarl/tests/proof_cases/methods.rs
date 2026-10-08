@@ -36,7 +36,7 @@ fn changing_jarl_acknowledgment_breaks_the_kernel_checked_contract() {
     // Control: the copied, unmutated crate must verify, or a fixture-level
     // failure would satisfy the mutation check below.
     run(&original).unwrap();
-    let error = run(&original.replace("self.node.dirty = false;", "self.node.dirty = true;"))
-        .unwrap_err();
+    let error =
+        run(&original.replace("self.node.dirty = false;", "self.node.dirty = true;")).unwrap_err();
     assert!(error.contains("Lean rejected Proofs.lean"), "{error}");
 }

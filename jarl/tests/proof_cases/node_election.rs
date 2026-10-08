@@ -6,10 +6,9 @@ use std::{fs, path::Path};
 fn whole_body_election_timer_effects_reject_changed_bodies() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let w = Work::new();
-    let mut project: serde_json::Value = serde_json::from_slice(
-        &fs::read(root.join("proofs/node-election/project.json")).unwrap(),
-    )
-    .unwrap();
+    let mut project: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join("proofs/node-election/project.json")).unwrap())
+            .unwrap();
     fs::create_dir(w.0.join("src")).unwrap();
     for file in fs::read_dir(root.join("src")).unwrap() {
         let file = file.unwrap();

@@ -6,7 +6,14 @@
 //! engine is exercised: the dynamic engine's membership hooks are function
 //! pointers, which the machine hands to its oracle and this test cannot run.
 use super::*;
-use std::{format, fs, path::Path, process::Command, string::{String, ToString}, vec, vec::Vec};
+use std::{
+    format, fs,
+    path::Path,
+    process::Command,
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
 
 /// The machine's value syntax for a Rust value, field by field in
 /// declaration order.
@@ -83,7 +90,10 @@ impl Value for LogId {
 }
 impl<V: Value> Value for Entry<V> {
     fn value(&self) -> String {
-        record("Entry", &[("id", self.id.value()), ("value", self.value.value())])
+        record(
+            "Entry",
+            &[("id", self.id.value()), ("value", self.value.value())],
+        )
     }
 }
 impl<S: Value> Value for Snapshot<S> {
@@ -102,7 +112,9 @@ impl Value for Role {
 impl Value for Rejection {
     fn value(&self) -> String {
         match self {
-            Rejection::Conflict { next } => variant("Rejection", "Conflict", &[("next", next.value())]),
+            Rejection::Conflict { next } => {
+                variant("Rejection", "Conflict", &[("next", next.value())])
+            }
             Rejection::Full => variant("Rejection", "Full", &[]),
         }
     }
@@ -119,15 +131,19 @@ impl Value for Outbound {
     fn value(&self) -> String {
         match self {
             Outbound::PreVote(t) => variant("Outbound", "PreVote", &[("0", t.value())]),
-            Outbound::PreVoted(t, g) => {
-                variant("Outbound", "PreVoted", &[("0", t.value()), ("1", g.value())])
-            }
+            Outbound::PreVoted(t, g) => variant(
+                "Outbound",
+                "PreVoted",
+                &[("0", t.value()), ("1", g.value())],
+            ),
             Outbound::Vote => variant("Outbound", "Vote", &[]),
             Outbound::Voted(g) => variant("Outbound", "Voted", &[("0", g.value())]),
             Outbound::Replicate => variant("Outbound", "Replicate", &[]),
-            Outbound::Replicated(i, r) => {
-                variant("Outbound", "Replicated", &[("0", i.value()), ("1", r.value())])
-            }
+            Outbound::Replicated(i, r) => variant(
+                "Outbound",
+                "Replicated",
+                &[("0", i.value()), ("1", r.value())],
+            ),
         }
     }
 }
@@ -145,12 +161,12 @@ impl Value for crate::state::HardState {
 }
 impl<V: Value, S: Value, const CAP: usize> Value for State<V, S, CAP> {
     fn value(&self) -> String {
-        let (hard, snapshot, entries, len) = self.parts();
+        let (entries, len) = self.slots();
         record(
             "State",
             &[
-                ("hard", hard.value()),
-                ("snapshot", snapshot.value()),
+                ("hard", self.hard.value()),
+                ("snapshot", self.snapshot.value()),
                 ("entries", entries.value()),
                 ("len", len.value()),
             ],
@@ -174,9 +190,15 @@ impl<const MAX: usize> Value for Membership<MAX> {
         });
         let items = members
             .iter()
-            .map(|m| m.as_ref().map_or(".absent".into(), |r| format!("(.present ({r}))")))
+            .map(|m| {
+                m.as_ref()
+                    .map_or(".absent".into(), |r| format!("(.present ({r}))"))
+            })
             .collect::<Vec<String>>();
-        record("Membership", &[("members", format!("(.array [{}])", items.join(", ")))])
+        record(
+            "Membership",
+            &[("members", format!("(.array [{}])", items.join(", ")))],
+        )
     }
 }
 impl<const N: usize> Value for Config<N> {
@@ -426,7 +448,9 @@ fn schedules(count: usize) -> Vec<Case> {
 #[ignore = "requires pinned Lean; scripts/verify.sh runs this"]
 fn generated_tick_and_step_agree_with_native_runs() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let work = root.join("artifacts").join(format!("machine-{}", std::process::id()));
+    let work = root
+        .join("artifacts")
+        .join(format!("machine-{}", std::process::id()));
     let _ = fs::remove_dir_all(&work);
     fs::create_dir_all(&work).unwrap();
     let project = serde_json::json!({
@@ -506,13 +530,21 @@ fn generated_tick_and_step_agree_with_native_runs() {
         stdout,
         String::from_utf8_lossy(&run.stderr)
     );
-    let ok = stdout.lines().filter(|l| l.starts_with("PROVIUM_DIFF ok")).count();
+    let ok = stdout
+        .lines()
+        .filter(|l| l.starts_with("PROVIUM_DIFF ok"))
+        .count();
     let bad = stdout
         .lines()
         .filter(|l| l.starts_with("PROVIUM_DIFF") && !l.starts_with("PROVIUM_DIFF ok"))
         .take(3)
         .collect::<Vec<_>>();
-    assert!(bad.is_empty(), "{} of {} differ: {bad:?}", cases.len() - ok, cases.len());
+    assert!(
+        bad.is_empty(),
+        "{} of {} differ: {bad:?}",
+        cases.len() - ok,
+        cases.len()
+    );
     assert_eq!(ok, cases.len());
     let _ = fs::remove_dir_all(&work);
 }

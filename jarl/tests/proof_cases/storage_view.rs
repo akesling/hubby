@@ -40,7 +40,11 @@ fn delta_contracts_reject_source_and_host_order_changes() {
     // failure: either the theorem checker rejects it, or the frontend's
     // fail-closed shape check names the construct it no longer admits.
     for (old, new, expected) in [
-        (".saturating_sub(1)", ".saturating_sub(0)", "Lean rejected Proofs.lean"),
+        (
+            ".saturating_sub(1)",
+            ".saturating_sub(0)",
+            "Lean rejected Proofs.lean",
+        ),
         (
             "filter(|_| snapshot_changed)",
             "filter(|_| !snapshot_changed)",
