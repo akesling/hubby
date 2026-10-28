@@ -152,6 +152,9 @@ pub struct Crate {
     /// Names that an identifier pattern would resolve to as a value (consts,
     /// statics, unit structs and imports) instead of introducing a binding.
     value_names: std::collections::BTreeSet<String>,
+    /// Integer-literal `const` items by name; `None` when a name is declared
+    /// more than once or its initializer is not a plain integer literal.
+    const_values: BTreeMap<String, Option<u64>>,
 }
 /// Names a crate item must not take: primitive, prelude and standard-root names
 /// that the backends interpret as builtin. A crate item with such a name (a
@@ -322,6 +325,7 @@ impl Crate {
             crate_trait_methods: vec![],
             trait_impl_targets: vec![],
             value_names: std::collections::BTreeSet::new(),
+            const_values: BTreeMap::new(),
         };
         krate.file(root, "", true)?;
         krate.check_method_resolution()?;
@@ -450,6 +454,22 @@ impl Crate {
             match &item {
                 Item::Const(i) if !test_only(&i.attrs) => {
                     self.value_names.insert(i.ident.to_string());
+                    let value = match &*i.expr {
+                        Expr::Lit(syn::ExprLit {
+                            lit: syn::Lit::Int(n),
+                            ..
+                        }) if i.attrs.is_empty() || attrs(&i.attrs).is_ok() => {
+                            n.base10_parse::<u64>().ok()
+                        }
+                        _ => None,
+                    };
+                    let name = i.ident.to_string();
+                    let entry = if self.const_values.contains_key(&name) {
+                        None
+                    } else {
+                        value
+                    };
+                    self.const_values.insert(name, entry);
                 }
                 Item::Static(i) if !test_only(&i.attrs) => {
                     self.value_names.insert(i.ident.to_string());

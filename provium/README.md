@@ -135,8 +135,11 @@ loops consumed by `for`, `next`, `next_back`, `last`, `position`, `any`, `all`,
 `find`, `count`, `max` or `min`; iterator-valued locals are re-created at each
 use, which Rust's borrow rules make equivalent. Also supported: `loop`,
 `while` and labeled `break`/`continue`, `?` on `Option` and same-error
-`Result`, `let … else`, `match` with tuple, struct and variant patterns and
-or-patterns, tuples and their lexicographic comparison, casts and
+`Result`, `let … else`, `match` with tuple, struct and variant patterns,
+or-patterns and guards (a failed guard falls through to the next arm),
+array literals, `core::array::from_fn`, slices as arrays, owned `self`
+receivers and writes through `&mut` fields, `let` types fixed only by a later
+call argument (as for an inferred const argument), tuples and their lexicographic comparison, casts and
 `try_from`, `Option`/`Result` combinators, array `fill`, `map`, `get`,
 `contains`, slice `sort_unstable` and `rotate_left`, `matches!`, `assert!`,
 `unreachable!`, derived `Clone`/`Default`/equality, and integer locals whose

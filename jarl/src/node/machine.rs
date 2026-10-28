@@ -1,5 +1,6 @@
-//! Differential check of Provium's imperative lowering of `Node::tick` and
-//! `Node::step`: native runs over random three-node schedules are compared
+//! Differential check of Provium's imperative lowering of `Node::tick`,
+//! `Node::step`, `Node::next_message`, `Node::build` and
+//! `Ready::persisted`: native runs over random three-node schedules are compared
 //! with Lean's evaluation of the generated machine programs on the same
 //! serialized states and inputs. A test, not a proof: it catches frontend
 //! lowering defects the proofs would otherwise silently inherit. Only the fixed
@@ -360,9 +361,14 @@ fn result(r: &Result<(), Error>) -> String {
 struct Case {
     function: &'static str,
     before: String,
-    arguments: String,
+    /// Ordinary arguments; the impl's const arguments N and CAP follow them.
+    arguments: Vec<String>,
     result: String,
     after: String,
+}
+
+fn ready(node: &str) -> String {
+    record("Ready", &[("node", node.to_string())])
 }
 
 type TestNode = Node<u64, (), 3, 4>;
@@ -398,7 +404,7 @@ fn schedules(count: usize) -> Vec<Case> {
                     cases.push(Case {
                         function: "node_Node_tick",
                         before,
-                        arguments: String::new(),
+                        arguments: vec![],
                         result: result(&r),
                         after: nodes[i].value(),
                     });
@@ -411,22 +417,49 @@ fn schedules(count: usize) -> Vec<Case> {
                     cases.push(Case {
                         function: "node_Node_step",
                         before,
-                        arguments: message.value(),
+                        arguments: vec![message.value()],
                         result: result(&r),
                         after: nodes[to].value(),
                     });
                 }
                 4 => {
-                    if let Some(ready) = nodes[i].ready() {
-                        disk[i] = ready.state().clone();
-                        ready.persisted();
+                    let before = nodes[i].value();
+                    if let Some(handle) = nodes[i].ready() {
+                        disk[i] = handle.state().clone();
+                        handle.persisted();
+                        cases.push(Case {
+                            function: "ready_Ready_persisted",
+                            before: ready(&before),
+                            arguments: vec![],
+                            result: ".unit".into(),
+                            after: ready(&nodes[i].value()),
+                        });
                     }
                 }
                 5 if !network.is_empty() => {
                     network.remove(random.below(network.len()));
                 }
                 6 if random.below(4) == 0 => {
-                    nodes[i] = Node::new(config(i), disk[i].clone()).unwrap();
+                    // `Node::new` validates the checkpoint, builds the fixed
+                    // membership from the configuration, and calls `build`.
+                    let membership = Membership::new(&config(i).members, &[]).unwrap();
+                    let built = Node::build(config(i), disk[i].clone(), membership, None);
+                    cases.push(Case {
+                        function: "node_Node_build",
+                        before: ".unit".into(),
+                        arguments: vec![
+                            config(i).value(),
+                            disk[i].value(),
+                            membership.value(),
+                            ".absent".into(),
+                        ],
+                        result: match &built {
+                            Ok(node) => variant("Result", "Ok", &[("0", node.value())]),
+                            Err(e) => variant("Result", "Err", &[("0", e.value())]),
+                        },
+                        after: ".unit".into(),
+                    });
+                    nodes[i] = built.unwrap();
                 }
                 _ => {
                     if nodes[i].role() == Role::Leader && nodes[i].ready().is_none() {
@@ -435,8 +468,20 @@ fn schedules(count: usize) -> Vec<Case> {
                 }
             }
             for node in nodes.iter_mut() {
-                while let Some(message) = node.next_message() {
-                    network.push(message.cloned());
+                loop {
+                    let before = node.value();
+                    let message = node.next_message().map(|m| m.cloned());
+                    cases.push(Case {
+                        function: "node_Node_next_message",
+                        before,
+                        arguments: vec![],
+                        result: message.value(),
+                        after: node.value(),
+                    });
+                    match message {
+                        Some(message) => network.push(message),
+                        None => break,
+                    }
                 }
             }
         }
@@ -446,7 +491,7 @@ fn schedules(count: usize) -> Vec<Case> {
 
 #[test]
 #[ignore = "requires pinned Lean; scripts/verify.sh runs this"]
-fn generated_tick_and_step_agree_with_native_runs() {
+fn generated_node_transitions_agree_with_native_runs() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let work = root
         .join("artifacts")
@@ -458,7 +503,13 @@ fn generated_tick_and_step_agree_with_native_runs() {
         "crate_root": root.join("src/lib.rs"),
         "namespace": "Jarl",
         "methods": [],
-        "imperative_methods": ["node::Node::tick", "node::Node::step"],
+        "imperative_methods": [
+            "node::Node::tick",
+            "node::Node::step",
+            "node::Node::next_message",
+            "node::Node::build",
+            "ready::Ready::persisted"
+        ],
         "proofs": "Proofs.lean",
         "obligations": [
             {"theorem": "Diff.tick", "function": "node_Node_tick"},
@@ -478,11 +529,22 @@ fn generated_tick_and_step_agree_with_native_runs() {
     // The schedules must exercise every fixed-engine message kind, failed
     // calls, and elections that a leader wins.
     for kind in ["\"Vote\"", "\"Voted\"", "\"Append\"", "\"Replicated\""] {
-        let n = cases.iter().filter(|c| c.arguments.contains(kind)).count();
+        let n = cases
+            .iter()
+            .filter(|c| c.arguments.iter().any(|a| a.contains(kind)))
+            .count();
         assert!(n >= 5, "{kind}: {n}");
     }
     assert!(cases.iter().any(|c| c.result.contains("\"Err\"")));
     assert!(cases.iter().any(|c| c.after.contains("\"Leader\"")));
+    for function in [
+        "node_Node_next_message",
+        "node_Node_build",
+        "ready_Ready_persisted",
+    ] {
+        let n = cases.iter().filter(|c| c.function == function).count();
+        assert!(n >= 5, "{function}: {n}");
+    }
     let mut lean = String::from(
         "import Generated\nopen Provium.State Provium.Imperative\n\
          partial def same : PureValue → PureValue → Bool\n\
@@ -505,12 +567,14 @@ fn generated_tick_and_step_agree_with_native_runs() {
     );
     for (i, c) in cases.iter().enumerate() {
         // Impl const parameters N and CAP follow the ordinary arguments.
-        let constants = "(.number \"usize\" 3), (.number \"usize\" 4)";
-        let arguments = if c.arguments.is_empty() {
-            constants.to_string()
-        } else {
-            format!("({}), {constants}", c.arguments)
-        };
+        let mut arguments = c
+            .arguments
+            .iter()
+            .map(|a| format!("({a})"))
+            .collect::<Vec<_>>();
+        arguments.push("(.number \"usize\" 3)".into());
+        arguments.push("(.number \"usize\" 4)".into());
+        let arguments = arguments.join(", ");
         lean.push_str(&format!(
             "#eval check {i} (Jarl.{} target 100000 ({}) [{arguments}]) ({}) ({})\n",
             c.function, c.before, c.result, c.after

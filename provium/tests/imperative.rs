@@ -116,11 +116,17 @@ fn receiver_bodies_lower_with_inlined_calls_and_reject_unsupported_rust() {
     }
     let grant = w.lower("Node::grant").unwrap().imperative.unwrap();
     assert!(grant.expression.contains(".index "), "{}", grant.expression);
-    // A guard would otherwise be dropped silently.
-    assert!(Work::new(SOURCE)
+    // A guarded match lowers to a labeled block whose arms fall through.
+    let guarded = Work::new(SOURCE)
         .lower("Node::grant")
-        .unwrap_err()
-        .contains("guarded"));
+        .unwrap()
+        .imperative
+        .unwrap();
+    assert!(
+        guarded.expression.contains(".block "),
+        "{}",
+        guarded.expression
+    );
     for (from, to, message) in [
         (
             "self.elapsed = 0;",
@@ -199,7 +205,8 @@ fn lean_node(
 #[test]
 #[ignore = "requires pinned Lean; scripts/verify.sh runs this"]
 fn native_receiver_effects_are_kernel_checked() {
-    let source = SOURCE.replace("Some(t) if false => Some(Outbound::PreVote(t)),\n", "");
+    // The guard `if false` must fall through to the next arm, as natively.
+    let source = SOURCE.to_string();
     let w = Work::new(&source);
     // Native runs print the final receiver in the machine's value syntax.
     let mut main = format!(

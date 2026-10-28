@@ -33,7 +33,8 @@ enum Ty {
     },
     Option(Box<Ty>),
     Result(Box<Ty>, Box<Ty>),
-    Array(Box<Ty>),
+    /// An array and its length, when the lowering can name it.
+    Array(Box<Ty>, Konst),
     Tuple(Vec<Ty>),
     /// A function pointer; calls go to the oracle and return `output`.
     Function(Box<Ty>),
@@ -54,20 +55,39 @@ impl PartialEq for Ty {
             (Ty::Number(a), Ty::Number(b)) => a == b,
             (
                 Ty::Named {
-                    name: a, types: x, ..
+                    name: a,
+                    types: x,
+                    consts: m,
                 },
                 Ty::Named {
-                    name: b, types: y, ..
+                    name: b,
+                    types: y,
+                    consts: n,
                 },
-            ) => a == b && x == y,
+            ) => {
+                a == b
+                    && (x.is_empty() || y.is_empty() || x == y)
+                    && (m.len() != n.len() || m.iter().zip(n).all(|(p, q)| konst_eq(p, q)))
+            }
             (Ty::Option(a), Ty::Option(b)) => a == b,
             (Ty::Result(a, e), Ty::Result(b, f)) => a == b && e == f,
-            (Ty::Array(a), Ty::Array(b)) => a == b,
+            (Ty::Array(a, m), Ty::Array(b, n)) => a == b && konst_eq(m, n),
             (Ty::Tuple(a), Ty::Tuple(b)) => a == b,
             (Ty::Function(a), Ty::Function(b)) => a == b,
             (Ty::Opaque(a), Ty::Opaque(b)) => a == b,
             _ => false,
         }
+    }
+}
+
+/// Const arguments agree unless both are known and differ; distinct const
+/// parameters are distinct, as in Rust's type checking.
+fn konst_eq(a: &Konst, b: &Konst) -> bool {
+    match (a, b) {
+        (Konst::Unknown, _) | (_, Konst::Unknown) => true,
+        (Konst::Slot(x), Konst::Slot(y)) => x == y,
+        (Konst::Value(x), Konst::Value(y)) => x == y,
+        _ => false,
     }
 }
 
@@ -276,6 +296,7 @@ const BUILTIN_METHODS: &[&str] = &[
     "contains",
     "get",
     "len",
+    "is_empty",
     "fill",
     "rotate_left",
     "clamp",
@@ -387,7 +408,16 @@ impl<'a> Compiler<'a> {
                 ..
             }) => n.base10_parse::<u64>().map_or(Konst::Unknown, Konst::Value),
             Expr::Path(p) => single(&p.path)
-                .and_then(|n| generics.consts.get(&n).cloned())
+                .and_then(|n| {
+                    generics.consts.get(&n).cloned().or_else(|| {
+                        self.krate
+                            .const_values
+                            .get(&n)
+                            .copied()
+                            .flatten()
+                            .map(Konst::Value)
+                    })
+                })
                 .unwrap_or(Konst::Unknown),
             Expr::Block(b) if b.block.stmts.len() == 1 => match &b.block.stmts[0] {
                 syn::Stmt::Expr(e, None) => self.konst(e, generics),
@@ -410,9 +440,15 @@ impl<'a> Compiler<'a> {
             Type::Paren(p) => self.ty_in(&p.elem, declared, generics, module, self_ty)?,
             Type::Group(g) => self.ty_in(&g.elem, declared, generics, module, self_ty)?,
             Type::Reference(r) => self.ty_in(&r.elem, declared, generics, module, self_ty)?,
-            Type::Array(a) => Ty::Array(Box::new(
-                self.ty_in(&a.elem, declared, generics, module, self_ty)?,
-            )),
+            Type::Array(a) => Ty::Array(
+                Box::new(self.ty_in(&a.elem, declared, generics, module, self_ty)?),
+                self.konst(&a.len, generics),
+            ),
+            // A slice is its elements, as an array of unknown length.
+            Type::Slice(e) => Ty::Array(
+                Box::new(self.ty_in(&e.elem, declared, generics, module, self_ty)?),
+                Konst::Unknown,
+            ),
             Type::Tuple(t) if t.elems.is_empty() => Ty::Unit,
             Type::Tuple(t) => Ty::Tuple(
                 t.elems
@@ -507,6 +543,44 @@ impl<'a> Compiler<'a> {
             _ => Ty::Opaque(tokens(t)),
         })
     }
+    /// `Self` in a frame: the receiver's type, or the impl's self type
+    /// instantiated by the frame's generics.
+    fn frame_self(&self, frame: &Frame<'a>) -> Option<Ty> {
+        frame
+            .receiver
+            .as_ref()
+            .map(|r| r.1.clone())
+            .or_else(|| self.frame_self_of(frame.def, &frame.generics))
+    }
+    fn frame_self_of(&self, def: &Definition, generics: &Generics) -> Option<Ty> {
+        match &def.self_type {
+            Some(t) => self
+                .ty_in(t, &def.impl_generics, generics, &def.module, None)
+                .ok(),
+            None => Some(self.fresh_instance(def.receiver.clone())),
+        }
+    }
+    /// A crate type written without its arguments: each type parameter is
+    /// left to inference and each const parameter unknown.
+    fn fresh_instance(&self, name: String) -> Ty {
+        let declared = self
+            .krate
+            .structs
+            .get(&name)
+            .map(|s| &s.generics)
+            .or_else(|| self.krate.enums.get(&name).map(|e| &e.generics));
+        let (types, consts) = declared.map_or((vec![], vec![]), |g| {
+            (
+                g.type_params().map(|_| Ty::Infer).collect(),
+                g.const_params().map(|_| Konst::Unknown).collect(),
+            )
+        });
+        Ty::Named {
+            name,
+            types,
+            consts,
+        }
+    }
     fn ty(&self, frame: &Frame<'a>, t: &Type) -> Result<Ty, String> {
         self.ty_in(
             t,
@@ -517,7 +591,7 @@ impl<'a> Compiler<'a> {
                 .receiver
                 .as_ref()
                 .map(|r| &r.1)
-                .or(frame_self(frame).as_ref()),
+                .or(self.frame_self(frame).as_ref()),
         )
     }
     /// The instantiation a declaration's generics receive from `ty`.
@@ -653,7 +727,7 @@ impl<'a> Compiler<'a> {
             Ty::Tuple(items) => items
                 .iter()
                 .try_for_each(|t| self.derived(t, required, depth + 1)),
-            Ty::Array(inner) if required != "PartialOrd" => {
+            Ty::Array(inner, _) if required != "PartialOrd" => {
                 self.derived(inner, required, depth + 1)
             }
             Ty::Named { name, .. } => {
@@ -692,7 +766,7 @@ impl<'a> Compiler<'a> {
                 }
                 types.iter().try_for_each(|t| self.droppable(t))
             }
-            Ty::Option(t) | Ty::Array(t) => self.droppable(t),
+            Ty::Option(t) | Ty::Array(t, _) => self.droppable(t),
             Ty::Result(a, b) => {
                 self.droppable(a)?;
                 self.droppable(b)
@@ -703,6 +777,19 @@ impl<'a> Compiler<'a> {
     }
     fn copy(&self, ty: &Ty) -> Result<(), String> {
         self.derived(ty, "Copy", 0)
+    }
+    /// Whether a record field is declared as a `&mut` reference: writes
+    /// through it are allowed whatever the binding of the record.
+    fn mutable_reference_field(&self, ty: &Ty, member: &syn::Member) -> bool {
+        let (Ty::Named { name, .. }, syn::Member::Named(member)) = (ty, member) else {
+            return false;
+        };
+        self.krate.structs.get(name).is_some_and(|s| {
+            s.fields.iter().any(|f| {
+                f.ident.as_ref() == Some(member)
+                    && matches!(&f.ty, Type::Reference(r) if r.mutability.is_some())
+            })
+        })
     }
     fn field(&self, ty: &Ty, member: &syn::Member) -> Result<(String, Ty), String> {
         let name = match member {
@@ -820,15 +907,17 @@ impl<'a> Compiler<'a> {
             Expr::Field(f) => {
                 attrs(&f.attrs)?;
                 let mut place = self.place(frame, &f.base)?;
+                let through = self.mutable_reference_field(&place.ty, &f.member);
                 let (name, field) = self.field(&place.ty, &f.member)?;
                 place.path.push(format!(".field {}", q(&name)));
                 place.ty = field;
+                place.mutable |= through;
                 Ok(place)
             }
             Expr::Index(i) => {
                 attrs(&i.attrs)?;
                 let mut place = self.place(frame, &i.expr)?;
-                let Ty::Array(element) = place.ty.clone() else {
+                let Ty::Array(element, _) = place.ty.clone() else {
                     return Err("indexing requires a builtin array".into());
                 };
                 let (index, index_ty) = self.expr(frame, &i.index, Some(&Ty::Number("usize")))?;
@@ -1001,9 +1090,10 @@ impl<'a> Compiler<'a> {
                             Expr::Repeat(r) if untyped(&r.expr) => {
                                 let kind =
                                     self.infer_local(frame, &l.pat, rest, expected, |k| {
-                                        Ty::Array(Box::new(Ty::Number(k)))
+                                        Ty::Array(Box::new(Ty::Number(k)), Konst::Unknown)
                                     })?;
-                                annotated = Some(Ty::Array(Box::new(Ty::Number(kind))));
+                                annotated =
+                                    Some(Ty::Array(Box::new(Ty::Number(kind)), Konst::Unknown));
                             }
                             e if untyped(e) => {
                                 let kind =
@@ -1013,7 +1103,21 @@ impl<'a> Compiler<'a> {
                             _ => {}
                         }
                     }
-                    let (value, ty) = self.expr(frame, &init.expr, annotated.as_ref())?;
+                    let (value, ty) = match self.expr(frame, &init.expr, annotated.as_ref()) {
+                        Ok(typed) => typed,
+                        // A type fixed only by a later use (a const argument
+                        // Rust infers from it): take the first use's type.
+                        Err(e) if annotated.is_none() => {
+                            let Some(wanted) = self.usage_type(frame, &l.pat, &b.stmts[i + 1..])
+                            else {
+                                return Err(e);
+                            };
+                            let (value, ty) = self.expr(frame, &init.expr, Some(&wanted))?;
+                            Self::require(&ty, &wanted)?;
+                            (value, wanted)
+                        }
+                        Err(e) => return Err(e),
+                    };
                     let slot = self.fresh();
                     parts.push(format!(".write {slot} ({value})"));
                     parts.extend(self.destructure(frame, &l.pat, slot, &ty)?);
@@ -1108,6 +1212,66 @@ impl<'a> Compiler<'a> {
             // No use constrains the type: Rust falls back to i32.
             _ => Ok("i32"),
         }
+    }
+    /// The parameter type at the first place a local is passed to one of the
+    /// receiver type's own functions (`Self::f(.., x, ..)` or `self.f(.., x, ..)`).
+    fn usage_type(&self, frame: &Frame<'a>, pat: &syn::Pat, rest: &[syn::Stmt]) -> Option<Ty> {
+        let syn::Pat::Ident(i) = pat else { return None };
+        let name = i.ident.to_string();
+        struct Finder<'n> {
+            name: &'n str,
+            found: Option<(String, usize)>,
+        }
+        impl<'ast> syn::visit::Visit<'ast> for Finder<'_> {
+            fn visit_expr_call(&mut self, c: &'ast syn::ExprCall) {
+                if self.found.is_none() {
+                    if let Expr::Path(p) = &*c.func {
+                        let segments = p
+                            .path
+                            .segments
+                            .iter()
+                            .map(|s| s.ident.to_string())
+                            .collect::<Vec<_>>();
+                        if let [first, method] = segments.as_slice() {
+                            if first == "Self" {
+                                if let Some(index) = c.args.iter().position(|a| matches!(strip(a), Expr::Path(q) if q.path.is_ident(self.name))) {
+                                    self.found = Some((method.clone(), index));
+                                }
+                            }
+                        }
+                    }
+                }
+                syn::visit::visit_expr_call(self, c);
+            }
+        }
+        let mut finder = Finder {
+            name: &name,
+            found: None,
+        };
+        for stmt in rest {
+            syn::visit::Visit::visit_stmt(&mut finder, stmt);
+        }
+        let (method, index) = finder.found?;
+        let owner = self.frame_self(frame)?;
+        let (_, def) = self.method_definition(&owner, &method).ok()?;
+        let input = def
+            .item
+            .sig
+            .inputs
+            .iter()
+            .filter(|i| matches!(i, syn::FnArg::Typed(_)))
+            .nth(index)?;
+        let syn::FnArg::Typed(t) = input else {
+            return None;
+        };
+        self.ty_in(
+            &t.ty,
+            &def.impl_generics,
+            &frame.generics,
+            &def.module,
+            Some(&owner),
+        )
+        .ok()
     }
     fn statement_macro(
         &mut self,
@@ -1372,16 +1536,12 @@ impl<'a> Compiler<'a> {
         }
         let first = p.segments[0].ident.to_string();
         let owner = if first == "Self" {
-            frame_self(frame).ok_or("Self outside an impl")?
+            self.frame_self(frame).ok_or("Self outside an impl")?
         } else {
             let resolved = self.krate.resolve(&frame.def.module, &first, 0)?;
             match expected {
                 Ty::Named { name, .. } if *name == resolved => expected.clone(),
-                _ => Ty::Named {
-                    name: resolved,
-                    types: vec![],
-                    consts: vec![],
-                },
+                _ => self.fresh_instance(resolved),
             }
         };
         let Ty::Named { name, .. } = &owner else {
@@ -1432,6 +1592,63 @@ impl<'a> Compiler<'a> {
         // representation fault in the machine, never a skipped statement.
         Ok((
             format!(".choose ({value}) [{}]", out.join(", ")),
+            result.unwrap_or(Ty::Unit),
+        ))
+    }
+
+    /// A `match` with guards: each arm in order tests its pattern, then its
+    /// guard in the pattern's bindings, and exits the match with its body's
+    /// value; a failed guard falls through to the next arm, as in Rust.
+    fn guarded_arms(
+        &mut self,
+        frame: &Frame<'a>,
+        value: String,
+        ty: &Ty,
+        arms: &[syn::Arm],
+        expected: Option<&Ty>,
+    ) -> Result<(String, Ty), String> {
+        let done = self.label();
+        let scrutinee = self.fresh();
+        let mut result: Option<Ty> = expected.cloned();
+        let mut parts = vec![format!(".write {scrutinee} ({value})")];
+        for a in arms {
+            attrs(&a.attrs)?;
+            let cases: Vec<&syn::Pat> = if let syn::Pat::Or(o) = &a.pat {
+                attrs(&o.attrs)?;
+                o.cases.iter().collect()
+            } else {
+                vec![&a.pat]
+            };
+            for case in cases {
+                let saved = self.env.clone();
+                let pattern = self.pattern(frame, case, ty)?;
+                let (body, t) = self.expr(frame, &a.body, result.as_ref())?;
+                let taken = format!(".exit {done} ({body})");
+                let arm = match &a.guard {
+                    Some((_, guard)) => {
+                        let (g, gt) = self.expr(frame, guard, Some(&Ty::Bool))?;
+                        Self::require(&gt, &Ty::Bool)?;
+                        format!(".branch ({g}) ({taken}) ({})", unit())
+                    }
+                    None => taken,
+                };
+                self.env = saved;
+                if !diverges(&a.body) {
+                    match &result {
+                        Some(r) => Self::require(&t, r)?,
+                        None => result = Some(t),
+                    }
+                }
+                parts.push(format!(
+                    ".choose (.read {scrutinee}) [({pattern}, {arm}), (.any, {})]",
+                    unit()
+                ));
+            }
+        }
+        // Rust requires the arms to be exhaustive; no arm taken is a fault.
+        parts.push(".panic \"no match arm\"".into());
+        Ok((
+            format!(".block {done} ({})", chain(parts)),
             result.unwrap_or(Ty::Unit),
         ))
     }
@@ -1746,7 +1963,7 @@ impl<'a> Compiler<'a> {
             if !place.mutable {
                 return Err("mutable iteration over an immutable place".into());
             }
-            let Ty::Array(element) = place.ty.clone() else {
+            let Ty::Array(element, _) = place.ty.clone() else {
                 return Err("mutable iteration requires an array".into());
             };
             setup.extend(place.setup.iter().cloned());
@@ -1754,7 +1971,7 @@ impl<'a> Compiler<'a> {
             (*element, Some((place.slot, place.path)))
         } else {
             let (code, ty) = self.expr(frame, base, None)?;
-            let Ty::Array(element) = ty else {
+            let Ty::Array(element, _) = ty else {
                 return Err(format!("iteration requires a builtin array, found {ty:?}"));
             };
             setup.push(format!(".write {array} ({code})"));
@@ -2229,7 +2446,7 @@ impl<'a> Compiler<'a> {
         let self_ty = receiver_frame
             .as_ref()
             .map(|r| r.1.clone())
-            .or_else(|| frame_self_of(def, &generics, self));
+            .or_else(|| self.frame_self_of(def, &generics));
         let output = match &sig.output {
             syn::ReturnType::Default => Ty::Unit,
             syn::ReturnType::Type(_, t) => self.ty_in(
@@ -2496,7 +2713,7 @@ impl<'a> Compiler<'a> {
             return Err("inclusive slice ranges are unsupported".into());
         }
         let place = self.place(frame, base)?;
-        let Ty::Array(element) = place.ty.clone() else {
+        let Ty::Array(element, _) = place.ty.clone() else {
             return Err("slicing requires a builtin array".into());
         };
         let usize_ty = Ty::Number("usize");
@@ -2531,6 +2748,40 @@ impl<'a> Compiler<'a> {
             ("len", []) => {
                 parts.push(format!(".binary \"-\" (.read {hi}) (.read {lo})"));
                 return Ok((chain(parts), usize_ty));
+            }
+            ("contains", [needle]) => {
+                self.derived(&element, "PartialEq", 0)?;
+                let (code, nt) = self.expr(frame, strip(needle), Some(&element))?;
+                Self::require(&nt, &element)?;
+                let wanted = self.fresh();
+                let found = self.fresh();
+                parts.push(format!(".write {wanted} ({code})"));
+                parts.push(format!(".write {found} ({})", boolean(false)));
+                let p = Pipeline {
+                    setup: vec![],
+                    source: Source::Elements {
+                        array,
+                        lo,
+                        hi,
+                        places: None,
+                    },
+                    reverse: false,
+                    stages: vec![],
+                    item: (*element).clone(),
+                };
+                let walk = self.iterate(p, |_, item, exit, _, _| {
+                    Ok(format!(
+                        ".branch (.binary \"==\" (.read {item}) (.read {wanted})) ({}) ({})",
+                        seq(
+                            format!(".write {found} ({})", boolean(true)),
+                            format!(".exit {exit} ({})", unit())
+                        ),
+                        unit()
+                    ))
+                })?;
+                parts.push(walk);
+                parts.push(format!(".read {found}"));
+                return Ok((chain(parts), Ty::Bool));
             }
             ("sort_unstable", []) => {
                 let Ty::Number(_) = *element else {
@@ -2798,7 +3049,7 @@ impl<'a> Compiler<'a> {
                     ty.clone(),
                 )
             }
-            ("map", Ty::Array(element), [f]) => {
+            ("map", Ty::Array(element, length), [f]) => {
                 // `array.map(f)` applies `f` to each element in order.
                 let closure = self.closure_syntax(frame, f)?;
                 let applied = self.apply(&closure, std::slice::from_ref(element), None)?;
@@ -2813,17 +3064,21 @@ impl<'a> Compiler<'a> {
                         format!(".range {index} ({}) (.length ({read})) (.assign {result} [.index {index}] ({call}))", usize_literal(0)),
                         format!(".read {result}"),
                     ]),
-                    Ty::Array(Box::new(applied.ty)),
+                    Ty::Array(Box::new(applied.ty), length.clone()),
                 )
             }
-            ("len", Ty::Array(_), []) => (format!(".length ({value})"), Ty::Number("usize")),
-            ("get", Ty::Array(element), [i]) => {
+            ("is_empty", Ty::Array(..), []) => (
+                format!(".binary \"==\" (.length ({value})) ({})", usize_literal(0)),
+                Ty::Bool,
+            ),
+            ("len", Ty::Array(..), []) => (format!(".length ({value})"), Ty::Number("usize")),
+            ("get", Ty::Array(element, _), [i]) => {
                 let (index, it) = self.expr(frame, i, Some(&Ty::Number("usize")))?;
                 Self::require(&it, &Ty::Number("usize"))?;
                 let is = self.fresh();
                 (chain(vec![store, format!(".write {is} ({index})"), format!(".branch (.binary \"<\" (.read {is}) (.length ({read}))) (.present (.index ({read}) (.read {is}))) ({absent})")]), Ty::Option(element.clone()))
             }
-            ("contains", Ty::Array(element), [v]) => {
+            ("contains", Ty::Array(element, _), [v]) => {
                 self.derived(element, "PartialEq", 0)?;
                 let (needle, nt) = self.expr(frame, strip(v), Some(element))?;
                 Self::require(&nt, element)?;
@@ -2868,7 +3123,7 @@ impl<'a> Compiler<'a> {
                     Ty::Bool,
                 )
             }
-            ("fill", Ty::Array(element), [v]) => {
+            ("fill", Ty::Array(element, _), [v]) => {
                 let place = place.ok_or("fill requires a place")?;
                 if !place.mutable {
                     return Err("fill through an immutable place".into());
@@ -2977,6 +3232,48 @@ impl<'a> Compiler<'a> {
                 return Ok((Self::call_applied(&applied, &values), applied.ty));
             }
         }
+        // `core::array::from_fn(f)`: the array of `f(0)`, …, `f(len - 1)`, in
+        // order, its length fixed by the expected array type. `core` and `std`
+        // are reserved names, so the path cannot name a crate item.
+        let segments = p
+            .path
+            .segments
+            .iter()
+            .map(|s| s.ident.to_string())
+            .collect::<Vec<_>>();
+        if p.path
+            .segments
+            .iter()
+            .all(|s| matches!(s.arguments, syn::PathArguments::None))
+            && matches!(segments.as_slice(), [root, a, f] if (root == "core" || root == "std") && a == "array" && f == "from_fn")
+        {
+            let [f] = args[..] else {
+                return Err("from_fn takes one callback".into());
+            };
+            let Some(Ty::Array(element, length)) = expected else {
+                return Err("from_fn needs a known array type".into());
+            };
+            let count = Self::konst_code(length).map_err(|e| format!("{e} (from_fn length)"))?;
+            let closure = self.closure_syntax(frame, f)?;
+            let applied = self.apply(&closure, &[Ty::Number("usize")], Some(element))?;
+            Self::require(&applied.ty, element)?;
+            let len = self.fresh();
+            let index = self.fresh();
+            let result = self.fresh();
+            let call = Self::call_applied(&applied, &[format!(".read {index}")]);
+            return Ok((
+                chain(vec![
+                    format!(".write {len} ({count})"),
+                    format!(".write {result} (.replicate (.literal .unit) (.read {len}))"),
+                    format!(
+                        ".range {index} ({}) (.read {len}) (.assign {result} [.index {index}] ({call}))",
+                        usize_literal(0)
+                    ),
+                    format!(".read {result}"),
+                ]),
+                Ty::Array(Box::new(applied.ty), length.clone()),
+            ));
+        }
         // `Type::function(args)`, `Self::function(args)` or `Variant(args)`.
         if p.path.segments.len() == 2 {
             let first = p.path.segments[0].ident.to_string();
@@ -2995,16 +3292,16 @@ impl<'a> Compiler<'a> {
                 }
             }
             let owner_ty = if first == "Self" {
-                frame_self(frame).ok_or("Self outside an impl")?
+                self.frame_self(frame).ok_or("Self outside an impl")?
             } else {
                 let resolved = self.krate.resolve(&frame.def.module, &first, 0)?;
                 match expected {
                     Some(t @ Ty::Named { name, .. }) if *name == resolved => t.clone(),
-                    _ => Ty::Named {
-                        name: resolved,
-                        types: vec![],
-                        consts: vec![],
-                    },
+                    // `Type::new(..)?`: the expected result names the type.
+                    Some(Ty::Result(t, _)) | Some(Ty::Option(t)) if matches!(&**t, Ty::Named { name, .. } if *name == resolved) => {
+                        (**t).clone()
+                    }
+                    _ => self.fresh_instance(resolved),
                 }
             };
             let Ty::Named { name: owner, .. } = &owner_ty else {
@@ -3116,9 +3413,10 @@ impl<'a> Compiler<'a> {
         let (receiver, mutable_receiver) = match sig.inputs.first() {
             Some(syn::FnArg::Receiver(r)) => {
                 attrs(&r.attrs)?;
-                if r.reference.is_none() || r.colon_token.is_some() {
-                    return Err("receiver must be &self or &mut self".into());
+                if r.colon_token.is_some() {
+                    return Err("typed receivers are unsupported".into());
                 }
+                // `&mut self`, or an owned `mut self`, may be written.
                 (true, r.mutability.is_some())
             }
             _ => (false, false),
@@ -3215,7 +3513,7 @@ impl<'a> Compiler<'a> {
         let self_ty = receiver
             .as_ref()
             .map(|r| r.1.clone())
-            .or_else(|| frame_self_of(def, &generics, self));
+            .or_else(|| self.frame_self_of(def, &generics));
         let output = match &sig.output {
             syn::ReturnType::Default => Ty::Unit,
             syn::ReturnType::Type(_, t) => self.ty_in(
@@ -3229,7 +3527,8 @@ impl<'a> Compiler<'a> {
         let mut parts = vec![];
         let (receiver_code, write_back) = match (sig.inputs.first(), receiver) {
             (Some(syn::FnArg::Receiver(r)), Some((code, _, place))) => {
-                if r.mutability.is_some() {
+                // An owned receiver is moved into the call: nothing to write back.
+                if r.reference.is_some() && r.mutability.is_some() {
                     let place = place.ok_or("&mut self call on a temporary")?;
                     if !place.mutable {
                         return Err("&mut self call through an immutable place".into());
@@ -3311,7 +3610,7 @@ impl<'a> Compiler<'a> {
             ("<" | "<=" | ">" | ">=", Ty::Number(_)) => Ok(Ty::Bool),
             ("==" | "!=", _) => {
                 self.derived(left, "PartialEq", 0)?;
-                if matches!(left, Ty::Array(_)) {
+                if matches!(left, Ty::Array(..)) {
                     return Err("array equality is not modeled".into());
                 }
                 Ok(Ty::Bool)
@@ -3535,21 +3834,51 @@ impl<'a> Compiler<'a> {
                     )
                 }
             }
+            Expr::Array(a) => {
+                attrs(&a.attrs)?;
+                let element = match expected {
+                    Some(Ty::Array(e, _)) => Some((**e).clone()),
+                    _ => None,
+                };
+                let result = self.fresh();
+                let index = self.fresh();
+                let mut parts = vec![format!(
+                    ".write {result} (.replicate (.literal .unit) ({}))",
+                    usize_literal(a.elems.len())
+                )];
+                let mut item = element;
+                for (i, e) in a.elems.iter().enumerate() {
+                    let (code, ty) = self.expr(frame, e, item.as_ref())?;
+                    if let Some(t) = &item {
+                        Self::require(&ty, t)?;
+                    }
+                    item = Some(ty);
+                    parts.push(format!(".write {index} ({})", usize_literal(i)));
+                    parts.push(format!(".assign {result} [.index {index}] ({code})"));
+                }
+                parts.push(format!(".read {result}"));
+                let item = item.ok_or("an empty array literal needs a known element type")?;
+                (
+                    chain(parts),
+                    Ty::Array(Box::new(item), Konst::Value(a.elems.len() as u64)),
+                )
+            }
             Expr::Repeat(r) => {
                 attrs(&r.attrs)?;
                 let element = match expected {
-                    Some(Ty::Array(e)) => Some((**e).clone()),
+                    Some(Ty::Array(e, _)) => Some((**e).clone()),
                     _ => None,
                 };
                 let (value, ty) = self.expr(frame, &r.expr, element.as_ref())?;
                 self.copy(&ty)?;
-                let count = match self.konst(&r.len, &frame.generics) {
+                let length = self.konst(&r.len, &frame.generics);
+                let count = match &length {
                     Konst::Unknown => return Err("array length is not available".into()),
-                    k => Self::konst_code(&k)?,
+                    k => Self::konst_code(k)?,
                 };
                 (
                     format!(".replicate ({value}) ({count})"),
-                    Ty::Array(Box::new(ty)),
+                    Ty::Array(Box::new(ty), length),
                 )
             }
             Expr::Field(f) => {
@@ -3561,7 +3890,7 @@ impl<'a> Compiler<'a> {
             Expr::Index(i) => {
                 attrs(&i.attrs)?;
                 let (array, ty) = self.expr(frame, &i.expr, None)?;
-                let Ty::Array(element) = ty else {
+                let Ty::Array(element, _) = ty else {
                     return Err("indexing requires a builtin array".into());
                 };
                 let (index, index_ty) = self.expr(frame, &i.index, Some(&Ty::Number("usize")))?;
@@ -3696,15 +4025,16 @@ impl<'a> Compiler<'a> {
             Expr::Match(m) => {
                 attrs(&m.attrs)?;
                 let (value, ty) = self.expr(frame, &m.expr, None)?;
-                let mut arms = vec![];
-                for a in &m.arms {
-                    attrs(&a.attrs)?;
-                    if a.guard.is_some() {
-                        return Err("guarded match arms are unsupported".into());
+                if m.arms.iter().any(|a| a.guard.is_some()) {
+                    self.guarded_arms(frame, value, &ty, &m.arms, expected)?
+                } else {
+                    let mut arms = vec![];
+                    for a in &m.arms {
+                        attrs(&a.attrs)?;
+                        arms.push((a.pat.clone(), &*a.body));
                     }
-                    arms.push((a.pat.clone(), &*a.body));
+                    self.arms(frame, value, &ty, &arms, expected)?
                 }
-                self.arms(frame, value, &ty, &arms, expected)?
             }
             Expr::Return(r) => {
                 attrs(&r.attrs)?;
@@ -3721,8 +4051,15 @@ impl<'a> Compiler<'a> {
             }
             Expr::Try(t) => {
                 attrs(&t.attrs)?;
-                let (value, ty) = self.expr(frame, &t.expr, None)?;
                 let output = frame.output.clone().ok_or("? needs a known result type")?;
+                let wanted = match (&output, expected) {
+                    (Ty::Result(_, error), Some(inner)) => {
+                        Some(Ty::Result(Box::new(inner.clone()), error.clone()))
+                    }
+                    (Ty::Option(_), Some(inner)) => Some(Ty::Option(Box::new(inner.clone()))),
+                    _ => None,
+                };
+                let (value, ty) = self.expr(frame, &t.expr, wanted.as_ref())?;
                 let x = self.fresh();
                 match (&ty, &output) {
                     (Ty::Option(inner), Ty::Option(_)) => (format!(".choose ({value}) [(.present (.bind {x}), .read {x}), (.any, .ret (.literal .absent))]"), (**inner).clone()),
@@ -3753,16 +4090,12 @@ impl<'a> Compiler<'a> {
                 } else {
                     let name = single(&s.path).ok_or("unresolved struct path")?;
                     let owner = if name == "Self" {
-                        frame_self(frame).ok_or("Self outside an impl")?
+                        self.frame_self(frame).ok_or("Self outside an impl")?
                     } else {
                         let resolved = self.krate.resolve(&frame.def.module, &name, 0)?;
                         match expected {
                             Some(t @ Ty::Named { name, .. }) if *name == resolved => t.clone(),
-                            _ => Ty::Named {
-                                name: resolved,
-                                types: vec![],
-                                consts: vec![],
-                            },
+                            _ => self.fresh_instance(resolved),
                         }
                     };
                     (owner, None)
@@ -3936,7 +4269,7 @@ impl<'a> Compiler<'a> {
 fn contains_infer(ty: &Ty) -> bool {
     match ty {
         Ty::Infer => true,
-        Ty::Option(t) | Ty::Array(t) | Ty::Function(t) => contains_infer(t),
+        Ty::Option(t) | Ty::Array(t, _) | Ty::Function(t) => contains_infer(t),
         Ty::Result(a, b) => contains_infer(a) || contains_infer(b),
         Ty::Tuple(items) => items.iter().any(contains_infer),
         Ty::Named { types, .. } => types.iter().any(contains_infer),
@@ -3962,22 +4295,6 @@ fn name_of(ty: &Ty) -> String {
         Ty::Named { name, .. } => name.clone(),
         _ => String::new(),
     }
-}
-fn frame_self(frame: &Frame) -> Option<Ty> {
-    frame.receiver.as_ref().map(|r| r.1.clone()).or_else(|| {
-        Some(Ty::Named {
-            name: frame.def.receiver.clone(),
-            types: vec![],
-            consts: vec![],
-        })
-    })
-}
-fn frame_self_of(def: &Definition, _generics: &Generics, _c: &Compiler) -> Option<Ty> {
-    Some(Ty::Named {
-        name: def.receiver.clone(),
-        types: vec![],
-        consts: vec![],
-    })
 }
 /// Whether evaluating `e` never completes normally (so its type does not
 /// constrain the enclosing expression).
