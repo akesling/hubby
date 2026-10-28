@@ -1068,6 +1068,62 @@ theorem update_field_ok (env : PureEnv) (n : String) (rest : List Access) (r : S
   · rintro ⟨fs', ⟨old, u, hf, hu, rfl⟩, rfl⟩; exact ⟨old, u, hf, hu, rfl⟩
   · rintro ⟨old, u, hf, hu, rfl⟩; exact ⟨_, ⟨old, u, hf, hu, rfl⟩, rfl⟩
 
+theorem replaceField_eq (change : PureValue → Except Exit PureValue) (n : String) :
+    ∀ (fs : List (String × PureValue)), replaceField change n fs =
+      match (fs.find? (fun p => p.1 == n)).map (·.2) with
+      | some old => (change old) >>= fun u => .ok (setField n u fs)
+      | none => .error (.fault .representation)
+  | [] => rfl
+  | (k, v) :: rest => by
+    by_cases h : k = n
+    · subst h
+      simp only [replaceField, ite_true, List.find?, beq_self_eq_true, Option.map_some, setField]
+      cases change v <;> rfl
+    · have hb : (k == n) = false := by simpa using h
+      simp only [replaceField, h, ite_false, List.find?, hb, setField]
+      rw [replaceField_eq change n rest]
+      cases (rest.find? (fun p => p.1 == n)).map (·.2) with
+      | none => rfl
+      | some old => cases hc : change old <;> simp [hc, bind, Except.bind, pure, Except.pure]
+
+/-- An assignment through a field of a record, as a computation. -/
+theorem update_field_eq (env : PureEnv) (n : String) (rest : List Access) (r : String)
+    (fs : List (String × PureValue)) (v : PureValue) :
+    update env (.field n :: rest) (.record r fs) v =
+      match (fs.find? (fun p => p.1 == n)).map (·.2) with
+      | some old => (update env rest old v) >>= fun u => .ok (.record r (setField n u fs))
+      | none => .error (.fault .representation) := by
+  simp only [update]
+  rw [replaceField_eq]
+  cases (fs.find? (fun p => p.1 == n)).map (·.2) with
+  | none => rfl
+  | some old => cases hc : update env rest old v <;> simp [hc, bind, Except.bind, pure, Except.pure]
+
+theorem except_bind_ok_eq {ε α β : Type} (a : α) (f : α → Except ε β) : (Except.ok a >>= f) = f a := rfl
+
+/-- An assignment through an index of an array. -/
+theorem update_index_ok (env : PureEnv) (slot : Nat) (rest : List Access) (vs : List PureValue)
+    (v x : PureValue) :
+    update env (.index slot :: rest) (.array vs) v = .ok x ↔
+      ∃ k i old u, env slot = some (.number k i) ∧ vs[i]? = some old ∧ update env rest old v = .ok u ∧
+        x = .array (vs.set i u) := by
+  simp only [update]
+  constructor
+  · intro h
+    split at h
+    · rename_i k i hs
+      split at h
+      · rename_i old hold
+        rw [except_bind_ok] at h
+        obtain ⟨u, hu, hx⟩ := h
+        simp only [pure, Except.pure, Except.ok.injEq] at hx
+        exact ⟨k, i, old, u, hs, hold, hu, hx.symm⟩
+      · cases h
+    · cases h
+  · rintro ⟨k, i, old, u, hs, hold, hu, rfl⟩
+    rw [hs]
+    simp only [hold, hu, bind, Except.bind, pure, Except.pure]
+
 theorem update_nil_ok (env : PureEnv) (current v x : PureValue) :
     update env [] current v = .ok x ↔ v = x := by
   simp [update]
@@ -1113,7 +1169,7 @@ macro_rules
     | (apply wp_rotate_any)
     | (apply wp_variant)
     | (apply wp_record)
-    | (set_option linter.unusedSimpArgs false in simp only [WpFields, WpArgs, List.nil_append, List.cons_append])
+    | (set_option linter.unusedSimpArgs false in simp only [WpFields, WpArgs, WriteBack, List.nil_append, List.cons_append])
     | (apply wp_choose)
     | (set_option linter.unusedSimpArgs false in
        simp (config := {decide := true}) only [↓reduceIte])
@@ -1153,11 +1209,14 @@ macro_rules
        simp (disch := first | decide | omega) only [set_same, set_other, Option.some.injEq, $lemmas,*] at _hs
        subst _hs
        try (set_option linter.unusedSimpArgs false in
-         simp (config := {decide := true}) only [update_field_ok, update_nil_ok, List.find?, String.reduceBEq,
-           Option.map_some, Option.map_none, Option.some.injEq, setField, String.reduceEq, ↓reduceIte,
-           exists_eq_left, exists_eq_left', exists_and_left, exists_eq_right, and_true, true_and,
-           $lemmas,*] at _hu)
+         simp (config := {decide := true}) (disch := first | decide | omega) only [update_field_ok,
+           update_index_ok, update_nil_ok, set_same, set_other, List.getElem?_set_self,
+           List.getElem?_eq_getElem, PureValue.number.injEq, List.find?, String.reduceBEq, Option.map_some,
+           Option.map_none, Option.some.injEq, setField, String.reduceEq, ↓reduceIte, and_assoc,
+           exists_eq_left, exists_eq_left', exists_and_left, exists_and_right, exists_eq_right,
+           exists_eq', exists_eq, exists_const, and_true, true_and, $lemmas,*] at _hu)
        try subst _hu
+       try (injection _hu with _hu; subst _hu)
        try (obtain ⟨_a, _ha, _hu⟩ := _hu; subst _hu)
        try dsimp only)
     -- A match's selected arm, at every fuel deep enough for its patterns.
@@ -1212,5 +1271,15 @@ macro "wp_receiver" : tactic =>
     set_option linter.unusedSimpArgs false in
       simp (disch := decide) only [set_same, set_other, Option.some.injEq] at _hr
     subst _hr))
+
+/-- Close `∃ xs, value = f xs` when the value is `f` at some arguments, found by
+    unification after unfolding the given definitions. -/
+syntax "wp_exists" (" [" ident,* "]")? : tactic
+macro_rules
+  | `(tactic| wp_exists) => `(tactic| wp_exists [])
+  | `(tactic| wp_exists [$defs,*]) => `(tactic| (
+    repeat (apply Exists.intro)
+    (try unfold $defs*)
+    rfl))
 
 end Provium.Imperative
