@@ -1480,6 +1480,39 @@ theorem wp_fill {m : Machine} {slot valueSlot : Nat} {fname name : String} {Q : 
     apply done e v hkept
     rw [he0, List.drop_length, List.append_nil]
 
+/-- A whole-method run that ends normally or by `return` satisfies `P` on its
+    value and final receiver when the body's weakest precondition holds. -/
+theorem run_of_wp {m : Machine} {body : Expr} {self : PureValue} {args : List PureValue}
+    {P : PureValue → PureValue → Prop}
+    (h : Wp m body { normal := fun v e => ∀ r, e 0 = some r → P v r,
+                     returned := fun v e => ∀ r, e 0 = some r → P v r,
+                     exited := fun _ _ _ => True } (frameOf self args))
+    {fuel : Nat} {v r : PureValue} (hrun : run m fuel body self args = .ok (v, r)) : P v r := by
+  have h1 := h fuel
+  unfold run at hrun
+  have frame : (args.zipIdx 1).foldl (fun env (value, slot) => pureSet env slot value)
+      (pureSet (fun _ => none) 0 self) = frameOf self args := rfl
+  simp only [frame] at hrun
+  revert h1 hrun
+  cases eval m fuel body (frameOf self args) with
+  | ok res =>
+    obtain ⟨w, e⟩ := res
+    intro h1 hrun
+    simp only [] at hrun
+    cases hr : e 0 with
+    | none => rw [hr] at hrun; cases hrun
+    | some r' => rw [hr] at hrun; cases hrun; exact h1 _ hr
+  | error x =>
+    cases x with
+    | returned w e =>
+      intro h1 hrun
+      simp only [] at hrun
+      cases hr : e 0 with
+      | none => rw [hr] at hrun; cases hrun
+      | some r' => rw [hr] at hrun; cases hrun; exact h1 _ hr
+    | exit => intro _ hrun; simp at hrun
+    | fault => intro _ hrun; simp at hrun
+
 /-- Structural symbolic execution: sequencing, writes, literals, slot reads
     through `pureSet`, field reads, assignments, comparisons and arithmetic on
     numbers, indexing, matches, short-circuit operators and conditions, after
