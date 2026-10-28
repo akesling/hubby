@@ -155,6 +155,17 @@ contributes `state` followed by the callee's own paths). `footprint_sound` and
 leaves every path disjoint from the footprint unchanged, so a frame fact such
 as "`push` never changes `state.hard.term`" follows by `decide`.
 
+`Provium.Logic` and `Provium.Wp` give a partial-correctness program logic for
+functional effects: `Triple` rules per construct, and weakest preconditions
+(`Wp`) that reduce a body to conditions on its parts in syntax order.
+`wp_walk [lemmas]` applies the structural rules and normalizes slot reads,
+field reads of record literals, comparisons of numbers and literal
+conditions; it stops at loops, calls and matches, which take an invariant
+(`wp_counted` for the counted traversals the frontend generates, whose
+increment provably never wraps), a callee `Spec` (`wp_invoke`), or a case
+split. Faults, including exhausted fuel, are unconstrained, so freedom from
+panics is a separate obligation.
+
 Payload destructors are not modeled: the lowering assumes they return normally
 and leave the tracked values unchanged. A fault carries no receiver, so
 partially mutated state under unwinding is not modeled. The correspondence
