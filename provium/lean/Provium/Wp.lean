@@ -953,6 +953,85 @@ theorem wp_range {m : Machine} {slot : Nat} {start stop body : Expr} {Q : Post} 
             rw [hbody] at hb'
             exact ih (n + 1) e3 w (by omega) (by omega) hb'
 
+/-- `wp_range` with the upper bound taken from the evaluated stop value. -/
+theorem wp_range_to {m : Machine} {slot : Nat} {start stop body : Expr} {Q : Post} {env : PureEnv}
+    (kind : String) (lo : Nat) (I : Nat → Nat → PureEnv → Prop)
+    (bounds : Wp m start { Q with normal := (fun a e1 => Wp m stop { Q with normal := (fun b e2 =>
+      a = .number kind lo ∧ ∀ hi, b = .number kind hi → lo ≤ hi ∧ I hi lo e2) } e1) } env)
+    (iteration : ∀ hi i e, lo ≤ i → i < hi → I hi i e →
+      Wp m body { Q with normal := (fun _ e' => I hi (i + 1) e') } (pureSet e slot (.number kind i)))
+    (done : ∀ hi e v, I hi hi e → Q.normal v e) :
+    Wp m (.range slot start stop body) Q env := by
+  intro fuel
+  cases fuel with
+  | zero => simp [eval, Post.holds]
+  | succ fuel =>
+    simp only [eval, bind, Except.bind]
+    have h1 := bounds fuel
+    cases ha : eval m fuel start env with
+    | error x => rw [ha] at h1; cases x <;> simp_all [Post.holds]
+    | ok r =>
+      obtain ⟨a, e1⟩ := r
+      rw [ha] at h1
+      have h2 := h1 fuel
+      simp only []
+      cases hb : eval m fuel stop e1 with
+      | error x =>
+        rw [hb] at h2
+        cases a <;> simp only [] <;> (try exact trivial) <;> (cases x <;> simp_all [Post.holds])
+      | ok r =>
+        obtain ⟨b, e2⟩ := r
+        rw [hb] at h2
+        obtain ⟨rfl, rest⟩ := h2
+        simp only [hb]
+        cases b with
+        | number other hi =>
+          simp only []
+          by_cases same : kind = other
+          · subst same
+            obtain ⟨le, start⟩ := rest hi rfl
+            simp only [ne_eq, not_true_eq_false, ite_false]
+            suffices ∀ (count n : Nat) (e : PureEnv) (u : PureValue), lo ≤ n → n + count = hi → I hi n e →
+                Q.holds ((List.range' n count).foldlM (fun (_, env) i =>
+                  eval m fuel body (pureSet env slot (.number kind i))) (u, e)) by
+              exact this (hi - lo) lo e2 .unit (Nat.le_refl _) (by omega) start
+            intro count
+            induction count with
+            | zero =>
+              intro n e u _ hn hi'
+              simp only [Nat.add_zero] at hn
+              subst hn
+              simp only [List.range', List.foldlM, pure, Except.pure, Post.holds]
+              exact done n e u hi'
+            | succ count ih =>
+              intro n e u hlo hn hi'
+              simp only [List.range'_succ, List.foldlM, bind, Except.bind]
+              have hb' := iteration hi n e hlo (by omega) hi' fuel
+              cases hbody : eval m fuel body (pureSet e slot (.number kind n)) with
+              | error x => rw [hbody] at hb'; cases x <;> simp_all [Post.holds]
+              | ok r =>
+                obtain ⟨w, e3⟩ := r
+                rw [hbody] at hb'
+                exact ih (n + 1) e3 w (by omega) (by omega) hb'
+          · simp only [same, ne_eq, not_false_eq_true, ite_true]; exact trivial
+        | _ => exact trivial
+
+/-- `wp_range_to` whose iterations write only the slots in `W` (the counter
+    among them), from the range's entry environment. -/
+theorem wp_range_here {m : Machine} {slot : Nat} {start stop body : Expr} {Q : Post} {env : PureEnv}
+    (kind : String) (lo : Nat) (W : List Nat) (P : Nat → Nat → PureEnv → Prop)
+    (bounds : Wp m start { Q with normal := (fun a e1 => Wp m stop { Q with normal := (fun b e2 =>
+      a = .number kind lo ∧ ∀ hi, b = .number kind hi → lo ≤ hi ∧ (∀ s, s ∉ W → e2 s = env s) ∧
+        P hi lo e2) } e1) } env)
+    (iteration : ∀ hi i e, lo ≤ i → i < hi → (∀ s, s ∉ W → e s = env s) → P hi i e →
+      Wp m body { Q with normal := (fun _ e' => (∀ s, s ∉ W → e' s = env s) ∧ P hi (i + 1) e') }
+        (pureSet e slot (.number kind i)))
+    (done : ∀ hi e v, (∀ s, s ∉ W → e s = env s) → P hi hi e → Q.normal v e) :
+    Wp m (.range slot start stop body) Q env :=
+  wp_range_to kind lo (fun hi i e => (∀ s, s ∉ W → e s = env s) ∧ P hi i e) bounds
+    (fun hi i e hlo hlt ⟨hk, hp⟩ => iteration hi i e hlo hlt hk hp)
+    (fun hi e v ⟨hk, hp⟩ => done hi e v hk hp)
+
 /-- A write to a slot of `W` keeps the slots outside `W`. -/
 theorem kept_set {e0 e : PureEnv} {W : List Nat} {x : Nat} (v : PureValue)
     (h : ∀ s, s ∉ W → e s = e0 s) (hx : x ∈ W) : ∀ s, s ∉ W → pureSet e x v s = e0 s := by
@@ -1082,6 +1161,37 @@ theorem back_frame (m : Machine) (name : String) (body : Expr) (hbody : m.functi
       simpa using this
     | exit => trivial
     | fault => trivial
+
+/-- A specification holds if it holds at each admissible receiver and argument list. -/
+theorem back_pointwise {m : Machine} {name : String} {body : Expr} (hbody : m.functions name = some body)
+    (spec : Spec) (h : ∀ self values, spec.pre self values →
+      SatisfiesBack m name { pre := fun s v => s = self ∧ v = values, post := spec.post }) :
+    SatisfiesBack m name spec := by
+  refine ⟨body, hbody, fun self values hp => ?_⟩
+  obtain ⟨body', hbody', t⟩ := h self values hp
+  rw [hbody] at hbody'
+  cases hbody'
+  exact t self values ⟨rfl, rfl⟩
+
+/-- A family of write-back specifications indexed by the receiver's view
+    `a` (with `f` injective) is one specification over every view. -/
+theorem back_uniform {m : Machine} {name : String} {α : Type} [Inhabited α] (f : α → PureValue)
+    (inj : ∀ a b, f a = f b → a = b) (G : α → List PureValue → Prop)
+    (P : α → List PureValue → PureValue → PureValue → Prop)
+    (h : ∀ a, SatisfiesBack m name
+      { pre := fun self values => self = f a ∧ G a values, post := fun _ values v r => P a values v r }) :
+    SatisfiesBack m name
+      { pre := fun self values => ∃ a, self = f a ∧ G a values,
+        post := fun self values v r => ∀ a, self = f a → P a values v r } := by
+  obtain ⟨body, hbody, _⟩ := h default
+  refine ⟨body, hbody, fun self values ⟨a, hself, hg⟩ => ?_⟩
+  obtain ⟨body', hbody', t⟩ := h a
+  rw [hbody] at hbody'
+  cases hbody'
+  exact triple_consequence (t self values ⟨hself, hg⟩) (fun _ h => h)
+    (fun v e hp r hr a' ha' => by rw [inj a' a (ha'.symm.trans hself)]; exact hp r hr)
+    (fun v e hp r hr a' ha' => by rw [inj a' a (ha'.symm.trans hself)]; exact hp r hr)
+    (fun _ _ _ _ => trivial)
 
 /-- A call that writes the callee's receiver back to a place in a slot. -/
 theorem wp_invoke_back {m : Machine} {name : String} {receiver : Expr} {slot : Nat} {path : List Access}
