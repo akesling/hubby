@@ -8,6 +8,9 @@ import Provium.Logic
 namespace Provium.Imperative
 open Provium.State
 
+/-- Every value satisfies `P`: the result of an unconstrained step. -/
+def Havoc (P : PureValue → Prop) : Prop := ∀ v, P v
+
 def Wp (m : Machine) (e : Expr) (Q : Post) (env : PureEnv) : Prop :=
   ∀ fuel, Q.holds (eval m fuel e env)
 
@@ -384,11 +387,167 @@ theorem wp_ite {m : Machine} {c : Prop} [Decidable c] {a b : Expr} {Q : Post} {e
   · rw [if_pos h]; exact yes h
   · rw [if_neg h]; exact no h
 
+/-- A conversion, with its result unconstrained. -/
+theorem wp_convert_any {m : Machine} {kind : String} {checked : Bool} {value : Expr} {Q : Post}
+    {env : PureEnv} (h : Wp m value { Q with normal := (fun _ e => Havoc (fun x => Q.normal x e)) } env) :
+    Wp m (.convert kind checked value) Q env := by
+  intro fuel
+  cases fuel with
+  | zero => simp [eval, Post.holds]
+  | succ fuel =>
+    simp only [eval, bind, Except.bind]
+    have h1 := h fuel
+    revert h1
+    cases eval m fuel value env with
+    | error x => cases x <;> simp [Post.holds]
+    | ok r =>
+      obtain ⟨v, e1⟩ := r
+      intro h1
+      cases v with
+      | number k n =>
+        simp only []
+        split
+        · exact trivial
+        · split <;> exact h1 _
+      | _ => exact trivial
+
+set_option linter.unusedSimpArgs false in
+/-- A rotation, with its result unconstrained. -/
+theorem wp_rotate_any {m : Machine} {array start stop amount : Expr} {Q : Post} {env : PureEnv}
+    (h : Wp m array { Q with normal := (fun _ e => Wp m start { Q with normal := (fun _ e =>
+      Wp m stop { Q with normal := (fun _ e => Wp m amount { Q with normal := (fun _ e =>
+        Havoc (fun x => Q.normal x e)) } e) } e) } e) } env) :
+    Wp m (.rotate array start stop amount) Q env := by
+  intro fuel
+  cases fuel with
+  | zero => simp [eval, Post.holds]
+  | succ fuel =>
+    simp only [eval, bind, Except.bind]
+    have h1 := h fuel
+    revert h1
+    cases eval m fuel array env with
+    | error x => cases x <;> simp [Post.holds]
+    | ok r =>
+      obtain ⟨a, e1⟩ := r
+      intro h1
+      have h2 := h1 fuel
+      cases hx : eval m fuel start e1 with
+      | error x => rw [hx] at h2; simp only [hx]; cases x <;> simp_all [Post.holds]
+      | ok r =>
+        obtain ⟨b, e2⟩ := r
+        rw [hx] at h2
+        simp only [hx]
+        cases b with
+        | number k1 first =>
+          simp only []
+          have h3 := h2 fuel
+          cases hx : eval m fuel stop e2 with
+          | error x => rw [hx] at h3; simp only [hx]; cases x <;> simp_all [Post.holds]
+          | ok r =>
+            obtain ⟨c, e3⟩ := r
+            rw [hx] at h3
+            simp only [hx]
+            cases c with
+            | number k2 last =>
+              simp only []
+              have h4 := h3 fuel
+              cases hx : eval m fuel amount e3 with
+              | error x => rw [hx] at h4; simp only [hx]; cases x <;> simp_all [Post.holds]
+              | ok r =>
+                obtain ⟨d, e4⟩ := r
+                rw [hx] at h4
+                simp only [hx]
+                cases d with
+                | number k3 mid =>
+                  simp only []
+                  cases a with
+                  | array values =>
+                    simp only []
+                    split
+                    · exact trivial
+                    · split
+                      · exact trivial
+                      · exact h4 _
+                  | _ => exact trivial
+                | _ => exact trivial
+            | _ => exact trivial
+        | _ => exact trivial
+
 /-- A panic is a fault, which a weakest precondition never constrains. -/
 theorem wp_panic {m : Machine} {reason : String} {Q : Post} {env : PureEnv} :
     Wp m (.panic reason) Q env := by
   intro fuel
   cases fuel <;> simp [eval, Post.holds]
+
+/-- Named fields, left to right, then `K` on the named values. -/
+def WpFields (m : Machine) (Q : Post) (K : List (String × PureValue) → PureEnv → Prop) :
+    List (String × Expr) → List (String × PureValue) → PureEnv → Prop
+  | [], values, env => K values env
+  | (name, field) :: rest, values, env =>
+    Wp m field { Q with normal := fun v e => WpFields m Q K rest (values ++ [(name, v)]) e } env
+
+/-- The field fold ends with `K` on its values, or with an ending `Q` accepts. -/
+def FieldsEnd (K : List (String × PureValue) → PureEnv → Prop) (Q : Post) :
+    Except Exit (List (String × PureValue) × PureEnv) → Prop
+  | .ok (values, env) => K values env
+  | .error x => Q.holds (.error x)
+
+theorem wpFields_fold (m : Machine) (fuel : Nat) (Q : Post) (K : List (String × PureValue) → PureEnv → Prop) :
+    ∀ (fields : List (String × Expr)) (values : List (String × PureValue)) (env : PureEnv),
+      WpFields m Q K fields values env →
+      FieldsEnd K Q (fields.foldlM (fun (values, env) (name, field) => do
+          let (value, env) ← eval m fuel field env
+          return (values ++ [(name, value)], env)) (values, env))
+  | [], values, env, h => by simpa [List.foldlM, pure, Except.pure, FieldsEnd, WpFields] using h
+  | (name, field) :: rest, values, env, h => by
+    simp only [WpFields] at h
+    have h1 := h fuel
+    simp only [List.foldlM, bind, Except.bind]
+    revert h1
+    cases eval m fuel field env with
+    | error x => cases x <;> simp [Post.holds, FieldsEnd]
+    | ok r =>
+      obtain ⟨v, e1⟩ := r
+      intro h1
+      exact wpFields_fold m fuel Q K rest (values ++ [(name, v)]) e1 h1
+
+theorem wp_variant {m : Machine} {name tag : String} {fields : List (String × Expr)} {Q : Post}
+    {env : PureEnv} (h : WpFields m Q (fun values e => Q.normal (.variant name tag values) e) fields [] env) :
+    Wp m (.variant name tag fields) Q env := by
+  intro fuel
+  cases fuel with
+  | zero => simp [eval, Post.holds]
+  | succ fuel =>
+    simp only [eval, bind, Except.bind]
+    have folded := wpFields_fold m fuel Q _ fields [] env h
+    simp only [bind, Except.bind] at folded
+    split
+    · rename_i x hf
+      rw [hf] at folded
+      simpa [FieldsEnd] using folded
+    · rename_i res hf
+      obtain ⟨values, e2⟩ := res
+      rw [hf] at folded
+      exact folded
+
+theorem wp_record {m : Machine} {name : String} {fields : List (String × Expr)} {Q : Post}
+    {env : PureEnv} (h : WpFields m Q (fun values e => Q.normal (.record name values) e) fields [] env) :
+    Wp m (.record name fields) Q env := by
+  intro fuel
+  cases fuel with
+  | zero => simp [eval, Post.holds]
+  | succ fuel =>
+    simp only [eval, bind, Except.bind]
+    have folded := wpFields_fold m fuel Q _ fields [] env h
+    simp only [bind, Except.bind] at folded
+    split
+    · rename_i x hf
+      rw [hf] at folded
+      simpa [FieldsEnd] using folded
+    · rename_i res hf
+      obtain ⟨values, e2⟩ := res
+      rw [hf] at folded
+      exact folded
 
 /-- An argument list, left to right, then `K` on the values. -/
 def WpArgs (m : Machine) (Q : Post) (K : List PureValue → PureEnv → Prop) :
@@ -640,6 +799,16 @@ theorem wp_scan_here {m : Machine} {exit cursor stop : Nat} {rest : Expr} {Q : P
       (.exit exit (.literal .unit)) (.literal .unit)) rest)) Q env :=
   wp_scan kind hi W env P stopKept stopValue k0 startCursor startLe (fun _ _ => rfl) start step done
 
+/-- A loop whose iterations write only the slots in `W`, from its entry
+    environment, with the facts `P` re-established by each iteration. -/
+theorem wp_while {m : Machine} {body : Expr} {Q : Post} {env : PureEnv} (W : List Nat)
+    (P : PureEnv → Prop) (start : P env)
+    (step : ∀ e, (∀ s, s ∉ W → e s = env s) → P e →
+      Wp m body { Q with normal := fun _ e' => (∀ s, s ∉ W → e' s = env s) ∧ P e' } e) :
+    Wp m (.loop body) Q env :=
+  wp_loop (fun e => (∀ s, s ∉ W → e s = env s) ∧ P e) ⟨fun _ _ => rfl, start⟩
+    (fun e ⟨h1, h2⟩ => step e h1 h2)
+
 /-- A write to a slot of `W` keeps the slots outside `W`. -/
 theorem kept_set {e0 e : PureEnv} {W : List Nat} {x : Nat} (v : PureValue)
     (h : ∀ s, s ∉ W → e s = e0 s) (hx : x ∈ W) : ∀ s, s ∉ W → pureSet e x v s = e0 s := by
@@ -651,6 +820,46 @@ theorem kept_set {e0 e : PureEnv} {W : List Nat} {x : Nat} (v : PureValue)
 theorem ite_ok_error {p : Prop} [Decidable p] {x : Exit} {y c : PureValue} :
     ((if p then Except.ok y else Except.error x) = (Except.ok c : Except Exit PureValue)) ↔ (p ∧ y = c) := by
   by_cases h : p <;> simp [h]
+
+/-- A call whose receiver is not written back, under no specification: its
+    value may be anything. -/
+theorem wp_invoke_any {m : Machine} {name : String} {receiver : Expr} {args : List Expr} {Q : Post}
+    {env : PureEnv}
+    (h : Wp m receiver { Q with normal := fun _ e => WpArgs m Q (fun _ e' => Havoc (fun v => Q.normal v e')) args [] e } env) :
+    Wp m (.invoke name receiver none args) Q env := by
+  intro fuel
+  cases fuel with
+  | zero => simp [eval, Post.holds]
+  | succ fuel =>
+    simp only [eval, bind, Except.bind]
+    have h1 := h fuel
+    revert h1
+    cases eval m fuel receiver env with
+    | error x => cases x <;> simp [Post.holds]
+    | ok r =>
+      obtain ⟨self, e1⟩ := r
+      intro h1
+      simp only []
+      have folded := wpArgs_fold m fuel Q _ args [] e1 h1
+      simp only [bind, Except.bind] at folded
+      split
+      · rename_i x hf
+        rw [hf] at folded
+        simpa [ArgsEnd] using folded
+      · rename_i res hf
+        obtain ⟨values, e2⟩ := res
+        rw [hf] at folded
+        simp only [ArgsEnd] at folded
+        cases m.functions name with
+        | none => exact trivial
+        | some body =>
+          simp only []
+          split
+          · rename_i x hx
+            split at hx <;> (try cases hx) <;> exact trivial
+          · rename_i res hx
+            obtain ⟨v, final⟩ := res
+            split at hx <;> cases hx <;> exact folded v
 
 /-- A specification for calls that write the receiver back: a normal or
     returned end whose receiver slot is still defined satisfies `post`. -/
@@ -801,20 +1010,88 @@ theorem wp_invoke_back {m : Machine} {name : String} {receiver : Expr} {slot : N
                 | error x => obtain ⟨f, rfl⟩ := update_faults _ _ _ _ x hu; exact trivial
                 | ok replaced => exact done current replaced hc hu
 
+theorem except_bind_ok {ε α β : Type} {x : Except ε α} {f : α → Except ε β} {y : β} :
+    (x >>= f) = .ok y ↔ ∃ a, x = .ok a ∧ f a = .ok y := by
+  cases x <;> simp [bind, Except.bind]
+
+/-- The fields with the first one named `n` given the value `u`. -/
+def setField (n : String) (u : PureValue) : List (String × PureValue) → List (String × PureValue)
+  | [] => []
+  | (k, v) :: rest => if k = n then (k, u) :: rest else (k, v) :: setField n u rest
+
+theorem replaceField_ok (change : PureValue → Except Exit PureValue) (n : String) :
+    ∀ (fs fs' : List (String × PureValue)), replaceField change n fs = .ok fs' ↔
+      ∃ old u, (fs.find? (fun p => p.1 == n)).map (·.2) = some old ∧ change old = .ok u ∧
+        fs' = setField n u fs
+  | [], fs' => by simp [replaceField]
+  | (k, v) :: rest, fs' => by
+    by_cases h : k = n
+    · subst h
+      simp only [replaceField, ite_true, setField, List.find?, beq_self_eq_true, Option.map_some]
+      cases hc : change v <;> simp [bind, Except.bind, pure, Except.pure, hc, eq_comm]
+    · have ih := replaceField_ok change n rest
+      have hb : (k == n) = false := by simpa using h
+      simp only [replaceField, h, ite_false, setField, List.find?, hb]
+      cases hr : replaceField change n rest with
+      | error x =>
+        simp only [bind, Except.bind]
+        constructor
+        · intro hx; cases hx
+        · rintro ⟨old, u, hf, hu, rfl⟩
+          have := (ih (setField n u rest)).mpr ⟨old, u, hf, hu, rfl⟩
+          rw [hr] at this; cases this
+      | ok rest' =>
+        simp only [bind, Except.bind, pure, Except.pure, Except.ok.injEq]
+        have ih' := ih rest'
+        rw [hr] at ih'
+        simp only [true_iff] at ih'
+        constructor
+        · rintro rfl
+          obtain ⟨old, u, hf, hu, rfl⟩ := ih'
+          exact ⟨old, u, hf, hu, rfl⟩
+        · rintro ⟨old, u, hf, hu, rfl⟩
+          obtain ⟨old', u', hf', hu', heq⟩ := ih'
+          rw [hf] at hf'
+          cases hf'
+          rw [hu] at hu'
+          cases hu'
+          rw [heq]
+
+/-- An assignment through a field of a record. -/
+theorem update_field_ok (env : PureEnv) (n : String) (rest : List Access) (r : String)
+    (fs : List (String × PureValue)) (v x : PureValue) :
+    update env (.field n :: rest) (.record r fs) v = .ok x ↔
+      ∃ old u, (fs.find? (fun p => p.1 == n)).map (·.2) = some old ∧ update env rest old v = .ok u ∧
+        x = .record r (setField n u fs) := by
+  simp only [update, except_bind_ok, replaceField_ok, pure, Except.pure, Except.ok.injEq]
+  constructor
+  · rintro ⟨fs', ⟨old, u, hf, hu, rfl⟩, rfl⟩; exact ⟨old, u, hf, hu, rfl⟩
+  · rintro ⟨old, u, hf, hu, rfl⟩; exact ⟨_, ⟨old, u, hf, hu, rfl⟩, rfl⟩
+
+theorem update_nil_ok (env : PureEnv) (current v x : PureValue) :
+    update env [] current v = .ok x ↔ v = x := by
+  simp [update]
+
 /-- Structural symbolic execution: sequencing, writes, literals, slot reads
-    through `pureSet`, field reads of record literals (after unfolding the
-    given definitions), scopes, blocks, exits and returns. -/
+    through `pureSet`, field reads, assignments, comparisons and arithmetic on
+    numbers, indexing, matches, short-circuit operators and conditions, after
+    unfolding the given definitions and rewriting with the given facts. It
+    stops at loops and calls, which need an invariant or a specification. A
+    result it cannot compute (such as a field of an opaque value) stays as a
+    hypothesis, so the walk continues over every possible value. -/
 syntax "wp_walk" (" [" Lean.Parser.Tactic.simpLemma,* "]")? : tactic
 macro_rules
   | `(tactic| wp_walk) => `(tactic| wp_walk [])
   | `(tactic| wp_walk [$lemmas,*]) => `(tactic| repeat' (first
     | (apply wp_sequence)
     | (apply wp_write)
+    | (apply wp_assign)
     | (apply wp_literal; try dsimp only)
     | (apply wp_read; intro _v _hv;
        set_option linter.unusedSimpArgs false in
        simp (disch := first | decide | omega) only [set_same, set_other, Option.some.injEq, $lemmas,*] at _hv;
        subst _hv; try dsimp only)
+    | (apply wp_read; intro _v _hv)
     | (apply wp_field)
     | (apply wp_and)
     | (apply wp_or)
@@ -829,42 +1106,94 @@ macro_rules
     | (apply wp_present)
     | (apply wp_block)
     | (exact wp_panic)
+    | ((try dsimp only); with_reducible show Havoc _; unfold Havoc; intro _any)
+    | ((try dsimp only); with_reducible show ∀ (v : PureValue), Wp _ _ _ _; intro _any)
+    | ((try dsimp only); with_reducible show ∀ (v w : PureValue), pureField v _ = some w → _; intro _any)
+    | (apply wp_convert_any)
+    | (apply wp_rotate_any)
+    | (apply wp_variant)
+    | (apply wp_record)
+    | (set_option linter.unusedSimpArgs false in simp only [WpFields, WpArgs, List.nil_append, List.cons_append])
     | (apply wp_choose)
-    -- A match's selected arm, at every fuel deep enough for its patterns.
-    | (intro _f _body _env _hs;
-       have _hs := select_add _f 6 _ _ _ _ _hs;
-       set_option linter.unusedSimpArgs false in
-       simp [select, matchPattern, List.foldlM, bind, Except.bind, pure, Except.pure, $lemmas,*] at _hs;
-       obtain ⟨_h1, _h2⟩ := _hs; subst _h1; subst _h2)
     | (set_option linter.unusedSimpArgs false in
        simp (config := {decide := true}) only [↓reduceIte])
     | (apply wp_ite <;> intro _hite)
     | (split)
     -- A binary operation's result.
-    | (intro _c _f _hc;
+    | (with_reducible show ∀ (c : PureValue) (f : Nat), binary _ _ _ _ _ _ = Except.ok c → _
+       intro _c _f _hc
        try (set_option linter.unusedSimpArgs false in
-         simp (disch := first | decide | omega) only [binary_add_fits, Except.ok.injEq] at _hc);
+         simp (disch := first | decide | omega) only [binary_add_fits, Except.ok.injEq] at _hc)
        try (set_option linter.unusedSimpArgs false in
-         simp (config := {decide := true}) (disch := first | decide | omega) only [binary_numbers, arithmetic, String.reduceEq,
-           ↓reduceIte, ite_error_ok, ite_ok_error, Except.ok.injEq, $lemmas,*] at _hc);
-       first | subst _hc | (obtain ⟨_, _hc⟩ := _hc; subst _hc);
+         simp (config := {decide := true}) (disch := first | decide | omega) only [binary_numbers,
+           arithmetic, String.reduceEq, ↓reduceIte, ite_error_ok, ite_ok_error, Except.ok.injEq,
+           $lemmas,*] at _hc)
+       try (first | subst _hc | (obtain ⟨_, _hc⟩ := _hc; subst _hc))
        try dsimp only)
     -- An indexed read's result.
-    | (intro _vs _x _ha _hi;
+    | (with_reducible show ∀ (vs : List PureValue) (x : PureValue), _ = PureValue.array vs → indexValue vs _ = Except.ok x → _
+       intro _vs _x _ha _hi
+       try (set_option linter.unusedSimpArgs false in simp only [PureValue.array.injEq] at _ha)
+       try subst _ha
+       try (set_option linter.unusedSimpArgs false in
+         simp (disch := first | decide | omega) only [indexValue, List.getElem?_map, List.getElem?_eq_getElem,
+           Option.map_some, Option.some.injEq, Except.ok.injEq, $lemmas,*] at _hi)
+       try subst _hi
+       try dsimp only)
+    -- An array length.
+    | (with_reducible show ∀ (vs : List PureValue), _ = PureValue.array vs → _
+       intro _vs _ha
+       try (set_option linter.unusedSimpArgs false in simp only [PureValue.array.injEq] at _ha)
+       try subst _ha
+       try dsimp only)
+    -- An assignment's update of a slot's value.
+    | (with_reducible show ∀ (current updated : PureValue), _ = some current → update _ _ current _ = Except.ok updated → _
+       intro _cur _upd _hs _hu
        set_option linter.unusedSimpArgs false in
-       simp only [PureValue.array.injEq] at _ha; subst _ha;
+       simp (disch := first | decide | omega) only [set_same, set_other, Option.some.injEq, $lemmas,*] at _hs
+       subst _hs
+       try (set_option linter.unusedSimpArgs false in
+         simp (config := {decide := true}) only [update_field_ok, update_nil_ok, List.find?, String.reduceBEq,
+           Option.map_some, Option.map_none, Option.some.injEq, setField, String.reduceEq, ↓reduceIte,
+           exists_eq_left, exists_eq_left', exists_and_left, exists_eq_right, and_true, true_and,
+           $lemmas,*] at _hu)
+       try subst _hu
+       try (obtain ⟨_a, _ha, _hu⟩ := _hu; subst _hu)
+       try dsimp only)
+    -- A match's selected arm, at every fuel deep enough for its patterns.
+    | (with_reducible show ∀ (f : Nat) (body : Expr) (e : PureEnv), select f _ _ _ = Except.ok (some (body, e)) → _
+       intro _f _body _env _hs
+       have _hs := select_add _f 6 _ _ _ _ _hs
        set_option linter.unusedSimpArgs false in
-       simp (disch := first | decide | omega) only [indexValue, List.getElem?_map, List.getElem?_eq_getElem,
-         Option.map_some, Option.some.injEq, Except.ok.injEq, $lemmas,*] at _hi;
-       subst _hi; try dsimp only)
-    -- A field, condition or other single-value result.
-    | (intro _w _hw;
-       set_option linter.unusedSimpArgs false in
-       simp (disch := first | decide | omega) only [field_record, List.find?, Option.map, String.reduceBEq,
-         Option.some.injEq, PureValue.boolean.injEq, PureValue.array.injEq, $lemmas,*] at _hw;
-       subst _hw;
+       simp [select, matchPattern, List.foldlM, bind, Except.bind, pure, Except.pure, $lemmas,*] at _hs
+       obtain ⟨_h1, _h2⟩ := _hs; subst _h1; subst _h2)
+    -- A field's value.
+    | (with_reducible show ∀ (w : PureValue), pureField _ _ = some w → _
+       intro _w _hw
+       try (set_option linter.unusedSimpArgs false in
+         simp (disch := first | decide | omega) only [field_record, List.find?, Option.map, String.reduceBEq,
+           Option.some.injEq, $lemmas,*] at _hw)
+       try subst _hw
+       try dsimp only)
+    -- A condition's or other single boolean value.
+    | (with_reducible show ∀ (b : Bool), _ = PureValue.boolean b → _
+       intro _w _hw
+       try (set_option linter.unusedSimpArgs false in
+         simp (disch := first | decide | omega) only [PureValue.boolean.injEq, $lemmas,*] at _hw)
+       try subst _hw
        try set_option linter.unusedSimpArgs false in simp only [↓reduceIte, Bool.false_eq_true, decide_eq_true_eq,
          Nat.zero_le, Nat.le_refl, ite_true, ite_false, decide_true, decide_false])))
+
+/-- `wp_walk` that also passes over every call whose receiver is not written
+    back, leaving its value unconstrained. -/
+syntax "wp_walk_any" (" [" Lean.Parser.Tactic.simpLemma,* "]")? : tactic
+macro_rules
+  | `(tactic| wp_walk_any) => `(tactic| wp_walk_any [])
+  | `(tactic| wp_walk_any [$lemmas,*]) => `(tactic| (
+    wp_walk [$lemmas,*]
+    repeat' (first
+      | (apply wp_invoke_any; wp_walk [$lemmas,*])
+      | ((try dsimp only); with_reducible show Havoc _; unfold Havoc; intro _any; wp_walk [$lemmas,*]))))
 
 /-- Frames compose: an inner frame over `V ⊆ W` within an outer one over `W`. -/
 theorem kept_via {x y z : PureEnv} {V W : List Nat} (inner : ∀ s, s ∉ V → x s = y s)
@@ -875,5 +1204,13 @@ theorem kept_via {x y z : PureEnv} {V W : List Nat} (inner : ∀ s, s ∉ V → 
     over an environment that the given hypothesis already relates to `e0`. -/
 macro "wp_kept " h:term : tactic =>
   `(tactic| ((repeat (refine kept_set _ ?_ (by decide))); exact $h))
+
+/-- Open a write-back post: the receiver slot's final value. -/
+macro "wp_receiver" : tactic =>
+  `(tactic| (
+    intro _r _hr
+    set_option linter.unusedSimpArgs false in
+      simp (disch := decide) only [set_same, set_other, Option.some.injEq] at _hr
+    subst _hr))
 
 end Provium.Imperative
