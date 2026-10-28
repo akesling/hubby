@@ -473,6 +473,95 @@ theorem wp_rotate_any {m : Machine} {array start stop amount : Expr} {Q : Post} 
             | _ => exact trivial
         | _ => exact trivial
 
+set_option linter.unusedSimpArgs false in
+/-- An array of copies, with its result unconstrained. -/
+theorem wp_replicate_any {m : Machine} {value count : Expr} {Q : Post} {env : PureEnv}
+    (h : Wp m value { Q with normal := (fun _ e => Wp m count { Q with normal := (fun _ e =>
+      Havoc (fun x => Q.normal x e)) } e) } env) :
+    Wp m (.replicate value count) Q env := by
+  intro fuel
+  cases fuel with
+  | zero => simp [eval, Post.holds]
+  | succ fuel =>
+    simp only [eval, bind, Except.bind]
+    have h1 := h fuel
+    cases hx : eval m fuel value env with
+    | error x => rw [hx] at h1; simp only [hx]; cases x <;> simp_all [Post.holds]
+    | ok r =>
+      obtain ⟨a, e1⟩ := r
+      rw [hx] at h1
+      simp only [hx]
+      have h2 := h1 fuel
+      cases hy : eval m fuel count e1 with
+      | error x => rw [hy] at h2; simp only [hy]; cases x <;> simp_all [Post.holds]
+      | ok r =>
+        obtain ⟨b, e2⟩ := r
+        rw [hy] at h2
+        simp only [hy]
+        cases b with
+        | number k c => exact h2 _
+        | _ => exact trivial
+
+set_option linter.unusedSimpArgs false in
+/-- A sort of a slice, with its result unconstrained. -/
+theorem wp_sort_any {m : Machine} {array start stop : Expr} {Q : Post} {env : PureEnv}
+    (h : Wp m array { Q with normal := (fun _ e => Wp m start { Q with normal := (fun _ e =>
+      Wp m stop { Q with normal := (fun _ e => Havoc (fun x => Q.normal x e)) } e) } e) } env) :
+    Wp m (.sort array start stop) Q env := by
+  intro fuel
+  cases fuel with
+  | zero => simp [eval, Post.holds]
+  | succ fuel =>
+    simp only [eval, bind, Except.bind]
+    have h1 := h fuel
+    cases hx : eval m fuel array env with
+    | error x => rw [hx] at h1; simp only [hx]; cases x <;> simp_all [Post.holds]
+    | ok r =>
+      obtain ⟨a, e1⟩ := r
+      rw [hx] at h1
+      simp only [hx]
+      have h2 := h1 fuel
+      cases hy : eval m fuel start e1 with
+      | error x => rw [hy] at h2; simp only [hy]; cases x <;> simp_all [Post.holds]
+      | ok r =>
+        obtain ⟨b, e2⟩ := r
+        rw [hy] at h2
+        simp only [hy]
+        cases b with
+        | number k1 first =>
+          have h3 := h2 fuel
+          cases hz : eval m fuel stop e2 with
+          | error x => rw [hz] at h3; simp only [hz]; cases x <;> simp_all [Post.holds]
+          | ok r =>
+            obtain ⟨c, e3⟩ := r
+            rw [hz] at h3
+            simp only [hz]
+            cases c with
+            | number k2 last =>
+              cases a with
+              | array values =>
+                simp only []
+                split
+                · exact trivial
+                · split
+                  · exact trivial
+                  · exact h3 _
+              | _ => exact trivial
+            | _ => exact trivial
+        | _ => exact trivial
+
+/-- A match on an optional value: its `Some` arm binds the payload, any other
+    value takes the fallback arm. -/
+theorem select_option {f : Nat} {slot : Nat} {some none : Expr} {v : PureValue} {e : PureEnv}
+    {body : Expr} {e' : PureEnv}
+    (h : select f [(.present (.bind slot), some), (.any, none)] v e = .ok (Option.some (body, e'))) :
+    (∃ x, v = .present x ∧ body = some ∧ e' = pureSet e slot x) ∨ (body = none ∧ e' = e) := by
+  have h6 := select_add f 6 _ _ _ _ h
+  cases v <;> simp [select, matchPattern, List.foldlM, bind, Except.bind, pure, Except.pure] at h6 <;>
+    first
+      | (obtain ⟨rfl, rfl⟩ := h6; exact Or.inr ⟨rfl, rfl⟩)
+      | (obtain ⟨rfl, rfl⟩ := h6; exact Or.inl ⟨_, rfl, rfl, rfl⟩)
+
 /-- A panic is a fault, which a weakest precondition never constrains. -/
 theorem wp_panic {m : Machine} {reason : String} {Q : Post} {env : PureEnv} :
     Wp m (.panic reason) Q env := by
@@ -680,13 +769,13 @@ theorem binary_numbers (bits : Nat) (checked : Bool) (f : Nat) (op kind : String
     were words of that kind. -/
 theorem binary_eq_numbers {bits : Nat} {checked : Bool} {f : Nat} {kind : String} {a b : Nat}
     {c : PureValue} (h : binary bits checked f "==" (.number kind a) (.number kind b) = .ok c) :
-    c = .boolean (a == b) ∧ a < bound bits kind ∧ b < bound bits kind := by
+    c = .boolean (a == b) ∧ a < bound bits kind ∧ b < bound bits kind ∧ width bits kind ≠ 0 := by
   rw [binary_numbers, arithmetic_eq] at h
   by_cases g : (width bits kind = 0 ∨ a ≥ bound bits kind ∨ b ≥ bound bits kind)
   · rw [if_pos g] at h; cases h
   · rw [if_neg g] at h
     cases h
-    exact ⟨rfl, by omega, by omega⟩
+    exact ⟨rfl, by omega, by omega, by omega⟩
 
 /-- A successful `+` on two numbers whose sum fits the kind is the sum. -/
 theorem binary_add_numbers {bits : Nat} {checked : Bool} {f : Nat} {kind : String} {a b : Nat}
@@ -725,7 +814,7 @@ theorem wp_counted {m : Machine} {exit cursor stop : Nat} {rest : Expr} {Q : Pos
     (kind : String) (hi : Nat) (Inv : Nat → PureEnv → Prop)
     (frame : ∀ k e, Inv k e → e cursor = some (.number kind k) ∧ e stop = some (.number kind hi) ∧ k ≤ hi)
     (k0 : Nat) (start : Inv k0 env)
-    (step : ∀ k e, Inv k e → k < hi → hi < bound m.bits kind →
+    (step : ∀ k e, Inv k e → k < hi → hi < bound m.bits kind → width m.bits kind ≠ 0 →
       Wp m rest { Q with normal := (fun _ e' => ∃ k', Inv k' e') } e)
     (done : ∀ e, Inv hi e → Q.exited exit .unit e) :
     Wp m (.loop (.sequence (.branch (.binary "==" (.read cursor) (.read stop))
@@ -745,7 +834,7 @@ theorem wp_counted {m : Machine} {exit cursor stop : Nat} {rest : Expr} {Q : Pos
   rw [hs] at hb
   cases hb
   intro c f hb
-  obtain ⟨rfl, _, bounded⟩ := binary_eq_numbers hb
+  obtain ⟨rfl, _, bounded, wide⟩ := binary_eq_numbers hb
   intro b hb'
   cases hb'
   by_cases same : k = hi
@@ -757,7 +846,7 @@ theorem wp_counted {m : Machine} {exit cursor stop : Nat} {rest : Expr} {Q : Pos
   · have ne : (k == hi) = false := by simpa using same
     simp only [ne, Bool.false_eq_true, ite_false]
     apply wp_literal
-    exact step k e hk (by omega) bounded
+    exact step k e hk (by omega) bounded wide
 
 /-- A counted loop whose iterations write only the slots in `W` (the cursor
     among them): every other slot keeps its value from `e0`, the environment
@@ -768,7 +857,7 @@ theorem wp_scan {m : Machine} {exit cursor stop : Nat} {rest : Expr} {Q : Post} 
     (stopKept : stop ∉ W) (stopValue : e0 stop = some (.number kind hi))
     (k0 : Nat) (startCursor : env cursor = some (.number kind k0)) (startLe : k0 ≤ hi)
     (startKept : ∀ s, s ∉ W → env s = e0 s) (start : P k0 env)
-    (step : ∀ k e, e cursor = some (.number kind k) → k < hi → hi < bound m.bits kind →
+    (step : ∀ k e, e cursor = some (.number kind k) → k < hi → hi < bound m.bits kind → width m.bits kind ≠ 0 →
       (∀ s, s ∉ W → e s = e0 s) → P k e →
       Wp m rest { Q with normal := (fun _ e' => ∃ k', e' cursor = some (.number kind k') ∧ k' ≤ hi ∧
         (∀ s, s ∉ W → e' s = e0 s) ∧ P k' e') } e)
@@ -780,7 +869,7 @@ theorem wp_scan {m : Machine} {exit cursor stop : Nat} {rest : Expr} {Q : Post} 
       (∀ s, s ∉ W → e s = e0 s) ∧ P k e)
     (fun k e ⟨hc, hle, hkept, _⟩ => ⟨hc, by rw [hkept stop stopKept, stopValue], hle⟩)
     k0 ⟨startCursor, startLe, startKept, start⟩
-    (fun k e ⟨hc, _, hkept, hp⟩ lt bounded => step k e hc lt bounded hkept hp)
+    (fun k e ⟨hc, _, hkept, hp⟩ lt bounded wide => step k e hc lt bounded wide hkept hp)
     (fun e ⟨hc, _, hkept, hp⟩ => done e hc hkept hp)
 
 /-- `wp_scan` from the loop's own entry environment. -/
@@ -789,7 +878,7 @@ theorem wp_scan_here {m : Machine} {exit cursor stop : Nat} {rest : Expr} {Q : P
     (stopKept : stop ∉ W) (stopValue : env stop = some (.number kind hi))
     (k0 : Nat) (startCursor : env cursor = some (.number kind k0)) (startLe : k0 ≤ hi)
     (start : P k0 env)
-    (step : ∀ k e, e cursor = some (.number kind k) → k < hi → hi < bound m.bits kind →
+    (step : ∀ k e, e cursor = some (.number kind k) → k < hi → hi < bound m.bits kind → width m.bits kind ≠ 0 →
       (∀ s, s ∉ W → e s = env s) → P k e →
       Wp m rest { Q with normal := (fun _ e' => ∃ k', e' cursor = some (.number kind k') ∧ k' ≤ hi ∧
         (∀ s, s ∉ W → e' s = env s) ∧ P k' e') } e)
@@ -808,6 +897,61 @@ theorem wp_while {m : Machine} {body : Expr} {Q : Post} {env : PureEnv} (W : Lis
     Wp m (.loop body) Q env :=
   wp_loop (fun e => (∀ s, s ∉ W → e s = env s) ∧ P e) ⟨fun _ _ => rfl, start⟩
     (fun e ⟨h1, h2⟩ => step e h1 h2)
+
+/-- A counted `for` over `lo..hi` whose bounds evaluate to known numbers: an
+    invariant from `lo`, re-established by each iteration, holds at `hi`. -/
+theorem wp_range {m : Machine} {slot : Nat} {start stop body : Expr} {Q : Post} {env : PureEnv}
+    (kind : String) (lo hi : Nat) (I : Nat → PureEnv → Prop) (le : lo ≤ hi)
+    (bounds : Wp m start { Q with normal := (fun a e1 => Wp m stop { Q with normal := (fun b e2 =>
+      a = .number kind lo ∧ b = .number kind hi ∧ I lo e2) } e1) } env)
+    (iteration : ∀ i e, lo ≤ i → i < hi → I i e →
+      Wp m body { Q with normal := (fun _ e' => I (i + 1) e') } (pureSet e slot (.number kind i)))
+    (done : ∀ e v, I hi e → Q.normal v e) :
+    Wp m (.range slot start stop body) Q env := by
+  intro fuel
+  cases fuel with
+  | zero => simp [eval, Post.holds]
+  | succ fuel =>
+    simp only [eval, bind, Except.bind]
+    have h1 := bounds fuel
+    cases ha : eval m fuel start env with
+    | error x => rw [ha] at h1; cases x <;> simp_all [Post.holds]
+    | ok r =>
+      obtain ⟨a, e1⟩ := r
+      rw [ha] at h1
+      have h2 := h1 fuel
+      simp only []
+      cases hb : eval m fuel stop e1 with
+      | error x =>
+        rw [hb] at h2
+        cases a <;> simp only [] <;> (try exact trivial) <;> (cases x <;> simp_all [Post.holds])
+      | ok r =>
+        obtain ⟨b, e2⟩ := r
+        rw [hb] at h2
+        obtain ⟨rfl, rfl, start⟩ := h2
+        simp only [hb, ne_eq, not_true_eq_false, ite_false]
+        suffices ∀ (count n : Nat) (e : PureEnv) (u : PureValue), lo ≤ n → n + count = hi → I n e →
+            Q.holds ((List.range' n count).foldlM (fun (_, env) i =>
+              eval m fuel body (pureSet env slot (.number kind i))) (u, e)) by
+          exact this (hi - lo) lo e2 .unit (Nat.le_refl _) (by omega) start
+        intro count
+        induction count with
+        | zero =>
+          intro n e u _ hn hi'
+          simp only [Nat.add_zero] at hn
+          subst hn
+          simp only [List.range', List.foldlM, pure, Except.pure, Post.holds]
+          exact done e u hi'
+        | succ count ih =>
+          intro n e u hlo hn hi'
+          simp only [List.range'_succ, List.foldlM, bind, Except.bind]
+          have hb' := iteration n e hlo (by omega) hi' fuel
+          cases hbody : eval m fuel body (pureSet e slot (.number kind n)) with
+          | error x => rw [hbody] at hb'; cases x <;> simp_all [Post.holds]
+          | ok r =>
+            obtain ⟨w, e3⟩ := r
+            rw [hbody] at hb'
+            exact ih (n + 1) e3 w (by omega) (by omega) hb'
 
 /-- A write to a slot of `W` keeps the slots outside `W`. -/
 theorem kept_set {e0 e : PureEnv} {W : List Nat} {x : Nat} (v : PureValue)
@@ -1166,6 +1310,8 @@ macro_rules
     | ((try dsimp only); with_reducible show ∀ (v : PureValue), Wp _ _ _ _; intro _any)
     | ((try dsimp only); with_reducible show ∀ (v w : PureValue), pureField v _ = some w → _; intro _any)
     | (apply wp_convert_any)
+    | (apply wp_replicate_any)
+    | (apply wp_sort_any)
     | (apply wp_rotate_any)
     | (apply wp_variant)
     | (apply wp_record)
@@ -1219,6 +1365,9 @@ macro_rules
        try (injection _hu with _hu; subst _hu)
        try (obtain ⟨_a, _ha, _hu⟩ := _hu; subst _hu)
        try dsimp only)
+    -- An assignment into a slot whose value is unknown.
+    | (with_reducible show ∀ (current updated : PureValue), _ = some current → update _ _ current _ = Except.ok updated → _
+       intro _cur _upd _hs _hu)
     -- A match's selected arm, at every fuel deep enough for its patterns.
     | (with_reducible show ∀ (f : Nat) (body : Expr) (e : PureEnv), select f _ _ _ = Except.ok (some (body, e)) → _
        intro _f _body _env _hs
@@ -1226,6 +1375,10 @@ macro_rules
        set_option linter.unusedSimpArgs false in
        simp [select, matchPattern, List.foldlM, bind, Except.bind, pure, Except.pure, $lemmas,*] at _hs
        obtain ⟨_h1, _h2⟩ := _hs; subst _h1; subst _h2)
+    -- A match on an optional value of unknown shape.
+    | (with_reducible show ∀ (f : Nat) (body : Expr) (e : PureEnv), select f [(Pattern.present (Pattern.bind _), _), (Pattern.any, _)] _ _ = Except.ok (some (body, e)) → _
+       intro _f _body _env _hs
+       rcases select_option _hs with ⟨_x, _hx, _h1, _h2⟩ | ⟨_h1, _h2⟩ <;> subst _h1 <;> subst _h2)
     -- A field's value.
     | (with_reducible show ∀ (w : PureValue), pureField _ _ = some w → _
        intro _w _hw
@@ -1265,11 +1418,13 @@ macro "wp_kept " h:term : tactic =>
   `(tactic| ((repeat (refine kept_set _ ?_ (by decide))); exact $h))
 
 /-- Open a write-back post: the receiver slot's final value. -/
-macro "wp_receiver" : tactic =>
-  `(tactic| (
+syntax "wp_receiver" (" [" Lean.Parser.Tactic.simpLemma,* "]")? : tactic
+macro_rules
+  | `(tactic| wp_receiver) => `(tactic| wp_receiver [])
+  | `(tactic| wp_receiver [$lemmas,*]) => `(tactic| (
     intro _r _hr
     set_option linter.unusedSimpArgs false in
-      simp (disch := decide) only [set_same, set_other, Option.some.injEq] at _hr
+      simp (disch := decide) only [set_same, set_other, Option.some.injEq, $lemmas,*] at _hr
     subst _hr))
 
 /-- Close `∃ xs, value = f xs` when the value is `f` at some arguments, found by
