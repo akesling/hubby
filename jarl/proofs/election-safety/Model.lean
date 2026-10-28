@@ -163,6 +163,11 @@ def handlePreVoted (w : World) (v c term campaign : Nat) (granted : Bool) : Worl
     if Majority w.voters votes then _root_.Jarl.ElectionSafety.campaign counted v else counted
   else { w with nodes := set w.nodes v s }
 
+/-- Following a leader at the current term (`follow(Some(from))` on `Append`,
+    `AppendBatch` or `Install`): the role becomes follower and a probe ends.
+    It changes neither the term nor the vote, so any node may take it. -/
+def demote (s : Local) : Local := { s with role := .follower, prevoting := none }
+
 inductive Step : World → World → Prop where
   | timeout (w : World) (v : Node) (voter : v ∈ w.voters)
       (notLeader : (w.nodes v).role ≠ .leader) (ready : Idle (w.nodes v)) :
@@ -186,6 +191,11 @@ inductive Step : World → World → Prop where
   | answerProbe (w : World) (v c campaign : Nat) (granted : Bool)
       (delivered : ⟨c, v, .prevote campaign⟩ ∈ w.sent) (other : c ≠ v) (ready : Idle (w.nodes v)) :
       Step w { w with nodes := (set w.nodes v ({ w.nodes v with outbox := [.prevoted c campaign granted] })) }
+  | demote (w : World) (v : Node) : Step w { w with nodes := set w.nodes v (demote (w.nodes v)) }
+  /-- Jarl's outbox keeps one slot per peer, so a newer message replaces an
+      unsent one: a node may drop any of its pending messages. -/
+  | forget (w : World) (v : Node) (kept : List Pending) (sub : kept.Sublist (w.nodes v).outbox) :
+      Step w { w with nodes := set w.nodes v { w.nodes v with outbox := kept } }
   | preVoteReply (w : World) (v c term campaign : Nat) (granted : Bool)
       (delivered : ⟨c, v, .prevoted term campaign granted⟩ ∈ w.sent) (other : c ≠ v)
       (ready : Idle (w.nodes v)) :
@@ -1066,8 +1076,40 @@ theorem preVoteReply_inv (w : World) (v c term campaign : Nat) (granted : Bool) 
       · exact recounted
     · exact update_inv' w v _ inv (self_local w v inv)
 
+/-- Every node's current state satisfies its own node-level conditions. -/
+theorem node_ok (w : World) (v : Node) (inv : Inv w) : LocalOk w v (w.nodes v) where
+  durableLe := inv.durableLe v
+  clean := inv.clean v
+  durableBallot := inv.durableBallot v
+  ballotCurrent := fun t c b => inv.ballotCurrent t v c b
+  ballotDurable := fun t c b => inv.ballotDurable t v c b
+  voteRequest := inv.voteRequest v
+  outboxVote := inv.outboxVote v
+  outboxGrant := inv.outboxGrant v
+  probing := inv.probing v
+  campaigning := inv.campaigning v
+
+theorem demote_inv (w : World) (v : Node) (inv : Inv w) :
+    Inv { w with nodes := set w.nodes v (demote (w.nodes v)) } := by
+  have ok := node_ok w v inv
+  exact update_inv' w v _ inv
+    { ok with
+      probing := by intro c h; simp [demote] at h
+      campaigning := by intro h; simp [demote] at h }
+
+theorem forget_inv (w : World) (v : Node) (kept : List Pending) (inv : Inv w)
+    (sub : kept.Sublist (w.nodes v).outbox) :
+    Inv { w with nodes := set w.nodes v { w.nodes v with outbox := kept } } := by
+  have ok := node_ok w v inv
+  exact update_inv' w v _ inv
+    { ok with
+      outboxVote := fun x m => ok.outboxVote x (sub.subset m)
+      outboxGrant := fun c m => ok.outboxGrant c (sub.subset m) }
+
 theorem step_inv {w w' : World} (inv : Inv w) (step : Step w w') : Inv w' := by
   cases step with
+  | demote v => exact demote_inv w v inv
+  | forget v kept sub => exact forget_inv w v kept inv sub
   | timeout v voter _ ready => exact timeout_inv w v inv voter ready
   | requestVote v c t logOk delivered other ready =>
     exact requestVote_inv w v c t logOk inv delivered other ready
