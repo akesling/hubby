@@ -373,4 +373,143 @@ theorem triple_choose (m : Machine) (P : PureEnv → Prop) (value : Expr) (arms 
       rw [hv] at h
       cases x <;> simp_all [Post.holds]
 
+/-- The frame `invoke` builds: the receiver in slot 0 and the arguments after it. -/
+def frameOf (self : PureValue) (values : List PureValue) : PureEnv :=
+  (values.zipIdx 1).foldl (fun frame (value, slot) => pureSet frame slot value)
+    (pureSet (fun _ => none) 0 self)
+
+/-- A specification of a function of the table: from a receiver and arguments
+    satisfying `pre`, a normal or returned end yields a value and a final
+    receiver satisfying `post`. -/
+structure Spec where
+  pre : PureValue → List PureValue → Prop
+  post : PureValue → List PureValue → PureValue → PureValue → Prop
+
+def Satisfies (m : Machine) (name : String) (spec : Spec) : Prop :=
+  ∃ body, m.functions name = some body ∧ ∀ self values, spec.pre self values →
+    Triple m (fun env => env = frameOf self values) body
+      { normal := fun v env => ∃ r, env 0 = some r ∧ spec.post self values v r
+        returned := fun v env => ∃ r, env 0 = some r ∧ spec.post self values v r
+        exited := fun _ _ _ => True }
+
+/-- Evaluating an argument list left to right: `A acc values env` holds after
+    each prefix, starting from `A [] env₀`. -/
+def ArgsTriple (m : Machine) (args : List Expr) (A : List PureValue → PureEnv → Prop) (Q : Post) : Prop :=
+  ∀ fuel (values : List PureValue) env, A values env →
+    ∀ arg ∈ args, Q.holds (eval m fuel arg env) ∧
+      ∀ v env', eval m fuel arg env = .ok (v, env') → A (values ++ [v]) env'
+
+/-- The argument fold ends with `A` on its values, or with an ending `Q` accepts. -/
+def ArgsEnd (A : List PureValue → PureEnv → Prop) (Q : Post) :
+    Except Exit (List PureValue × PureEnv) → Prop
+  | .ok (values, env) => A values env
+  | .error x => Q.holds (.error x)
+
+theorem args_fold (m : Machine) (fuel : Nat) (A : List PureValue → PureEnv → Prop) (Q : Post) :
+    ∀ (args : List Expr) (values : List PureValue) (env : PureEnv),
+      (∀ (vs : List PureValue) e, A vs e → ∀ arg ∈ args, Q.holds (eval m fuel arg e) ∧
+        ∀ v e', eval m fuel arg e = .ok (v, e') → A (vs ++ [v]) e') →
+      A values env →
+      ArgsEnd A Q (args.foldlM (fun (values, env) argument => do
+          let (value, env) ← eval m fuel argument env
+          return (values ++ [value], env)) (values, env))
+  | [], values, env, _, a => by simpa [List.foldlM, pure, Except.pure, ArgsEnd] using a
+  | arg :: rest, values, env, step, a => by
+    have ⟨here, next⟩ := step values env a arg (by simp)
+    simp only [List.foldlM, bind, Except.bind]
+    cases hv : eval m fuel arg env with
+    | ok r =>
+      obtain ⟨v, e1⟩ := r
+      simp only [pure, Except.pure]
+      exact args_fold m fuel A Q rest (values ++ [v]) e1
+        (fun vs e h arg' m' => step vs e h arg' (by simp [m'])) (next v e1 hv)
+    | error x =>
+      rw [hv] at here
+      simpa [ArgsEnd] using here
+
+/-- A call through the function table: the receiver, then the arguments, then
+    the callee's specification, then the write-back to the caller's place. -/
+theorem triple_invoke (m : Machine) (P : PureEnv → Prop) (name : String) (receiver : Expr)
+    (writeBack : Option (Nat × List Access)) (args : List Expr) (Q : Post) (spec : Spec)
+    (sat : Satisfies m name spec) (R : PureValue → PureEnv → Prop)
+    (recv : Triple m P receiver { Q with normal := R })
+    (A : PureValue → List PureValue → PureEnv → Prop)
+    (start : ∀ self env, R self env → A self [] env)
+    (argsOk : ∀ self fuel values env, A self values env → ∀ arg ∈ args,
+      Q.holds (eval m fuel arg env) ∧ ∀ v env', eval m fuel arg env = .ok (v, env') →
+        A self (values ++ [v]) env')
+    (call : ∀ self values env, A self values env → spec.pre self values ∧
+      ∀ v r, spec.post self values v r → match writeBack with
+        | none => Q.normal v env
+        | some (slot, path) => ∀ current replaced, env slot = some current →
+            update env path current r = .ok replaced → Q.normal v (pureSet env slot replaced)) :
+    Triple m P (.invoke name receiver writeBack args) Q := by
+  obtain ⟨body, hbody, bodyOk⟩ := sat
+  intro fuel env hp
+  cases fuel with
+  | zero => simp [eval, Post.holds]
+  | succ fuel =>
+    simp only [eval, bind, Except.bind]
+    have h := recv fuel env hp
+    cases hr : eval m fuel receiver env with
+    | error x => rw [hr] at h; cases x <;> simp_all [Post.holds]
+    | ok r =>
+      obtain ⟨self, e1⟩ := r
+      rw [hr] at h
+      simp only []
+      have folded := args_fold m fuel (A self) Q args [] e1
+        (fun vs e a arg ma => argsOk self fuel vs e a arg ma) (start self e1 h)
+      simp only [bind, Except.bind] at folded
+      split
+      · rename_i x hf
+        rw [hf] at folded
+        simpa [ArgsEnd] using folded
+      · rename_i res hf
+        obtain ⟨values, e2⟩ := res
+        rw [hf] at folded
+        simp only [ArgsEnd] at folded
+        obtain ⟨pre, after⟩ := call self values e2 folded
+        simp only [hbody]
+        have hb := bodyOk self values pre fuel (frameOf self values) rfl
+        unfold frameOf at hb
+        cases he : eval m fuel body ((values.zipIdx 1).foldl
+            (fun frame (value, slot) => pureSet frame slot value) (pureSet (fun _ => none) 0 self)) with
+        | ok res =>
+          obtain ⟨v, final⟩ := res
+          rw [he] at hb
+          obtain ⟨r, hr0, post⟩ := hb
+          have done := after v r post
+          cases writeBack with
+          | none => exact done
+          | some w =>
+            obtain ⟨slot, path⟩ := w
+            simp only [hr0]
+            cases hc : e2 slot with
+            | none => exact trivial
+            | some current =>
+              simp only []
+              cases hu : update e2 path current r with
+              | error x => obtain ⟨f, rfl⟩ := update_faults _ _ _ _ x hu; exact trivial
+              | ok replaced => exact done current replaced hc hu
+        | error x =>
+          rw [he] at hb
+          cases x with
+          | fault f => exact trivial
+          | exit l v fin => exact trivial
+          | returned v final =>
+            obtain ⟨r, hr0, post⟩ := hb
+            have done := after v r post
+            cases writeBack with
+            | none => exact done
+            | some w =>
+              obtain ⟨slot, path⟩ := w
+              simp only [hr0]
+              cases hc : e2 slot with
+              | none => exact trivial
+              | some current =>
+                simp only []
+                cases hu : update e2 path current r with
+                | error x => obtain ⟨f, rfl⟩ := update_faults _ _ _ _ x hu; exact trivial
+                | ok replaced => exact done current replaced hc hu
+
 end Provium.Imperative
