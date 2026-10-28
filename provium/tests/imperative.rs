@@ -294,8 +294,15 @@ fn main() {
     assert!(native.status.success());
     let results = String::from_utf8(native.stdout).unwrap();
     assert_eq!(results.lines().count(), cases.len());
-    let mut proofs = "import Generated\nopen Provium.State\nset_option maxRecDepth 100000\nset_option maxHeartbeats 0\n".to_string();
-    let mut obligations = vec![];
+    let mut proofs = "import Generated\nimport Provium.Footprint\nopen Provium.State\nset_option maxRecDepth 100000\nset_option maxHeartbeats 0\n".to_string();
+    // The write footprint proves frame facts for every receiver and input:
+    // `grant` never changes `random`, and `follow` never changes `votes`.
+    proofs.push_str("theorem grant_keeps_random (target : Provium.Imperative.Target) (fuel : Nat) (before after value : PureValue) (arguments : List PureValue) (h : Subject.Node_grant target fuel before arguments = .ok (value, after)) : Provium.Imperative.get [\"random\"] after = Provium.Imperative.get [\"random\"] before :=\n  Provium.Imperative.run_keeps _ fuel 64 _ before after arguments value h _ (by dsimp only; decide)\n");
+    proofs.push_str("theorem follow_keeps_votes (target : Provium.Imperative.Target) (fuel : Nat) (before after value : PureValue) (arguments : List PureValue) (h : Subject.Node_follow target fuel before arguments = .ok (value, after)) : Provium.Imperative.get [\"votes\"] after = Provium.Imperative.get [\"votes\"] before :=\n  Provium.Imperative.run_keeps _ fuel 64 _ before after arguments value h _ (by dsimp only; decide)\n");
+    let mut obligations = vec![
+        serde_json::json!({"theorem": "grant_keeps_random", "function": "Node_grant"}),
+        serde_json::json!({"theorem": "follow_keeps_votes", "function": "Node_follow"}),
+    ];
     for (i, ((function, receiver, arguments, value), result)) in
         cases.iter().zip(results.lines()).enumerate()
     {

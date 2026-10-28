@@ -28,6 +28,7 @@ const RANK_ARITHMETIC: &str = include_str!("../lean/Provium/RankArithmetic.lean"
 const NUMERIC_FOLDS: &str = include_str!("../lean/Provium/NumericFolds.lean");
 const ORDER_STATISTICS: &str = include_str!("../lean/Provium/OrderStatistics.lean");
 const IMPERATIVE: &str = include_str!("../lean/Provium/Imperative.lean");
+const FOOTPRINT: &str = include_str!("../lean/Provium/Footprint.lean");
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Project {
@@ -1603,6 +1604,7 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
         ("Provium/RankArithmetic.lean", RANK_ARITHMETIC),
         ("Provium/NumericFolds.lean", NUMERIC_FOLDS),
         ("Provium/Imperative.lean", IMPERATIVE),
+        ("Provium/Footprint.lean", FOOTPRINT),
         ("Provium/Audit.lean", AUDIT),
         ("Generated.lean", &generated),
         ("Proofs.lean", &proofs),
@@ -1648,6 +1650,7 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
             Some("Provium/NumericFolds.olean"),
         ),
         ("Provium/Imperative.lean", Some("Provium/Imperative.olean")),
+        ("Provium/Footprint.lean", Some("Provium/Footprint.olean")),
         ("Provium/Audit.lean", Some("Provium/Audit.olean")),
         ("Generated.lean", Some("Generated.olean")),
     ] {
@@ -1737,6 +1740,7 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
         "Provium/RankArithmetic.olean",
         "Provium/NumericFolds.olean",
         "Provium/Imperative.olean",
+        "Provium/Footprint.olean",
         "Provium/Audit.olean",
         "Generated.olean",
         "Proofs.olean",

@@ -144,6 +144,14 @@ type is inferred from later uses (falling back to `i32`, modeled for
 non-negative values). `Clone` of a generic payload and calls through function
 pointers go to the oracle; theorems hold for every oracle.
 
+`Provium.Footprint` computes each program's write footprint: the field-name
+paths into the receiver that a run may change, with called functions'
+footprints expanded through the table (a `&mut self` call on `self.state`
+contributes `state` followed by the callee's own paths). `footprint_sound` and
+`run_keeps` prove that a run ending normally, by `return` or by a loop exit
+leaves every path disjoint from the footprint unchanged, so a frame fact such
+as "`push` never changes `state.hard.term`" follows by `decide`.
+
 Payload destructors are not modeled: the lowering assumes they return normally
 and leave the tracked values unchanged. A fault carries no receiver, so
 partially mutated state under unwinding is not modeled. The correspondence
