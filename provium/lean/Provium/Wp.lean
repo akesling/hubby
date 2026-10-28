@@ -1084,6 +1084,29 @@ theorem wp_invoke_any {m : Machine} {name : String} {receiver : Expr} {args : Li
             obtain ⟨v, final⟩ := res
             split at hx <;> cases hx <;> exact folded v
 
+/-- An oracle call, with its result unconstrained. -/
+theorem wp_external_any {m : Machine} {name : String} {args : List Expr} {Q : Post} {env : PureEnv}
+    (h : WpArgs m Q (fun _ e => Havoc (fun x => Q.normal x e)) args [] env) :
+    Wp m (.external name args) Q env := by
+  intro fuel
+  cases fuel with
+  | zero => simp [eval, Post.holds]
+  | succ fuel =>
+    simp only [eval, bind, Except.bind]
+    have folded := wpArgs_fold m fuel Q _ args [] env h
+    simp only [bind, Except.bind] at folded
+    split
+    · rename_i x hf
+      rw [hf] at folded
+      simpa [ArgsEnd] using folded
+    · rename_i res hf
+      obtain ⟨values, e2⟩ := res
+      rw [hf] at folded
+      simp only [ArgsEnd] at folded
+      cases m.oracle name values with
+      | ok v => exact folded v
+      | error r => exact trivial
+
 /-- A specification for calls that write the receiver back: a normal or
     returned end whose receiver slot is still defined satisfies `post`. -/
 def SatisfiesBack (m : Machine) (name : String) (spec : Spec) : Prop :=
@@ -1551,6 +1574,7 @@ macro_rules
     | ((try dsimp only); with_reducible show ∀ (v : PureValue), Wp _ _ _ _; intro _any)
     | ((try dsimp only); with_reducible show ∀ (v w : PureValue), pureField v _ = some w → _; intro _any)
     | (apply wp_convert_any)
+    | (apply wp_external_any)
     | (apply wp_replicate_any)
     | (apply wp_sort_any)
     | (apply wp_rotate_any)
