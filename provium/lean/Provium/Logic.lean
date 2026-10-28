@@ -512,4 +512,71 @@ theorem triple_invoke (m : Machine) (P : PureEnv → Prop) (name : String) (rece
                 | error x => obtain ⟨f, rfl⟩ := update_faults _ _ _ _ x hu; exact trivial
                 | ok replaced => exact done current replaced hc hu
 
+/-- A counted loop `for i in start..stop` over a fresh slot: an invariant
+    `I i env` from the first index, re-established by each iteration's body. -/
+theorem triple_range (m : Machine) (P : PureEnv → Prop) (slot : Nat) (start stop body : Expr)
+    (Q : Post) (S : PureValue → PureEnv → Prop) (E : PureValue → PureValue → PureEnv → Prop)
+    (I : Nat → PureEnv → Prop)
+    (first : Triple m P start { Q with normal := S })
+    (second : ∀ a, Triple m (S a) stop { Q with normal := E a })
+    (enter : ∀ kind lo hi env, E (.number kind lo) (.number kind hi) env → I lo env)
+    (iteration : ∀ kind i, Triple m (fun env => ∃ e, I i e ∧ env = pureSet e slot (.number kind i)) body
+      { Q with normal := fun _ env => I (i + 1) env })
+    (done : ∀ n env v, I n env → Q.normal v env) :
+    Triple m P (.range slot start stop body) Q := by
+  intro fuel env hp
+  cases fuel with
+  | zero => simp [eval, Post.holds]
+  | succ fuel =>
+    simp only [eval, bind, Except.bind]
+    have h1 := first fuel env hp
+    cases ha : eval m fuel start env with
+    | error x => rw [ha] at h1; cases x <;> simp_all [Post.holds]
+    | ok r =>
+      obtain ⟨a, e1⟩ := r
+      rw [ha] at h1
+      simp only []
+      have h2 := second a fuel e1 h1
+      cases a with
+      | number kind lo =>
+        simp only []
+        cases hb : eval m fuel stop e1 with
+        | error x => rw [hb] at h2; cases x <;> simp_all [Post.holds]
+        | ok r =>
+          obtain ⟨b, e2⟩ := r
+          rw [hb] at h2
+          simp only []
+          cases b with
+          | number other hi =>
+            simp only []
+            split
+            · exact trivial
+            · rename_i same
+              have same : kind = other := by simpa using same
+              subst same
+              have start' := enter kind lo hi e2 h2
+              -- Iterate over the indices lo, lo+1, ..., hi-1.
+              suffices ∀ (count n : Nat) (e : PureEnv) (u : PureValue), I n e →
+                  Q.holds ((List.range' n count).foldlM (fun (_, env) i =>
+                    eval m fuel body (pureSet env slot (.number kind i))) (u, e)) by
+                exact this (hi - lo) lo e2 .unit start'
+              intro count
+              induction count with
+              | zero =>
+                intro n e u hi'
+                simp only [List.range', List.foldlM, pure, Except.pure, Post.holds]
+                exact done n e u hi'
+              | succ count ih =>
+                intro n e u hi'
+                simp only [List.range'_succ, List.foldlM, bind, Except.bind]
+                have hb' := iteration kind n fuel (pureSet e slot (.number kind n)) ⟨e, hi', rfl⟩
+                cases hbody : eval m fuel body (pureSet e slot (.number kind n)) with
+                | error x => rw [hbody] at hb'; cases x <;> simp_all [Post.holds]
+                | ok r =>
+                  obtain ⟨w, e3⟩ := r
+                  rw [hbody] at hb'
+                  exact ih (n + 1) e3 w hb'
+          | _ => exact trivial
+      | _ => exact trivial
+
 end Provium.Imperative
