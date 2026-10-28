@@ -1382,6 +1382,104 @@ theorem update_nil_ok (env : PureEnv) (current v x : PureValue) :
     update env [] current v = .ok x ↔ v = x := by
   simp [update]
 
+theorem find_setField_same (f : String) (u : PureValue) :
+    ∀ (fs : List (String × PureValue)) (old : PureValue), (fs.find? (fun p => p.1 == f)).map (·.2) = some old →
+      ((setField f u fs).find? (fun p => p.1 == f)).map (·.2) = some u
+  | [], _, h => by simp at h
+  | (k, v) :: rest, old, h => by
+    by_cases hk : k = f
+    · subst hk; simp [setField]
+    · have hb : (k == f) = false := by simpa using hk
+      simp only [List.find?, hb, setField, hk, ite_false] at h ⊢
+      exact find_setField_same f u rest old h
+
+theorem setField_self (f : String) :
+    ∀ (fs : List (String × PureValue)) (old : PureValue), (fs.find? (fun p => p.1 == f)).map (·.2) = some old →
+      setField f old fs = fs
+  | [], _, h => by simp at h
+  | (k, v) :: rest, old, h => by
+    by_cases hk : k = f
+    · subst hk; simp [setField] at h ⊢; exact h.symm
+    · have hb : (k == f) = false := by simpa using hk
+      simp only [List.find?, hb] at h
+      simp only [setField, hk, ite_false, setField_self f rest old h]
+
+theorem setField_setField (f : String) (u w : PureValue) :
+    ∀ (fs : List (String × PureValue)), setField f u (setField f w fs) = setField f u fs
+  | [] => rfl
+  | (k, v) :: rest => by
+    by_cases hk : k = f
+    · subst hk; simp [setField]
+    · simp only [setField, hk, ite_false, setField_setField f u w rest]
+
+theorem replicate_drop_set {α : Type} (x : α) (vs : List α) (i : Nat) (h : i < vs.length) :
+    (List.replicate i x ++ vs.drop i).set i x = List.replicate (i + 1) x ++ vs.drop (i + 1) := by
+  induction i generalizing vs with
+  | zero =>
+    cases vs with
+    | nil => simp at h
+    | cons a rest => simp
+  | succ i ih =>
+    cases vs with
+    | nil => simp at h
+    | cons a rest =>
+      simp only [List.replicate_succ, List.cons_append, List.drop_succ_cons, List.set_cons_succ]
+      rw [ih rest (by simpa using h)]
+      rfl
+
+/-- A range that stores one value into every element of an array field of
+    the receiver record: afterwards the field holds copies of the value. -/
+theorem wp_fill {m : Machine} {slot valueSlot : Nat} {fname name : String} {Q : Post} {env : PureEnv}
+    (fs : List (String × PureValue)) (vs : List PureValue) (x : PureValue)
+    (h0 : env 0 = some (.record name fs)) (hfield : (fs.find? (fun p => p.1 == fname)).map (·.2) = some (.array vs))
+    (hx : env valueSlot = some x) (fresh : valueSlot ≠ slot ∧ valueSlot ≠ 0 ∧ slot ≠ 0)
+    (done : ∀ e v, (∀ s, s ∉ [0, slot] → e s = env s) →
+      e 0 = some (.record name (setField fname (.array (List.replicate vs.length x)) fs)) → Q.normal v e) :
+    Wp m (.range slot (.literal (.number "usize" 0)) (.length (.field (.read 0) fname))
+      (.assign 0 [.field fname, .index slot] (.read valueSlot))) Q env := by
+  apply wp_range_here "usize" 0 [0, slot] (fun hi i e => hi = vs.length ∧
+    e 0 = some (.record name (setField fname (.array (List.replicate i x ++ vs.drop i)) fs)))
+  · apply wp_literal
+    apply wp_length; apply wp_field; apply wp_read
+    intro v hv; rw [h0] at hv; cases hv
+    intro w hw
+    rw [field_record] at hw
+    rw [hfield] at hw; cases hw
+    intro vs' hvs; cases hvs
+    refine ⟨rfl, fun hi hhi => ?_⟩
+    cases hhi
+    refine ⟨Nat.zero_le _, fun _ _ => rfl, rfl, ?_⟩
+    rw [h0]
+    simp only [List.replicate_zero, List.drop_zero, List.nil_append, setField_self fname fs _ hfield]
+  · rintro hi i e - hlt hkept ⟨rfl, he0⟩
+    apply wp_assign
+    apply wp_read
+    intro v hv
+    rw [set_other _ _ fresh.1, hkept valueSlot (by simp [fresh.1, fresh.2.1]), hx] at hv
+    cases hv
+    intro current updated hc hu
+    rw [set_other _ _ (Ne.symm fresh.2.2), he0] at hc
+    cases hc
+    rw [update_field_ok] at hu
+    obtain ⟨old, u, hold, hu, rfl⟩ := hu
+    rw [find_setField_same fname _ fs _ hfield] at hold
+    cases hold
+    rw [update_index_ok] at hu
+    obtain ⟨k, j, old', u', hj, hold', hu', rfl⟩ := hu
+    rw [set_same] at hj
+    cases hj
+    rw [update_nil_ok] at hu'
+    subst hu'
+    refine ⟨fun s hs => ?_, rfl, ?_⟩
+    · have h1 : s ≠ 0 := fun h => hs (by simp [h])
+      have h2 : s ≠ slot := fun h => hs (by simp [h])
+      rw [set_other _ _ h1, set_other _ _ h2]
+      exact hkept s hs
+    · rw [set_same, setField_setField, replicate_drop_set x vs i (by omega)]
+  · rintro hi e v hkept ⟨rfl, he0⟩
+    apply done e v hkept
+    rw [he0, List.drop_length, List.append_nil]
+
 /-- Structural symbolic execution: sequencing, writes, literals, slot reads
     through `pureSet`, field reads, assignments, comparisons and arithmetic on
     numbers, indexing, matches, short-circuit operators and conditions, after
@@ -1494,7 +1592,7 @@ macro_rules
        intro _w _hw
        try (set_option linter.unusedSimpArgs false in
          simp (disch := first | decide | omega) only [field_record, List.find?, Option.map, String.reduceBEq,
-           Option.some.injEq, $lemmas,*] at _hw)
+           Option.some.injEq, setField, String.reduceEq, ↓reduceIte, $lemmas,*] at _hw)
        try subst _hw
        try dsimp only)
     -- A condition's or other single boolean value.
