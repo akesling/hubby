@@ -1,0 +1,15 @@
+{
+  "cargo_build": "@ROOT@/jarl/proofs/builds.json",
+  "crate_root": "@ROOT@/jarl/src/lib.rs",
+  "namespace": "Jarl",
+  "methods": [],
+  "imperative_methods": [
+    "node::Node::tick",
+    "node::Node::step",
+    "node::Node::next_message",
+    "node::Node::build",
+    "ready::Ready::persisted"
+  ],
+  "proofs": "Proofs.lean",
+  "obligations": [{"theorem": "Placeholder.t", "function": "node_Node_step"}]
+}

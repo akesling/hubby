@@ -1,0 +1,44 @@
+         all_goals
+           wp_receiver [hk]
+           subst_reads hself
+           have hne : src ≠ me := by
+             refine ne_of_check ‹binary _ _ _ "==" (idv src) (idv me) = _› ?_; assumption
+           have heq : dst = me := by
+             refine eq_of_check ‹binary _ _ _ "!=" (idv dst) (idv me) = _› ?_; assumption
+           subst hp
+           refine ⟨_, nodeEq, Or.inr ⟨idle, hsrc, hne, heq, os, bs, ho, hv, ?_⟩⟩
+           simp only [StepOut, Msg.term] at *
+           by_cases hTt : T < t
+           · simp only [hTt, if_true]
+             first | calm_tac | (exfalso; omega)
+           · simp only [hTt, if_false]
+             by_cases htT : t < T
+             · simp only [htT, if_true, adoptF, stepDownF]
+               first
+                 | (exfalso; omega)
+                 | (refine ⟨true, by simp, ?_⟩; rw [if_pos rfl]; simp only [htT, ↓reduceIte, ite_self]; calm_tac)
+                 | (refine ⟨false, by simp, ?_⟩; simp only [Bool.false_eq_true, if_false]; calm_tac)
+             · simp only [htT, if_false, adoptF]
+               obtain rfl : T = t := by omega
+               first
+                 | (exfalso; omega)
+                 | (refine ⟨false, by simp, ?_⟩; simp only [Bool.false_eq_true, if_false]; calm_tac)
+                 | (have hvf' : vf = .absent ∨ vf = .present (idv src) := by
+                      first
+                        | (right; rw [‹vf = PureValue.present _›]; congr 1
+                           have hb := ‹binary _ _ _ "==" _ (idv src) = _›
+                           exact id_of_check hb (by assumption))
+                        | (left; rcases hvf with h | ⟨x, h⟩
+                           · exact h
+                           · exact absurd h (‹∀ x, vf ≠ PureValue.present x› _))
+                    refine ⟨true, fun _ => hvf', ?_⟩
+                    rw [if_pos rfl]
+                    rcases hvf' with rfl | rfl <;>
+                      simp only [Nat.lt_irrefl, ↓reduceIte, ite_true, ite_false, eq_self_iff_true, reduceCtorEq, ite_self] <;>
+                      calm_tac)
+                 | (exfalso
+                    rcases hvf with rfl | ⟨x, rfl⟩
+                    · have hb := ‹binary _ _ _ "!=" PureValue.absent (PureValue.present (idv src)) = _›
+                      have hw := ne_absent_present_true hb
+                      contradiction
+                    · exact (‹∀ (y : PureValue), PureValue.present (idv x) ≠ PureValue.present y› _ rfl).elim))
