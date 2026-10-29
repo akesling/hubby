@@ -555,12 +555,13 @@ theorem wp_sort_any {m : Machine} {array start stop : Expr} {Q : Post} {env : Pu
 theorem select_option {f : Nat} {slot : Nat} {some none : Expr} {v : PureValue} {e : PureEnv}
     {body : Expr} {e' : PureEnv}
     (h : select f [(.present (.bind slot), some), (.any, none)] v e = .ok (Option.some (body, e'))) :
-    (∃ x, v = .present x ∧ body = some ∧ e' = pureSet e slot x) ∨ (body = none ∧ e' = e) := by
+    (∃ x, v = .present x ∧ body = some ∧ e' = pureSet e slot x) ∨
+      ((∀ x, v ≠ .present x) ∧ body = none ∧ e' = e) := by
   have h6 := select_add f 6 _ _ _ _ h
   cases v <;> simp [select, matchPattern, List.foldlM, bind, Except.bind, pure, Except.pure] at h6 <;>
     first
-      | (obtain ⟨rfl, rfl⟩ := h6; exact Or.inr ⟨rfl, rfl⟩)
       | (obtain ⟨rfl, rfl⟩ := h6; exact Or.inl ⟨_, rfl, rfl, rfl⟩)
+      | (obtain ⟨rfl, rfl⟩ := h6; refine Or.inr ⟨?_, rfl, rfl⟩; intro _ h; cases h)
 
 /-- A panic is a fault, which a weakest precondition never constrains. -/
 theorem wp_panic {m : Machine} {reason : String} {Q : Post} {env : PureEnv} :
@@ -1623,7 +1624,7 @@ macro_rules
          simp (config := {decide := true}) (disch := first | decide | omega) only [update_field_ok,
            update_index_ok, update_nil_ok, set_same, set_other, List.getElem?_set_self,
            List.getElem?_eq_getElem, PureValue.number.injEq, List.find?, String.reduceBEq, Option.map_some,
-           Option.map_none, Option.some.injEq, setField, String.reduceEq, ↓reduceIte, and_assoc,
+           Option.map_none, Option.some.injEq, Except.ok.injEq, setField, String.reduceEq, ↓reduceIte, and_assoc,
            exists_eq_left, exists_eq_left', exists_and_left, exists_and_right, exists_eq_right,
            exists_eq', exists_eq, exists_const, and_true, true_and, $lemmas,*] at _hu)
        try subst _hu
@@ -1643,7 +1644,7 @@ macro_rules
     -- A match on an optional value of unknown shape.
     | (with_reducible show ∀ (f : Nat) (body : Expr) (e : PureEnv), select f [(Pattern.present (Pattern.bind _), _), (Pattern.any, _)] _ _ = Except.ok (some (body, e)) → _
        intro _f _body _env _hs
-       rcases select_option _hs with ⟨_x, _hx, _h1, _h2⟩ | ⟨_h1, _h2⟩ <;> subst _h1 <;> subst _h2)
+       rcases select_option _hs with ⟨_x, _hx, _h1, _h2⟩ | ⟨_hx, _h1, _h2⟩ <;> subst _h1 <;> subst _h2)
     -- A field's value.
     | (with_reducible show ∀ (w : PureValue), pureField _ _ = some w → _
        intro _w _hw
