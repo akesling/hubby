@@ -563,6 +563,16 @@ theorem select_option {f : Nat} {slot : Nat} {some none : Expr} {v : PureValue} 
       | (obtain ⟨rfl, rfl⟩ := h6; exact Or.inl ⟨_, rfl, rfl, rfl⟩)
       | (obtain ⟨rfl, rfl⟩ := h6; refine Or.inr ⟨?_, rfl, rfl⟩; intro _ h; cases h)
 
+/-- A presence test (`is_some`) on an optional value of unknown shape. -/
+theorem select_some {f : Nat} {some none : Expr} {v : PureValue} {e : PureEnv} {body : Expr} {e' : PureEnv}
+    (h : select f [(.present .any, some), (.any, none)] v e = .ok (Option.some (body, e'))) :
+    ((∃ x, v = .present x) ∧ body = some ∧ e' = e) ∨ ((∀ x, v ≠ .present x) ∧ body = none ∧ e' = e) := by
+  have h6 := select_add f 6 _ _ _ _ h
+  cases v <;> simp [select, matchPattern, List.foldlM, bind, Except.bind, pure, Except.pure] at h6 <;>
+    first
+      | (obtain ⟨rfl, rfl⟩ := h6; exact Or.inl ⟨⟨_, rfl⟩, rfl, rfl⟩)
+      | (obtain ⟨rfl, rfl⟩ := h6; refine Or.inr ⟨?_, rfl, rfl⟩; intro _ h; cases h)
+
 /-- A panic is a fault, which a weakest precondition never constrains. -/
 theorem wp_panic {m : Machine} {reason : String} {Q : Post} {env : PureEnv} :
     Wp m (.panic reason) Q env := by
@@ -1645,6 +1655,10 @@ macro_rules
     | (with_reducible show ∀ (f : Nat) (body : Expr) (e : PureEnv), select f [(Pattern.present (Pattern.bind _), _), (Pattern.any, _)] _ _ = Except.ok (some (body, e)) → _
        intro _f _body _env _hs
        rcases select_option _hs with ⟨_x, _hx, _h1, _h2⟩ | ⟨_hx, _h1, _h2⟩ <;> subst _h1 <;> subst _h2)
+    -- A presence test on an optional value of unknown shape.
+    | (with_reducible show ∀ (f : Nat) (body : Expr) (e : PureEnv), select f [(Pattern.present Pattern.any, _), (Pattern.any, _)] _ _ = Except.ok (some (body, e)) → _
+       intro _f _body _env _hs
+       rcases select_some _hs with ⟨_hx, _h1, _h2⟩ | ⟨_hx, _h1, _h2⟩ <;> subst _h1 <;> subst _h2)
     -- A field's value.
     | (with_reducible show ∀ (w : PureValue), pureField _ _ = some w → _
        intro _w _hw
