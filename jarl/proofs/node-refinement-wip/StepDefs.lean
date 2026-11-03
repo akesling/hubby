@@ -83,11 +83,11 @@ macro "calm_tac" : tactic => `(tactic| (
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   all_goals first
     | rfl
-    | (intro _t _vf _h; first | exact _h | exact termVote_keep (by assumption) _ _ _ _ _ _ _h)
+    | (intro _t _vf _h; first | exact _h | exact termVote_keep (by assumption) _ _ _ _ _ _ _h | exact termVote_keep rfl _ _ _ _ _ _ _h)
     | exact Or.inl rfl
     | exact Or.inr rfl
     | (intro _os _h; refine ⟨_os, ?_, Settled.refl _os⟩; first | exact _h | (simp_all; done))
-    | (simp_all [followerv, candidatev, leaderv, peersv, membershipv, boolsv]; done)))
+    | (simp_all [followerv, candidatev, leaderv, peersv, membershipv, boolsv, List.map_set]; done)))
 
 /-- `calm_tac` that also chains the facts recorded by `calm_open`. -/
 macro "calm_chain" : tactic => `(tactic| (
@@ -249,6 +249,49 @@ theorem become_leader_u (target : Target) (ids : List Nat) (me : Nat) (cap : Pur
   exact back_weaken (become_leader_spec target n ids me fixed t vf c sn en ln hs os ho sized cap)
     (fun _ _ h => h) (fun _ _ _ _ _ h => h)
 
+/-- `Fixed` carries over to a node with the same configuration fields. -/
+theorem Fixed.of_eq {ids : List Nat} {me : Nat} {n n' : Fields} (f : Fixed ids me n)
+    (h1 : n'.membership = n.membership) (h2 : n'.bootstrap = n.bootstrap) (h3 : n'.hooks = .absent)
+    (h4 : n'.peers = peersv ids) (h5 : n'.config = n.config) (h6 : n'.local = n.local) : Fixed ids me n' where
+  unique := f.unique
+  member := f.member
+  membership := h1.trans f.membership
+  bootstrap := h2.trans f.bootstrap
+  hooks := h3
+  peers := h4
+  self := by rw [h5]; exact f.self
+  slot := h6.trans f.slot
+
+/-- A calm step keeps the outbox an array of the same length. -/
+theorem Calm.sized {n n' : Fields} {os : List PureValue} (c : Calm n n') (ho : n.outbox = .array os) (k : Nat)
+    (s : os.length = k) : ∃ os', n'.outbox = .array os' ∧ os'.length = k := by
+  obtain ⟨os', ho', set⟩ := c.outbox os ho
+  exact ⟨os', ho', set.1.trans s⟩
+
+/-- Assigning through an index of the votes table. -/
+theorem update_boolsv (env : PureEnv) (acc : List Access) (bs : List Bool) (v : PureValue) :
+    update env acc (boolsv bs) v = update env acc (.array (bs.map .boolean)) v := rfl
+
+/-- The `role == Candidate` check of a node with a known role. -/
+theorem role_check_candidate {bits : Nat} {checked : Bool} {f : Nat} {r : PureValue} {w : Bool}
+    (h : binary bits checked f "==" r (.variant "Role" "Candidate" []) = .ok (.boolean w))
+    (hr : r = followerv ∨ r = candidatev ∨ r = leaderv) : (w = true ↔ r = candidatev) := by
+  rcases hr with rfl | rfl | rfl <;>
+    simp only [followerv, candidatev, leaderv, binary_tags] at h ⊢ <;>
+    split at h <;> simp_all
+
+/-- A read of the votes table succeeds exactly within bounds. -/
+theorem some_map_boolean (bs : List Bool) (j : Nat) :
+    (∃ x, (bs.map PureValue.boolean)[j]? = some x) ↔ j < bs.length := by
+  constructor
+  · rintro ⟨x, hx⟩
+    rw [List.getElem?_map] at hx
+    cases h : bs[j]? with
+    | none => rw [h] at hx; cases hx
+    | some b => exact (List.getElem?_eq_some_iff.mp h).1
+  · intro hj
+    exact ⟨_, by rw [List.getElem?_map, List.getElem?_eq_getElem hj]; rfl⟩
+
 /-! ### `step` -/
 
 open Lean Elab Tactic Meta in
@@ -402,5 +445,35 @@ noncomputable def StepOut (ids : List Nat) (n : Fields) (t : Nat) (vf c sn en ln
   | .append T _ _ _ | .batch T _ _ _ | .install T _ =>
     if T < t then Calm n n' else Calm (demoteF (adoptF n t T c sn en ln) src) n'
   | .replicated T _ _ => Calm (adoptF n t T c sn en ln) n'
+
+open Classical in
+/-- Establishing the `Voted` outcome by its two arms, with the term check folded. -/
+theorem stepOut_voted_of {ids : List Nat} {n n' : Fields} {t : Nat} {vf c sn en ln : PureValue}
+    {os : List PureValue} {bs : List Bool} {src T : Nat} {g : Bool}
+    (yes : max t T = T → (adoptF n t T c sn en ln).role = candidatev → g = true →
+      (ids.length / 2 < granted (bs.set (ids.idxOf src) true) ∧
+          Calm { adoptF n t T c sn en ln with votes := boolsv (bs.set (ids.idxOf src) true), role := leaderv } n') ∨
+        (¬ ids.length / 2 < granted (bs.set (ids.idxOf src) true) ∧
+          Calm { adoptF n t T c sn en ln with votes := boolsv (bs.set (ids.idxOf src) true) } n'))
+    (no : ¬(max t T = T ∧ (adoptF n t T c sn en ln).role = candidatev ∧ g = true) →
+      Calm (adoptF n t T c sn en ln) n') :
+    StepOut ids n t vf c sn en ln os bs src (.voted T g) n' := by
+  simp only [StepOut]
+  split
+  · rename_i h; exact yes h.1 h.2.1 h.2.2
+  · rename_i h; exact no h
+
+/-- The node a current replication message leaves before its log work: still
+    fixed, with a term and vote, and the same outbox. -/
+theorem demote_adopt_good {ids : List Nat} {me : Nat} {n : Fields} {t T src : Nat} {vf c sn en ln : PureValue}
+    {os : List PureValue} (fixed : Fixed ids me n) (hs : n.state = statev (hardv t vf c) sn en ln)
+    (ho : n.outbox = .array os) :
+    Fixed ids me (demoteF (adoptF n t T c sn en ln) src) ∧
+      (∃ t' vf', TermVote (demoteF (adoptF n t T c sn en ln) src).state t' vf') ∧
+      (demoteF (adoptF n t T c sn en ln) src).outbox = .array os := by
+  unfold demoteF adoptF
+  split
+  · exact ⟨fixed.of_eq rfl rfl fixed.hooks fixed.peers rfl rfl, ⟨_, _, _, _, _, _, rfl⟩, ho⟩
+  · exact ⟨fixed.of_eq rfl rfl fixed.hooks fixed.peers rfl rfl, ⟨_, _, _, _, _, _, hs⟩, ho⟩
 
 end Refine

@@ -14,7 +14,10 @@ cases = {
   "append": ("(T : Nat) (prev entry commit : PureValue)", "(Msg.append T prev entry commit)"),
   "batch": ("(T : Nat) (prev entries commit : PureValue)", "(Msg.batch T prev entries commit)"),
   "install": ("(T : Nat) (snap : PureValue)", "(Msg.install T snap)"),
-  "replicated": ("(T : Nat) (index : PureValue) (rej : Rej)", "(Msg.replicated T index rej)"),
+  # The walk splits the rejection, so each constructor gets its own theorem.
+  "replicated_none": ("(T : Nat) (index : PureValue)", "(Msg.replicated T index .none)"),
+  "replicated_full": ("(T : Nat) (index : PureValue)", "(Msg.replicated T index .full)"),
+  "replicated_conflict": ("(T : Nat) (index nx : PureValue)", "(Msg.replicated T index (.conflict nx))"),
 }
 names = list(cases) if which == "all" else [which]
 for name in names:
@@ -29,6 +32,19 @@ for name in names:
     if name == "vote":
         body = body.replace("(hs : n.state = statev (hardv t vf c) sn en ln)",
             "(hs : n.state = statev (hardv t vf c) sn en ln)\n    (hvf : vf = .absent ∨ ∃ x, vf = .present (idv x))")
+    if name == "voted":
+        # Count the grant concretely: the votes table, `election_quorum`.
+        body = body.replace("binary_tags, followerv, Msg.term, hardv_commit]",
+            "binary_tags, followerv, Msg.term, hardv_commit, hv, update_boolsv, some_map_boolean, hbs, hlt]")
+        walk = "hk, Fields.value, envelopev, Msg.value, Rej.value, hh, hs, statev_hard, hardv_term, hardv_voted, hpv, binary_absent_present, binary_ne_absent_present, update_statev_hard, update_hardv_term, update_hardv_vote, update_hardv_commit, except_bind_ok_eq, binary_tags, followerv, Msg.term, hardv_commit, hv, update_boolsv, some_map_boolean, hbs, hlt"
+        quorum = ("           | (apply wp_invoke _ (election_quorum_spec target nodeOf ids (bs.set j true) fixed.unique (by simp [hbs]))\n"
+                  f"              wp_walk [{walk}]\n"
+                  "              refine ⟨⟨nodeEq, hmem, rfl, by simp only [boolsv, List.map_set], _, _, rfl⟩, ?_⟩\n"
+                  "              rintro v r ⟨-, rfl⟩\n"
+                  f"              wp_walk [{walk}])\n")
+        anchor = "           | (apply wp_invoke_any; wp_walk ["
+        assert body.count(anchor) == 1
+        body = body.replace(anchor, quorum + anchor)
     if tailfile != "-":
         tail = open(tailfile).read()
         i = body.index("         all_goals trace_state\n         all_goals sorry)")

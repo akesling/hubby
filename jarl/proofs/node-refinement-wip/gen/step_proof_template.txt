@@ -60,41 +60,41 @@ theorem step_spec (target : Target) (n : Fields) (ids : List Nat) (me : Nat) (go
          first
            | exact ⟨n, by simp [Fields.value, hh, hpeers, peersv], Or.inl (Calm.refl n)⟩
            | exact ⟨_, nodeEq, Or.inl calm_auto⟩)
-      | (cases m <;> wp_walk [hk, Fields.value, envelopev, Msg.value, Rej.value, hh, hs, statev_hard, hardv_term, hardv_voted, hpv, binary_absent_present, binary_ne_absent_present, update_statev_hard, update_hardv_term, update_hardv_vote, update_hardv_commit, except_bind_ok_eq, hself, binary_ids, binary_ne_ids, binary_tags]
+      | (cases m <;> wp_walk [hk, Fields.value, envelopev, Msg.value, Rej.value, hh, hs, statev_hard, hardv_term, hardv_voted, hpv, binary_absent_present, binary_ne_absent_present, update_statev_hard, update_hardv_term, update_hardv_vote, update_hardv_commit, except_bind_ok_eq, hself, binary_ids, binary_ne_ids, binary_tags, followerv, Msg.term, hardv_commit]
          all_goals try (wp_receiver [hk]; refine ⟨_, nodeEq, Or.inl ?_⟩; calm_tac)
          all_goals repeat' (first
            | (apply wp_invoke _ (message_term_spec target MSG)
-              wp_walk [hk, Fields.value, envelopev, Msg.value, Rej.value, hh, hs, statev_hard, hardv_term, hardv_voted, hpv, binary_absent_present, binary_ne_absent_present, update_statev_hard, update_hardv_term, update_hardv_vote, update_hardv_commit, except_bind_ok_eq, hself, binary_ids, binary_ne_ids, binary_tags]
+              wp_walk [hk, Fields.value, envelopev, Msg.value, Rej.value, hh, hs, statev_hard, hardv_term, hardv_voted, hpv, binary_absent_present, binary_ne_absent_present, update_statev_hard, update_hardv_term, update_hardv_vote, update_hardv_commit, except_bind_ok_eq, hself, binary_ids, binary_ne_ids, binary_tags, followerv, Msg.term, hardv_commit]
               refine ⟨⟨rfl, by first | rfl | trivial⟩, ?_⟩
               rintro v r ⟨-, rfl⟩
-              wp_walk [hk, Fields.value, envelopev, Msg.value, Rej.value, hh, hs, statev_hard, hardv_term, hardv_voted, hpv, binary_absent_present, binary_ne_absent_present, update_statev_hard, update_hardv_term, update_hardv_vote, update_hardv_commit, except_bind_ok_eq, hself, binary_ids, binary_ne_ids, binary_tags])
-           | (apply wp_invoke_any; wp_walk [hk, Fields.value, envelopev, Msg.value, Rej.value, hh, hs, statev_hard, hardv_term, hardv_voted, hpv, binary_absent_present, binary_ne_absent_present, update_statev_hard, update_hardv_term, update_hardv_vote, update_hardv_commit, except_bind_ok_eq, hself, binary_ids, binary_ne_ids, binary_tags])
+              wp_walk [hk, Fields.value, envelopev, Msg.value, Rej.value, hh, hs, statev_hard, hardv_term, hardv_voted, hpv, binary_absent_present, binary_ne_absent_present, update_statev_hard, update_hardv_term, update_hardv_vote, update_hardv_commit, except_bind_ok_eq, hself, binary_ids, binary_ne_ids, binary_tags, followerv, Msg.term, hardv_commit])
+           | (apply wp_invoke_any; wp_walk [hk, Fields.value, envelopev, Msg.value, Rej.value, hh, hs, statev_hard, hardv_term, hardv_voted, hpv, binary_absent_present, binary_ne_absent_present, update_statev_hard, update_hardv_term, update_hardv_vote, update_hardv_commit, except_bind_ok_eq, hself, binary_ids, binary_ne_ids, binary_tags, followerv, Msg.term, hardv_commit])
            | (apply wp_invoke_back _ (follow_u target)
               wp_walk [hk, Fields.value, envelopev, Msg.value, Rej.value, hh, hs, statev_hard, hardv_term, hardv_voted, hpv, binary_absent_present, binary_ne_absent_present, update_statev_hard, update_hardv_term,
-           update_hardv_vote, update_hardv_commit, except_bind_ok_eq]
+           update_hardv_vote, update_hardv_commit, except_bind_ok_eq, binary_tags, followerv, Msg.term, hardv_commit]
               refine ⟨⟨nodeOf, nodeEq, trivial, _, _, _, rfl⟩, ?_⟩
               rintro v r hpost
               obtain ⟨age, rnd, dl, el, rfl⟩ := hpost nodeOf nodeEq _ _ _ rfl
               wp_walk [hk, Fields.value, envelopev, Msg.value, Rej.value, hh, hs, statev_hard, hardv_term, hardv_voted, hpv, binary_absent_present, binary_ne_absent_present, update_statev_hard, update_hardv_term,
-           update_hardv_vote, update_hardv_commit, except_bind_ok_eq])
+           update_hardv_vote, update_hardv_commit, except_bind_ok_eq, binary_tags, followerv, Msg.term, hardv_commit])
            | (apply wp_invoke_back _ (reset_u target)
               wp_walk [hk, Fields.value, envelopev, Msg.value, Rej.value, hh, hs, statev_hard, hardv_term, hardv_voted, hpv, binary_absent_present, binary_ne_absent_present, update_statev_hard, update_hardv_term,
-           update_hardv_vote, update_hardv_commit, except_bind_ok_eq]
+           update_hardv_vote, update_hardv_commit, except_bind_ok_eq, binary_tags, followerv, Msg.term, hardv_commit]
               refine ⟨⟨nodeOf, nodeEq, trivial, _, _, rfl⟩, ?_⟩
               rintro v r hpost
               obtain ⟨n2, rfl, rnd, dl, el, rfl⟩ := hpost nodeOf nodeEq
               wp_walk [hk, Fields.value, envelopev, Msg.value, Rej.value, hh, hs, statev_hard, hardv_term, hardv_voted, hpv, binary_absent_present, binary_ne_absent_present, update_statev_hard, update_hardv_term,
-           update_hardv_vote, update_hardv_commit, except_bind_ok_eq])
+           update_hardv_vote, update_hardv_commit, except_bind_ok_eq, binary_tags, followerv, Msg.term, hardv_commit])
            | (apply wp_invoke_back _ (send_u target)
               wp_walk [hk, Fields.value, envelopev, Msg.value, Rej.value, hh, hs, statev_hard, hardv_term, hardv_voted, hpv, binary_absent_present, binary_ne_absent_present, update_statev_hard, update_hardv_term,
-           update_hardv_vote, update_hardv_commit, except_bind_ok_eq]
+           update_hardv_vote, update_hardv_commit, except_bind_ok_eq, binary_tags, followerv, Msg.term, hardv_commit]
               refine ⟨⟨nodeOf, nodeEq, trivial, os, _, _, _, _, by first | rfl | exact ho, rfl,
                 by first | omega | simp_all, by first | omega | simp_all⟩, ?_⟩
               rintro v r hpost
               have := hpost nodeOf nodeEq os _ _ _ _ (by first | rfl | exact ho) rfl
               subst this
               wp_walk [hk, Fields.value, envelopev, Msg.value, Rej.value, hh, hs, statev_hard, hardv_term, hardv_voted, hpv, binary_absent_present, binary_ne_absent_present, update_statev_hard, update_hardv_term,
-           update_hardv_vote, update_hardv_commit, except_bind_ok_eq])
+           update_hardv_vote, update_hardv_commit, except_bind_ok_eq, binary_tags, followerv, Msg.term, hardv_commit])
            | (wp_receiver [hk]; refine ⟨_, nodeEq, Or.inl ?_⟩; calm_tac))
          all_goals trace_state
          all_goals sorry)

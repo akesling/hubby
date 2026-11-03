@@ -104,6 +104,181 @@ theorem Abs.box {ids : List Nat} {n : Fields} {disk : Durable} {L : Local} (a : 
   outbox := ⟨os', rfl, rfl⟩
   prevoting := a.prevoting
 
+theorem Abs.term_of {ids : List Nat} {n : Fields} {disk : Durable} {L : Local} {t : Nat} {vf c sn en ln : PureValue}
+    (a : Abs ids n disk L) (hs : n.state = statev (hardv t vf c) sn en ln) :
+    t = L.term ∧ vf = voteValue L.vote := by
+  obtain ⟨c0, sn0, en0, ln0, hs0⟩ := a.state
+  rw [hs] at hs0
+  obtain ⟨h1, h2, -⟩ := statev_inj hs0
+  exact ⟨h1, h2⟩
+
+/-- `step` on a message that only carries a term (`PreVoted` without an active
+    probe, `Replicated`) adopts that term, up to dropped pending messages. -/
+theorem Abs.adopt_calm {ids : List Nat} {n n' : Fields} {disk : Durable} {L : Local}
+    {t : Nat} {vf c sn en ln : PureValue} {T : Nat} (a : Abs ids n disk L)
+    (hs : n.state = statev (hardv t vf c) sn en ln) (calm : Calm (adoptF n t T c sn en ln) n') :
+    ∃ kept, kept.Sublist (Jarl.ElectionSafety.adopt L T).outbox ∧
+      Abs ids n' disk { Jarl.ElectionSafety.adopt L T with outbox := kept } := by
+  obtain ⟨rfl, -⟩ := a.term_of hs
+  exact Abs.calm (Abs.adopt a T) calm
+
+/-- Following a leader is the model's `demote`. -/
+theorem Abs.demote {ids : List Nat} {n : Fields} {disk : Durable} {L : Local} (a : Abs ids n disk L)
+    (src : Nat) : Abs ids (demoteF n src) disk (Jarl.ElectionSafety.demote L) where
+  state := a.state
+  role := rfl
+  votes := a.votes
+  dirty := a.dirty
+  durable := a.durable
+  outbox := a.outbox
+  prevoting := rfl
+
+/-- `step` on `Append`, `AppendBatch` or `Install`: a stale message changes
+    nothing election-relevant; a current one adopts its term and demotes. -/
+theorem Abs.follow {ids : List Nat} {n n' : Fields} {disk : Durable} {L : Local}
+    {t : Nat} {vf c sn en ln : PureValue} {T src : Nat} (a : Abs ids n disk L)
+    (hs : n.state = statev (hardv t vf c) sn en ln)
+    (out : if T < t then Calm n n' else Calm (demoteF (adoptF n t T c sn en ln) src) n') :
+    (T < L.term ∧ ∃ kept, kept.Sublist L.outbox ∧ Abs ids n' disk { L with outbox := kept }) ∨
+      (¬ T < L.term ∧ ∃ kept, kept.Sublist (Jarl.ElectionSafety.demote (Jarl.ElectionSafety.adopt L T)).outbox ∧
+        Abs ids n' disk { Jarl.ElectionSafety.demote (Jarl.ElectionSafety.adopt L T) with outbox := kept }) := by
+  obtain ⟨rfl, -⟩ := a.term_of hs
+  by_cases hT : T < L.term
+  · rw [if_pos hT] at out
+    exact Or.inl ⟨hT, Abs.calm a out⟩
+  · rw [if_neg hT] at out
+    exact Or.inr ⟨hT, Abs.calm ((Abs.adopt a T).demote src) out⟩
+
+theorem votesOf_cons (i : Nat) (is : List Nat) (b : Bool) (bs : List Bool) :
+    votesOf (i :: is) (b :: bs) = if b then i :: votesOf is bs else votesOf is bs := by
+  cases b <;> simp [votesOf]
+
+/-- Marking slot `p` adds the voter at `p`. -/
+theorem mem_votesOf_set : ∀ (ids : List Nat) (bs : List Bool) (p x : Nat), p < bs.length → p < ids.length →
+    (x ∈ votesOf ids (bs.set p true) ↔ x ∈ votesOf ids bs ∨ x = ids[p]!)
+  | [], _, _, _, _, hp => by simp at hp
+  | _ :: _, [], _, _, hp, _ => by simp at hp
+  | i :: is, b :: bs, 0, x, _, _ => by
+    simp only [List.set_cons_zero, votesOf_cons, if_true, List.mem_cons]
+    cases b <;> simp [or_comm]
+  | i :: is, b :: bs, p + 1, x, hb, hi => by
+    have ih := mem_votesOf_set is bs p x (by simpa using hb) (by simpa using hi)
+    simp only [List.set_cons_succ, votesOf_cons]
+    have e : (i :: is)[p + 1]! = is[p]! := by simp
+    rw [e]
+    cases b <;> simp [ih, or_assoc]
+
+theorem boolsv_inj : ∀ {a b : List Bool}, boolsv a = boolsv b → a = b
+  | [], [], _ => rfl
+  | [], _ :: _, h => by simp [boolsv] at h
+  | _ :: _, [], h => by simp [boolsv] at h
+  | x :: a, y :: b, h => by
+    simp only [boolsv, List.map_cons, PureValue.array.injEq, List.cons.injEq, PureValue.boolean.injEq] at h
+    rw [h.1, boolsv_inj (a := a) (b := b) (by simp only [boolsv, h.2])]
+
+theorem role_cases_candidate {r : PureValue} (h : r = followerv ∨ r = candidatev ∨ r = leaderv) :
+    r = candidatev ↔ roleOf r = .candidate := by
+  rcases h with rfl | rfl | rfl <;> simp [roleOf, followerv, candidatev, leaderv]
+
+theorem adopt_term (L : Local) (T : Nat) : (Jarl.ElectionSafety.adopt L T).term = max L.term T := by
+  unfold Jarl.ElectionSafety.adopt
+  split <;> (try simp [Jarl.ElectionSafety.stepDown]) <;> omega
+
+open Jarl.ElectionSafety in
+/-- `step` on a `Voted` reply is the model's `handleVoted` at that node, up to
+    dropped pending messages. -/
+theorem Abs.voted {ids : List Nat} {me : Nat} {n n' : Fields} {disk : Durable} {w : World} {v : Node}
+    {t : Nat} {vf c sn en ln : PureValue} {os : List PureValue} {bs : List Bool} {src T : Nat} {g : Bool}
+    (a : Abs ids n disk (w.nodes v)) (good : Good ids me n) (hvoters : w.voters = ids)
+    (hs : n.state = statev (hardv t vf c) sn en ln) (hv : n.votes = boolsv bs) (hsrc : src ∈ ids)
+    (out : StepOut ids n t vf c sn en ln os bs src (.voted T g) n') :
+    ∃ kept, kept.Sublist ((handleVoted w v src T g).nodes v).outbox ∧
+      Abs ids n' disk { (handleVoted w v src T g).nodes v with outbox := kept } := by
+  obtain ⟨rfl, -⟩ := a.term_of hs
+  have a1 := Abs.adopt (c := c) (sn := sn) (en := en) (ln := ln) a T
+  have hbs : bs.length = ids.length := by
+    obtain ⟨bs0, hv0, len⟩ := good.votes
+    rw [hv] at hv0; rw [boolsv_inj hv0]; exact len
+  have hrole : (adoptF n (w.nodes v).term T c sn en ln).role = followerv ∨
+      (adoptF n (w.nodes v).term T c sn en ln).role = candidatev ∨
+      (adoptF n (w.nodes v).term T c sn en ln).role = leaderv := by
+    unfold adoptF; split
+    · exact Or.inl rfl
+    · exact good.role
+  have hvotes1 : (adoptF n (w.nodes v).term T c sn en ln).votes = boolsv bs := by
+    unfold adoptF; split <;> exact hv
+  have hcond : (max (w.nodes v).term T = T ∧ (adoptF n (w.nodes v).term T c sn en ln).role = candidatev ∧ g = true) ↔
+      (T = (Jarl.ElectionSafety.adopt (w.nodes v) T).term ∧ (Jarl.ElectionSafety.adopt (w.nodes v) T).role = .candidate ∧ g = true) := by
+    rw [adopt_term, role_cases_candidate hrole, a1.role]
+    constructor
+    · rintro ⟨h1, h2, h3⟩; exact ⟨h1.symm, h2, h3⟩
+    · rintro ⟨h1, h2, h3⟩; exact ⟨h1.symm, h2, h3⟩
+  simp only [StepOut] at out
+  unfold handleVoted
+  by_cases hc : max (w.nodes v).term T = T ∧ (adoptF n (w.nodes v).term T c sn en ln).role = candidatev ∧ g = true
+  · rw [if_pos hc] at out
+    rw [if_pos (hcond.mp hc)]
+    have hidx : ids.idxOf src < ids.length := List.idxOf_lt_length_of_mem hsrc
+    obtain ⟨bs0, hv0, same0⟩ := a1.votes
+    rw [hvotes1] at hv0
+    rw [← boolsv_inj hv0] at same0
+    have same : ∀ x, x ∈ (if src ∈ (Jarl.ElectionSafety.adopt (w.nodes v) T).votes then (Jarl.ElectionSafety.adopt (w.nodes v) T).votes
+          else (Jarl.ElectionSafety.adopt (w.nodes v) T).votes ++ [src]) ↔ x ∈ votesOf ids (bs.set (ids.idxOf src) true) := by
+      intro x
+      rw [mem_votesOf_set ids bs _ x (by omega) hidx, ← same0 x]
+      have e : ids[ids.idxOf src]! = src := by
+        rw [getElem!_pos ids _ hidx]; exact List.getElem_idxOf hidx
+      rw [e]
+      split
+      · constructor
+        · exact Or.inl
+        · rintro (h | rfl) <;> assumption
+      · simp
+    have maj := majority_granted (S := if src ∈ (Jarl.ElectionSafety.adopt (w.nodes v) T).votes then (Jarl.ElectionSafety.adopt (w.nodes v) T).votes
+          else (Jarl.ElectionSafety.adopt (w.nodes v) T).votes ++ [src]) good.fixed.unique (by simpa using hbs) same
+    rw [hvoters]
+    rcases out with ⟨hm, calm⟩ | ⟨hm, calm⟩
+    · rw [if_pos (maj.mpr hm)]
+      simp only [Jarl.ElectionSafety.set, if_true]
+      have a2 : Abs ids { adoptF n (w.nodes v).term T c sn en ln with
+            votes := boolsv (bs.set (ids.idxOf src) true), role := leaderv } disk
+          { Jarl.ElectionSafety.adopt (w.nodes v) T with votes := (if src ∈ (Jarl.ElectionSafety.adopt (w.nodes v) T).votes then (Jarl.ElectionSafety.adopt (w.nodes v) T).votes else (Jarl.ElectionSafety.adopt (w.nodes v) T).votes ++ [src]), role := .leader } :=
+        { state := a1.state, role := rfl, votes := ⟨_, rfl, same⟩, dirty := a1.dirty,
+          durable := a1.durable, outbox := a1.outbox, prevoting := a1.prevoting }
+      exact Abs.calm a2 calm
+    · rw [if_neg (fun h => hm (maj.mp h))]
+      simp only [Jarl.ElectionSafety.set, if_true]
+      have a2 : Abs ids { adoptF n (w.nodes v).term T c sn en ln with
+            votes := boolsv (bs.set (ids.idxOf src) true) } disk
+          { Jarl.ElectionSafety.adopt (w.nodes v) T with votes := (if src ∈ (Jarl.ElectionSafety.adopt (w.nodes v) T).votes then (Jarl.ElectionSafety.adopt (w.nodes v) T).votes else (Jarl.ElectionSafety.adopt (w.nodes v) T).votes ++ [src]) } :=
+        { state := a1.state, role := a1.role, votes := ⟨_, rfl, same⟩, dirty := a1.dirty,
+          durable := a1.durable, outbox := a1.outbox, prevoting := a1.prevoting }
+      exact Abs.calm a2 calm
+  · rw [if_neg hc] at out
+    rw [if_neg (fun h => hc (hcond.mpr h))]
+    simp only [Jarl.ElectionSafety.set, if_true]
+    exact Abs.calm a1 out
+
+/-- `step` on a `PreVote` request is the model's `answerProbe`, up to dropped
+    pending messages. -/
+theorem Abs.prevote {ids : List Nat} {me : Nat} {n n' : Fields} {disk : Durable} {L : Local}
+    {t : Nat} {vf c sn en ln : PureValue} {os : List PureValue} {bs : List Bool} {src T : Nat}
+    {last : PureValue} (a : Abs ids n disk L) (good : Good ids me n) (idle : Idle n)
+    (ho : n.outbox = .array os) (hsrc : src ∈ ids)
+    (out : StepOut ids n t vf c sn en ln os bs src (.prevote T last) n') :
+    ∃ g kept, kept.Sublist [Pending.prevoted src T g] ∧
+      Abs ids n' disk { L with outbox := kept } := by
+  have sized : os.length = ids.length := by
+    obtain ⟨os1, ho1, s1, -⟩ := good.outbox; rw [ho] at ho1; cases ho1; exact s1
+  have empty : ∀ o ∈ os, o = .absent := by
+    obtain ⟨-, -, os1, ho1, e⟩ := idle; rw [ho] at ho1; cases ho1; exact e
+  have hidx : ids.idxOf src < ids.length := List.idxOf_lt_length_of_mem hsrc
+  obtain ⟨g, calm⟩ := out
+  refine ⟨g, ?_⟩
+  have a1 := Abs.box a (os.set (ids.idxOf src) (prevotedv T g))
+  rw [outboxOf_single ids os _ _ sized empty hidx, List.getElem_idxOf hidx] at a1
+  exact Abs.calm a1 calm
+
 open Jarl.ElectionSafety Classical in
 /-- `step` on a `Vote` request is the model's `requestVote` for some log
     comparison outcome, up to dropped pending messages. -/

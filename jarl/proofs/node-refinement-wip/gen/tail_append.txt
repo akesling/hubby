@@ -1,0 +1,40 @@
+         all_goals
+           repeat' (first
+             | (apply wp_invoke_back _ (append_u target ids me cap)
+                wp_walk [hk, Fields.value, envelopev, Msg.value, Rej.value, hh, hs, statev_hard, hardv_term, hardv_voted, hpv, binary_absent_present, binary_ne_absent_present, update_statev_hard, update_hardv_term, update_hardv_vote, update_hardv_commit, except_bind_ok_eq, binary_tags, followerv]
+                refine ⟨⟨nodeOf, nodeEq, ⟨fixed.of_eq rfl rfl rfl rfl rfl rfl,
+                  by first | exact ⟨_, _, _, _, _, _, hs⟩ | exact ⟨_, _, _, _, _, _, rfl⟩⟩, _, _, _, rfl⟩, ?_⟩
+                rintro v r hpost
+                obtain ⟨n3, rfl, calmA⟩ := hpost nodeOf nodeEq
+                wp_walk [hk, Fields.value, envelopev, Msg.value, Rej.value, hh, hs, statev_hard, hardv_term, hardv_voted, hpv, binary_absent_present, binary_ne_absent_present, update_statev_hard, update_hardv_term, update_hardv_vote, update_hardv_commit, except_bind_ok_eq, binary_tags, followerv])
+             | (apply wp_invoke_back _ (reply_u target ids cap)
+                wp_walk [hk, Fields.value, envelopev, Msg.value, Rej.value, hh, hs, statev_hard, hardv_term, hardv_voted, hpv, binary_absent_present, binary_ne_absent_present, update_statev_hard, update_hardv_term, update_hardv_vote, update_hardv_commit, except_bind_ok_eq, binary_tags, followerv]
+                first
+                  | refine ⟨⟨nodeOf, nodeEq, ⟨os, ho, sized⟩, _, _, _, rfl, by assumption⟩, ?_⟩
+                  | refine ⟨⟨_, rfl, calmA.sized ho _ sized, _, _, _, rfl, by assumption⟩, ?_⟩
+                rintro v r hpost
+                first
+                  | obtain ⟨n4, rfl, calmR⟩ := hpost nodeOf nodeEq
+                  | obtain ⟨n4, rfl, calmR⟩ := hpost _ rfl
+                wp_walk [hk, Fields.value, envelopev, Msg.value, Rej.value, hh, hs, statev_hard, hardv_term, hardv_voted, hpv, binary_absent_present, binary_ne_absent_present, update_statev_hard, update_hardv_term, update_hardv_vote, update_hardv_commit, except_bind_ok_eq, binary_tags, followerv]))
+         all_goals
+           wp_receiver [hk]
+           subst_reads hself
+           have hne : src ≠ me := by
+             refine ne_of_check ‹binary _ _ _ "==" (idv src) (idv me) = _› ?_; assumption
+           have heq : dst = me := by
+             refine eq_of_check ‹binary _ _ _ "!=" (idv dst) (idv me) = _› ?_; assumption
+           subst hp
+           first
+             | refine ⟨_, nodeEq, Or.inr ⟨idle, hsrc, hne, heq, os, bs, ho, hv, ?_⟩⟩
+             | refine ⟨_, rfl, Or.inr ⟨idle, hsrc, hne, heq, os, bs, ho, hv, ?_⟩⟩
+           simp only [StepOut, Msg.term, adoptF, stepDownF, demoteF] at *
+           by_cases hTt : T < t
+           · simp only [hTt, if_true]
+             first | (exfalso; omega) | (refine Calm.trans ?_ calmR; calm_tac)
+           · simp only [hTt, if_false]
+             by_cases htT : t < T
+             · simp only [htT, if_true]
+               first | (exfalso; omega) | (refine Calm.trans (Calm.trans ?_ calmA) calmR; calm_tac)
+             · simp only [htT, if_false]
+               first | (exfalso; omega) | (refine Calm.trans (Calm.trans ?_ calmA) calmR; calm_tac))

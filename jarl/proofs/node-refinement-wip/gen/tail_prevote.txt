@@ -1,0 +1,16 @@
+         all_goals
+           wp_receiver [hk]
+           subst_reads hself
+           have hne : src ≠ me := by
+             refine ne_of_check ‹binary _ _ _ "==" (idv src) (idv me) = _› ?_; assumption
+           have heq : dst = me := by
+             refine eq_of_check ‹binary _ _ _ "!=" (idv dst) (idv me) = _› ?_; assumption
+           subst hp
+           first
+             | refine ⟨_, nodeEq, Or.inr ⟨idle, hsrc, hne, heq, os, bs, ho, hv, ?_⟩⟩
+             | refine ⟨_, rfl, Or.inr ⟨idle, hsrc, hne, heq, os, bs, ho, hv, ?_⟩⟩
+           simp only [StepOut] at *
+           first
+             | (refine ⟨false, ?_⟩; calm_tac)
+             | (refine ⟨true, ?_⟩; calm_tac)
+             | (apply Exists.intro; calm_tac))

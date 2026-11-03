@@ -1740,8 +1740,9 @@ fixed-engine `Node` to the election-safety model with Provium's weakest
 precondition calculus (`Provium.Wp`). It has kernel-checked specifications
 for every helper that `tick` and `step` call, `tick_spec`, `Ready::persisted`,
 the abstraction `Abs` with its lifting of calm steps and campaigns, and the
-complete `Vote` arm of `step` together with its model counterpart (`Abs.vote`).
-The other seven message kinds, `next_message`, `build`, the world simulation
-and the implementation-level election-safety theorem remain open. The
+complete `step_spec` over every message kind, each with its model counterpart
+(`Abs.vote`, `Abs.voted`, `Abs.prevote`, `Abs.adopt_calm`, `Abs.follow`).
+`next_message`, `build`, the world simulation and the implementation-level
+election-safety theorem remain open. The
 directory has no `project.json`, so no gate checks it and it makes no claim;
 `build.sh` checks it by hand.

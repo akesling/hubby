@@ -1,0 +1,43 @@
+         all_goals
+           repeat' (first
+             | (apply wp_invoke_any; wp_walk [hk, Fields.value, envelopev, Msg.value, Rej.value, hh, hs, statev_hard, hardv_term, hardv_voted, hpv, binary_absent_present, binary_ne_absent_present, update_statev_hard, update_hardv_term, update_hardv_vote, update_hardv_commit, except_bind_ok_eq, binary_tags, followerv, Msg.term, hardv_commit])
+             | ((try dsimp only); with_reducible show Havoc _; unfold Havoc; intro _any; wp_walk [hk, Fields.value, envelopev, Msg.value, Rej.value, hh, hs, statev_hard, hardv_term, hardv_voted, hpv, binary_absent_present, binary_ne_absent_present, update_statev_hard, update_hardv_term, update_hardv_vote, update_hardv_commit, except_bind_ok_eq, binary_tags, followerv, Msg.term, hardv_commit])
+             | (apply wp_invoke_back _ (install_spec target _ _ _ _ _ _)
+                wp_walk [hk, Fields.value, envelopev, Msg.value, Rej.value, hh, hs, statev_hard, hardv_term, hardv_voted, hpv, binary_absent_present, binary_ne_absent_present, update_statev_hard, update_hardv_term, update_hardv_vote, update_hardv_commit, except_bind_ok_eq, binary_tags, followerv, Msg.term, hardv_commit]
+                refine ⟨⟨rfl, _, _, rfl⟩, ?_⟩
+                rintro v r ⟨c1, sn1, en1, ln1, rfl⟩
+                wp_walk [hk, Fields.value, envelopev, Msg.value, Rej.value, hh, hs, statev_hard, hardv_term, hardv_voted, hpv, binary_absent_present, binary_ne_absent_present, update_statev_hard, update_hardv_term, update_hardv_vote, update_hardv_commit, except_bind_ok_eq, binary_tags, followerv, Msg.term, hardv_commit])
+             | (apply wp_invoke_back _ (refresh_u target ids me cap)
+                wp_walk [hk, Fields.value, envelopev, Msg.value, Rej.value, hh, hs, statev_hard, hardv_term, hardv_voted, hpv, binary_absent_present, binary_ne_absent_present, update_statev_hard, update_hardv_term, update_hardv_vote, update_hardv_commit, except_bind_ok_eq, binary_tags, followerv, Msg.term, hardv_commit]
+                refine ⟨⟨nodeOf, nodeEq, fixed.of_eq rfl rfl rfl rfl rfl rfl, by first | rfl | simp⟩, ?_⟩
+                rintro v r hpost
+                have hr := hpost nodeOf nodeEq
+                subst hr
+                wp_walk [hk, Fields.value, envelopev, Msg.value, Rej.value, hh, hs, statev_hard, hardv_term, hardv_voted, hpv, binary_absent_present, binary_ne_absent_present, update_statev_hard, update_hardv_term, update_hardv_vote, update_hardv_commit, except_bind_ok_eq, binary_tags, followerv, Msg.term, hardv_commit])
+             | (apply wp_invoke_back _ (reply_u target ids cap)
+                wp_walk_any [hk, Fields.value, envelopev, Msg.value, Rej.value, hh, hs, statev_hard, hardv_term, hardv_voted, hpv, binary_absent_present, binary_ne_absent_present, update_statev_hard, update_hardv_term, update_hardv_vote, update_hardv_commit, except_bind_ok_eq, binary_tags, followerv, Msg.term, hardv_commit]
+                refine ⟨⟨nodeOf, nodeEq, ⟨os, ho, sized⟩, _, _, _, rfl, by assumption⟩, ?_⟩
+                rintro v r hpost
+                obtain ⟨n4, rfl, calmR⟩ := hpost nodeOf nodeEq
+                wp_walk [hk, Fields.value, envelopev, Msg.value, Rej.value, hh, hs, statev_hard, hardv_term, hardv_voted, hpv, binary_absent_present, binary_ne_absent_present, update_statev_hard, update_hardv_term, update_hardv_vote, update_hardv_commit, except_bind_ok_eq, binary_tags, followerv, Msg.term, hardv_commit]))
+         all_goals
+           wp_receiver [hk]
+           subst_reads hself
+           have hne : src ≠ me := by
+             refine ne_of_check ‹binary _ _ _ "==" (idv src) (idv me) = _› ?_; assumption
+           have heq : dst = me := by
+             refine eq_of_check ‹binary _ _ _ "!=" (idv dst) (idv me) = _› ?_; assumption
+           subst hp
+           first
+             | refine ⟨_, nodeEq, Or.inr ⟨idle, hsrc, hne, heq, os, bs, ho, hv, ?_⟩⟩
+             | refine ⟨_, rfl, Or.inr ⟨idle, hsrc, hne, heq, os, bs, ho, hv, ?_⟩⟩
+           simp only [StepOut, Msg.term, adoptF, stepDownF, demoteF] at *
+           by_cases hTt : T < t
+           · simp only [hTt, if_true]
+             first | (exfalso; omega) | (refine Calm.trans ?_ calmR; calm_tac)
+           · simp only [hTt, if_false]
+             by_cases htT : t < T
+             · simp only [htT, if_true]
+               first | (exfalso; omega) | (refine Calm.trans ?_ calmR; calm_tac)
+             · simp only [htT, if_false]
+               first | (exfalso; omega) | (refine Calm.trans ?_ calmR; calm_tac))
