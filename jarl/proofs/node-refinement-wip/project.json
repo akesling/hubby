@@ -1,0 +1,130 @@
+{
+  "cargo_build": "../builds.json",
+  "crate_root": "../../src/lib.rs",
+  "namespace": "Jarl",
+  "methods": [],
+  "imperative_methods": [
+    "node::Node::tick",
+    "node::Node::step",
+    "node::Node::next_message",
+    "node::Node::build",
+    "ready::Ready::persisted"
+  ],
+  "proofs": "Proofs.lean",
+  "proof_modules": [
+    {
+      "name": "Model",
+      "path": "../election-safety/Model.lean"
+    },
+    {
+      "name": "Leaders",
+      "path": "Leaders.lean"
+    },
+    {
+      "name": "Refine",
+      "path": "Refine.lean"
+    },
+    {
+      "name": "Abstract",
+      "path": "Abstract.lean"
+    },
+    {
+      "name": "StepDefs",
+      "path": "StepDefs.lean"
+    },
+    {
+      "name": "Persist",
+      "path": "Persist.lean"
+    },
+    {
+      "name": "AbsStep",
+      "path": "AbsStep.lean"
+    },
+    {
+      "name": "NextMessage",
+      "path": "NextMessage.lean"
+    },
+    {
+      "name": "Build",
+      "path": "Build.lean"
+    },
+    {
+      "name": "Sound",
+      "path": "Sound.lean"
+    },
+    {
+      "name": "StepCase_prevote",
+      "path": "StepCase_prevote.lean"
+    },
+    {
+      "name": "StepCase_prevoted",
+      "path": "StepCase_prevoted.lean"
+    },
+    {
+      "name": "StepCase_vote",
+      "path": "StepCase_vote.lean"
+    },
+    {
+      "name": "StepCase_voted",
+      "path": "StepCase_voted.lean"
+    },
+    {
+      "name": "StepCase_append",
+      "path": "StepCase_append.lean"
+    },
+    {
+      "name": "StepCase_batch",
+      "path": "StepCase_batch.lean"
+    },
+    {
+      "name": "StepCase_install",
+      "path": "StepCase_install.lean"
+    },
+    {
+      "name": "StepCase_replicated_none",
+      "path": "StepCase_replicated_none.lean"
+    },
+    {
+      "name": "StepCase_replicated_full",
+      "path": "StepCase_replicated_full.lean"
+    },
+    {
+      "name": "StepCase_replicated_conflict",
+      "path": "StepCase_replicated_conflict.lean"
+    },
+    {
+      "name": "Step",
+      "path": "Step.lean"
+    },
+    {
+      "name": "Sim",
+      "path": "Sim.lean"
+    }
+  ],
+  "obligations": [
+    {
+      "theorem": "Refine.tick_spec",
+      "function": "node_Node_tick"
+    },
+    {
+      "theorem": "Refine.step_spec",
+      "function": "node_Node_step"
+    },
+    {
+      "theorem": "Refine.next_spec",
+      "function": "node_Node_next_message"
+    },
+    {
+      "theorem": "Refine.build_spec",
+      "function": "node_Node_build"
+    },
+    {
+      "theorem": "Refine.persisted_spec",
+      "function": "ready_Ready_persisted"
+    },
+    {
+      "theorem": "Refine.node_election_safety",
+      "function": "node_Node_step"
+    }
+  ]
+}

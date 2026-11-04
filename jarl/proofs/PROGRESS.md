@@ -18,8 +18,8 @@ Sections below are a chronological log; their counts were correct when written.
 The current obligation counts, from each `project.json`, are: capacity 2,
 consensus 10, election 4, election-safety 5 (specification), initialization 4,
 input-gating 8, log-boundary 14, membership 118, message-dispatch 2,
-message-validation 56, node-election 2, persistence 6, replication-contract 16,
-specification 18 (specification), storage 54, storage-view 13: 332 in total. `coverage.json`
+message-validation 56, node-election 2, node-refinement-wip 6, persistence 6, replication-contract 16,
+specification 18 (specification), storage 54, storage-view 13: 338 in total. `coverage.json`
 reviews 190 items and 101 conservative public roots; 41 items carry declared
 component evidence. Update this section with every checkpoint.
 
@@ -1733,7 +1733,7 @@ Next: prove refinement from the generated `tick`/`step` (fixed engine) to the
 table's functions.
 
 
-## M2 Node refinement (in progress, ungated)
+## M2 Node refinement
 
 [node-refinement-wip](node-refinement-wip/README.md) refines the generated
 fixed-engine `Node` to the election-safety model with Provium's weakest
@@ -1742,7 +1742,11 @@ for every helper that `tick` and `step` call, `tick_spec`, `Ready::persisted`,
 the abstraction `Abs` with its lifting of calm steps and campaigns, and the
 complete `step_spec` over every message kind, each with its model counterpart
 (`Abs.vote`, `Abs.voted`, `Abs.prevote`, `Abs.adopt_calm`, `Abs.follow`).
-`next_message`, `build`, the world simulation and the implementation-level
-election-safety theorem remain open. The
-directory has no `project.json`, so no gate checks it and it makes no claim;
-`build.sh` checks it by hand.
+`next_spec` and `build_spec` cover `next_message` and `build`. `Sim.lean`
+simulates every run of a cluster (ticks, deliveries over a lossy, duplicating,
+reordering network that may forge non-election messages, sends, saves and
+restarts) by a reachable model world, and proves `node_election_safety`: two
+nodes that are both leader in the same term are the same node. Its
+`project.json` checks every module as a Provium proof module, with obligations
+for each method's specification and `node_election_safety`. It covers the
+fixed engine only; dynamic membership remains open.
