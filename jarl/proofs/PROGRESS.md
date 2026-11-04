@@ -1750,3 +1750,29 @@ nodes that are both leader in the same term are the same node. Its
 `project.json` checks every module as a Provium proof module, with obligations
 for each method's specification and `node_election_safety`. It covers the
 fixed engine only; dynamic membership remains open.
+
+## M3 fixed-engine safety
+
+Provium's typed backend translates the fixed `Node` engine to shallow, typed
+Lean (`provium/docs/typed-backend.md`), and [engine](engine/README.md) proves
+Raft safety about that translation for every reachable cluster: a cluster
+starts from `Node::new` on empty states and moves by any node's `tick`,
+`step` of any envelope ever sent, `propose`, `propose_batch`, `compact`,
+persistence through `Ready::persisted`, `next_message` (sent or dropped) and
+restart from durable state. `Engine/Main.lean` proves
+
+- `election_safety`: two leaders in the same term are the same node (S02 for
+  the fixed engine, now over the full translated bodies rather than the
+  M2 model);
+- `raft_state_machine_safety`: entries exposed as committed at the same index,
+  by any nodes at any two points of an execution, are equal (S08/S09);
+- `raft_snapshot_safety`: an exposed snapshot's boundary agrees with every
+  entry and snapshot exposed later at its index (S10).
+
+The proof is an inductive invariant over a ghost history of leader logs,
+elections with their election logs, acknowledgments and ballots (S03–S07),
+preserved by every action including crash/restart (S15). Its assumptions are
+listed in the engine README: the typed translation's trusted front end and
+core library, `Clone` returning an equal value, panics as crashes,
+whole-state persistence, and snapshot application values not being tracked.
+The dynamic engine (M4) is not covered.

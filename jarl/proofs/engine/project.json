@@ -1,0 +1,152 @@
+{
+  "kind": "typed",
+  "cargo_build": "../builds.json",
+  "crate_root": "../../src/lib.rs",
+  "namespace": "Jarl",
+  "roots": [
+    "node::Node::new",
+    "node::Node::tick",
+    "node::Node::step",
+    "node::Node::propose",
+    "node::Node::propose_batch",
+    "node::Node::compact",
+    "node::Node::next_message",
+    "ready::Ready::persisted",
+    "state::State::restore"
+  ],
+  "proofs": "Proofs.lean",
+  "proof_modules": [
+    {
+      "name": "Engine.Log",
+      "path": "Engine/Log.lean"
+    },
+    {
+      "name": "Engine.Ghost",
+      "path": "Engine/Ghost.lean"
+    },
+    {
+      "name": "Engine.Fixed",
+      "path": "Engine/Fixed.lean"
+    },
+    {
+      "name": "Engine.NodeOps",
+      "path": "Engine/NodeOps.lean"
+    },
+    {
+      "name": "Engine.Append",
+      "path": "Engine/Append.lean"
+    },
+    {
+      "name": "Engine.Replicated",
+      "path": "Engine/Replicated.lean"
+    },
+    {
+      "name": "Engine.Host",
+      "path": "Engine/Host.lean"
+    },
+    {
+      "name": "Engine.Step",
+      "path": "Engine/Step.lean"
+    },
+    {
+      "name": "Engine.Tick",
+      "path": "Engine/Tick.lean"
+    },
+    {
+      "name": "Engine.NextMessage",
+      "path": "Engine/NextMessage.lean"
+    },
+    {
+      "name": "Engine.Cluster",
+      "path": "Engine/Cluster.lean"
+    },
+    {
+      "name": "Engine.Invariant",
+      "path": "Engine/Invariant.lean"
+    },
+    {
+      "name": "Engine.Init",
+      "path": "Engine/Init.lean"
+    },
+    {
+      "name": "Engine.Api",
+      "path": "Engine/Api.lean"
+    },
+    {
+      "name": "Engine.Frame",
+      "path": "Engine/Frame.lean"
+    },
+    {
+      "name": "Engine.LogFacts",
+      "path": "Engine/LogFacts.lean"
+    },
+    {
+      "name": "Engine.Preserve.Local",
+      "path": "Engine/Preserve/Local.lean"
+    },
+    {
+      "name": "Engine.Preserve.Send",
+      "path": "Engine/Preserve/Send.lean"
+    },
+    {
+      "name": "Engine.Preserve.Persist",
+      "path": "Engine/Preserve/Persist.lean"
+    },
+    {
+      "name": "Engine.Preserve.Tick",
+      "path": "Engine/Preserve/Tick.lean"
+    },
+    {
+      "name": "Engine.Preserve.Deliver",
+      "path": "Engine/Preserve/Deliver.lean"
+    },
+    {
+      "name": "Engine.Preserve.All",
+      "path": "Engine/Preserve/All.lean"
+    },
+    {
+      "name": "Engine.Safety",
+      "path": "Engine/Safety.lean"
+    },
+    {
+      "name": "Engine.Main",
+      "path": "Engine/Main.lean"
+    }
+  ],
+  "obligations": [
+    {
+      "theorem": "Jarl.Engine.new_state_base",
+      "function": "state::State::new"
+    },
+    {
+      "theorem": "Jarl.Engine.election_safety",
+      "function": "node::Node::tick"
+    },
+    {
+      "theorem": "Jarl.Engine.election_safety",
+      "function": "node::Node::step"
+    },
+    {
+      "theorem": "Jarl.Engine.raft_state_machine_safety",
+      "function": "node::Node::step"
+    },
+    {
+      "theorem": "Jarl.Engine.raft_state_machine_safety",
+      "function": "node::Node::propose"
+    },
+    {
+      "theorem": "Jarl.Engine.raft_snapshot_safety",
+      "function": "node::Node::compact"
+    },
+    {
+      "theorem": "Jarl.Engine.raft_snapshot_safety",
+      "function": "node::Node::step"
+    }
+  ],
+  "differential": {
+    "source": "differential.rs",
+    "crate_name": "jarl",
+    "function": "run",
+    "seeds": 40
+  }
+}

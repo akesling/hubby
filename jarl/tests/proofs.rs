@@ -150,6 +150,9 @@ mod message_validation;
 #[path = "proof_cases/replication_contract.rs"]
 mod replication_contract;
 
+#[path = "proof_cases/engine.rs"]
+mod engine;
+
 #[test]
 fn specification_witnesses_are_kernel_checked() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
