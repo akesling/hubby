@@ -503,6 +503,35 @@ theorem wp_replicate_any {m : Machine} {value count : Expr} {Q : Post} {env : Pu
         | _ => exact trivial
 
 set_option linter.unusedSimpArgs false in
+/-- `count` copies of a value. -/
+theorem wp_replicate {m : Machine} {value count : Expr} {Q : Post} {env : PureEnv}
+    (h : Wp m value { Q with normal := (fun a e => Wp m count { Q with normal := (fun b e' =>
+      ∀ kind k, b = .number kind k → Q.normal (.array (List.replicate k a)) e') } e) } env) :
+    Wp m (.replicate value count) Q env := by
+  intro fuel
+  cases fuel with
+  | zero => simp [eval, Post.holds]
+  | succ fuel =>
+    simp only [eval, bind, Except.bind]
+    have h1 := h fuel
+    cases hx : eval m fuel value env with
+    | error x => rw [hx] at h1; simp only [hx]; cases x <;> simp_all [Post.holds]
+    | ok r =>
+      obtain ⟨a, e1⟩ := r
+      rw [hx] at h1
+      simp only [hx]
+      have h2 := h1 fuel
+      cases hy : eval m fuel count e1 with
+      | error x => rw [hy] at h2; simp only [hy]; cases x <;> simp_all [Post.holds]
+      | ok r =>
+        obtain ⟨b, e2⟩ := r
+        rw [hy] at h2
+        simp only [hy]
+        cases b with
+        | number kind k => exact h2 kind k rfl
+        | _ => exact trivial
+
+set_option linter.unusedSimpArgs false in
 /-- A sort of a slice, with its result unconstrained. -/
 theorem wp_sort_any {m : Machine} {array start stop : Expr} {Q : Post} {env : PureEnv}
     (h : Wp m array { Q with normal := (fun _ e => Wp m start { Q with normal := (fun _ e =>
@@ -1586,7 +1615,11 @@ macro_rules
     | ((try dsimp only); with_reducible show ∀ (v w : PureValue), pureField v _ = some w → _; intro _any)
     | (apply wp_convert_any)
     | (apply wp_external_any)
-    | (apply wp_replicate_any)
+    | (apply wp_replicate)
+    -- A count's value.
+    | (with_reducible show ∀ (kind : String) (k : Nat), _ = PureValue.number kind k → _
+       intro _kind _k _hk
+       try (simp only [PureValue.number.injEq] at _hk; obtain ⟨_h1, _h2⟩ := _hk; subst _h1; subst _h2))
     | (apply wp_sort_any)
     | (apply wp_rotate_any)
     | (apply wp_variant)
