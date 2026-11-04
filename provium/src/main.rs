@@ -12,6 +12,12 @@ fn run() -> Result<(), String> {
         }
         return Ok(());
     }
+    if args.len() >= 4 && args[0] == "typed-generate" {
+        // typed-generate <crate-root> <namespace> <root>...
+        let lean = provium::typed::generate_host(Path::new(&args[1]), &args[3..], &args[2])?;
+        print!("{lean}");
+        return Ok(());
+    }
     if args.len() == 1 && matches!(args[0].as_str(), "--help" | "-h") {
         println!("provium capture-cargo <build.json> --out <directory>\nprovium inspect-cargo <build.json> --out <directory>\nprovium inventory <crate-directory> --out <directory>\nprovium audit-coverage <crate-directory>\nprovium verify-complete <crate-directory> (fails until complete proof support exists)\n");
         println!("provium <compile|verify|verify-methods|verify-project> <project.json> --out <directory>\n\ncompile: generate source-linked Lean and IR (no proof success claim)\nverify: regenerate, run pinned Lean with trust=0, audit all obligations\nverify-methods: check supported complete method bodies and state contracts\nverify-project: verify any project kind with the backend assert_proofs! selects\n\nSupported Rust: closed scalar unsigned/bool functions; checked arithmetic,\nif expressions, local lets/assignments, assertions, acyclic source-local calls.\nUnsupported Rust is rejected. See README.md for the trusted boundary.");
@@ -59,6 +65,10 @@ fn run() -> Result<(), String> {
                 inventory.items.len()
             );
         }
+        "verify-typed" => println!(
+            "{}",
+            provium::typed::verify::verify(Path::new(&args[1]), Path::new(&args[3]))?
+        ),
         "verify-methods" => println!(
             "{}",
             provium::methods::verify(Path::new(&args[1]), Path::new(&args[3]))?

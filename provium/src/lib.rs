@@ -13,6 +13,7 @@ pub mod project;
 
 pub mod specification;
 pub mod suite;
+pub mod typed;
 pub use suite::{verify_project, verify_suite, ProjectReport};
 
 /// Assert all projects in a proof directory owned by the calling crate.

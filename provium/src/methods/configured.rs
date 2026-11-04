@@ -42,7 +42,7 @@ fn fields(cfg: &Configuration, fields: &mut Fields) -> Result<(), String> {
     *list = kept;
     Ok(())
 }
-pub(super) fn item(cfg: &Configuration, node: Item) -> Result<Option<Item>, String> {
+pub(crate) fn item(cfg: &Configuration, node: Item) -> Result<Option<Item>, String> {
     let Some(mut node) = declaration(cfg, node)? else {
         return Ok(None);
     };

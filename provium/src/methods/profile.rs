@@ -4,7 +4,7 @@
 use serde::Serialize;
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
-pub(super) struct Profile {
+pub(crate) struct Profile {
     pub overflow_checked: bool,
     pub panic_abort: bool,
 }

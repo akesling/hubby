@@ -2,13 +2,13 @@
 use super::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-pub(super) struct Loaded {
+pub(crate) struct Loaded {
     pub module: String,
     pub path: PathBuf,
     pub artifact: String,
     pub source: String,
 }
-pub(super) fn load(base: &Path, modules: &[ProofModule]) -> Result<Vec<Loaded>, String> {
+pub(crate) fn load(base: &Path, modules: &[ProofModule]) -> Result<Vec<Loaded>, String> {
     let mut names = std::collections::BTreeSet::new();
     modules
         .iter()
@@ -54,7 +54,7 @@ pub(super) fn load(base: &Path, modules: &[ProofModule]) -> Result<Vec<Loaded>, 
 }
 
 static NEXT: AtomicUsize = AtomicUsize::new(0);
-pub(super) struct Workspace(PathBuf);
+pub(crate) struct Workspace(PathBuf);
 impl Workspace {
     pub fn new(out: &Path) -> Result<Self, String> {
         // create_dir, rather than create_dir_all, prevents reusing a previous

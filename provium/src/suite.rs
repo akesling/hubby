@@ -28,7 +28,9 @@ pub fn verify_project(project: &Path, output: &Path) -> Result<ProjectReport, St
             project.display()
         ));
     }
-    let details = if value["kind"] == "specification" {
+    let details = if value["kind"] == "typed" {
+        crate::typed::verify::verify(project, output)
+    } else if value["kind"] == "specification" {
         crate::specification::verify(project, output)
     } else if value.get("methods").is_some() {
         crate::methods::verify(project, output)

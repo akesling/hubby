@@ -1,9 +1,9 @@
 //! Whole-body translation of typed field assignments and boolean control flow.
 //! No statement is sliced away or accepted as an opaque call.
-mod build;
-mod configured;
+pub(crate) mod build;
+pub(crate) mod configured;
 mod constructor_source;
-mod profile;
+pub(crate) mod profile;
 mod source;
 mod target;
 
@@ -58,7 +58,7 @@ pub struct ProofModule {
     pub path: PathBuf,
 }
 mod initialized;
-mod proof_modules;
+pub(crate) mod proof_modules;
 #[derive(Serialize)]
 pub struct Input {
     pub path: PathBuf,
@@ -1396,7 +1396,7 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
     let pointer_bits = target::pointer_bits(&cfg_text)?;
     let krate = Crate::load_configured(&base.join(&project.crate_root), configuration)?;
     if let Some(build) = &cargo_build {
-        build.bind_sources(&krate)?;
+        build.bind_sources(&krate.files)?;
     }
     let methods = project
         .methods

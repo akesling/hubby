@@ -41,3 +41,4 @@ cargo test --locked --test validators -- --ignored
 cargo test --locked --test imperative -- --ignored
 
 cargo test --locked --test views -- --ignored
+cargo test --locked --test typed -- --ignored

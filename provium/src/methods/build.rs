@@ -1,13 +1,13 @@
 //! Fresh Cargo provenance for method verification. Dependency/sysroot semantics
 //! and source-preservation proofs remain separate requirements.
-use super::{Crate, Project};
+use super::Project;
 use crate::{cargo_capture, cargo_subject, project::hash};
 use std::{
     fs,
     path::{Path, PathBuf},
 };
 
-pub(super) struct Build {
+pub(crate) struct Build {
     pub capture: cargo_capture::Capture,
     request_path: PathBuf,
     request_bytes: Vec<u8>,
@@ -116,12 +116,15 @@ impl Build {
             .as_deref()
             .ok_or("captured root has no effective cfg".into())
     }
-    pub fn bind_sources(&self, krate: &Crate) -> Result<(), String> {
+    pub fn bind_sources(
+        &self,
+        files: &std::collections::BTreeMap<PathBuf, String>,
+    ) -> Result<(), String> {
         let package = self.capture.subject.packages[0]
             .manifest
             .parent()
             .ok_or("missing package directory")?;
-        for (path, text) in &krate.files {
+        for (path, text) in files {
             if !self.capture.source_inventory.sources.iter().any(|source| {
                 package
                     .join(&source.path)
