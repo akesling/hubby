@@ -106,6 +106,17 @@ def shl {k : Nat} (a : Fin (2 ^ n)) (s : Fin (2 ^ k)) : M (Fin (2 ^ n)) :=
   if s.val < n then pure ⟨(a.val <<< s.val) % 2 ^ n, Nat.mod_lt _ (Nat.two_pow_pos n)⟩
   else fail "attempt to shift left with overflow"
 
+/-- Operations by a literal that cannot panic: a shift amount below the width
+or a nonzero divisor. -/
+def shrK (a : Fin (2 ^ n)) (k : Nat) : Fin (2 ^ n) :=
+  ⟨a.val >>> k, Nat.lt_of_le_of_lt (Nat.shiftRight_le _ _) a.isLt⟩
+def shlK (a : Fin (2 ^ n)) (k : Nat) : Fin (2 ^ n) :=
+  ⟨(a.val <<< k) % 2 ^ n, Nat.mod_lt _ (Nat.two_pow_pos n)⟩
+def divK (a : Fin (2 ^ n)) (k : Nat) : Fin (2 ^ n) :=
+  ⟨a.val / k, Nat.lt_of_le_of_lt (Nat.div_le_self _ _) a.isLt⟩
+def remK (a : Fin (2 ^ n)) (k : Nat) : Fin (2 ^ n) :=
+  if k = 0 then a else ⟨a.val % k, Nat.lt_of_le_of_lt (Nat.mod_le _ _) a.isLt⟩
+
 /-- `as` between unsigned types: truncation or zero extension. -/
 def cast {m : Nat} (a : Fin (2 ^ n)) : Fin (2 ^ m) :=
   ⟨a.val % 2 ^ m, Nat.mod_lt _ (Nat.two_pow_pos m)⟩
@@ -267,6 +278,16 @@ def setRangeA (a : Array α) (lo : usize) (s : Array α) : Array α :=
   Array.ofFn fun (i : Fin a.size) =>
     if h : lo.val ≤ i.val ∧ i.val - lo.val < s.size then s[i.val - lo.val] else a[i]
 
+/-- `for x in &mut a[lo..hi] { body }` where the body only updates `x`. -/
+def mapRangeM {n : Nat} (a : Vector α n) (lo hi : usize) (f : α → M α) : M (Vector α n) :=
+  if lo.val ≤ hi.val ∧ hi.val ≤ n then
+    (Vector.ofFn fun i : Fin n => if lo.val ≤ i.val ∧ i.val < hi.val then f a[i] else pure a[i]).mapM id
+  else fail "range out of bounds"
+def mapRangeMA (a : Array α) (lo hi : usize) (f : α → M α) : M (Array α) :=
+  if lo.val ≤ hi.val ∧ hi.val ≤ a.size then
+    (Array.ofFn fun i : Fin a.size => if lo.val ≤ i.val ∧ i.val < hi.val then f a[i] else pure a[i]).mapM id
+  else fail "range out of bounds"
+
 def fill {n : Nat} (_ : Vector α n) (v : α) : Vector α n := Vector.replicate n v
 def rotate_left (s : Array α) (k : usize) : M (Array α) :=
   if k.val ≤ s.size then pure (s.extract k.val s.size ++ s.extract 0 k.val)
@@ -295,6 +316,146 @@ def take_while (l : List α) (p : α → Bool) : List α := l.takeWhile p
 def range (lo hi : usize) : List usize :=
   (List.range (hi.val - lo.val)).map fun i => ofNat (lo.val + i)
 end Iter
+
+/-! ## Lemmas
+
+Each checked operation equals `pure` of its mathematical result under the
+condition that rules out its panic. Use them with `simp (disch := omega)`.
+-/
+
+section Lemmas
+variable {n k : Nat} {α : Type}
+
+@[simp] theorem add_ok (a b : Fin (2 ^ n)) (h : a.val + b.val < 2 ^ n) :
+    add a b = pure ⟨a.val + b.val, h⟩ := by simp [add, h]
+@[simp] theorem sub_ok (a b : Fin (2 ^ n)) (h : b.val ≤ a.val) :
+    sub a b = pure ⟨a.val - b.val, by omega⟩ := by simp [sub, h]
+@[simp] theorem mul_ok (a b : Fin (2 ^ n)) (h : a.val * b.val < 2 ^ n) :
+    mul a b = pure ⟨a.val * b.val, h⟩ := by simp [mul, h]
+@[simp] theorem div_ok (a b : Fin (2 ^ n)) (h : b.val ≠ 0) :
+    div a b = pure ⟨a.val / b.val, Nat.lt_of_le_of_lt (Nat.div_le_self _ _) a.isLt⟩ := by simp [div, h]
+@[simp] theorem rem_ok (a b : Fin (2 ^ n)) (h : b.val ≠ 0) :
+    rem a b = pure ⟨a.val % b.val, Nat.lt_of_le_of_lt (Nat.mod_le _ _) a.isLt⟩ := by simp [rem, h]
+@[simp] theorem shr_ok (a : Fin (2 ^ n)) (s : Fin (2 ^ k)) (h : s.val < n) :
+    shr a s = pure ⟨a.val >>> s.val, Nat.lt_of_le_of_lt (Nat.shiftRight_le _ _) a.isLt⟩ := by
+  simp [shr, h]
+@[simp] theorem clamp_ok (x lo hi : Fin (2 ^ n)) (h : lo.val ≤ hi.val) :
+    clamp x lo hi = pure (Rust.min (Rust.max x lo) hi) := by simp [clamp, h]
+
+@[simp] theorem Slice.index_ok {m : Nat} (a : Vector α m) (i : usize) (h : i.val < m) :
+    Slice.index a i = pure a[i.val] := by simp [Slice.index, h]
+@[simp] theorem Slice.set_ok {m : Nat} (a : Vector α m) (i : usize) (v : α) (h : i.val < m) :
+    Slice.set a i v = pure (a.set i.val v) := by simp [Slice.set, h]
+
+@[simp] theorem val_usizeOf (m : Nat) (h : m < 2 ^ 64) : (usizeOf m).val = m := by
+  simp [usizeOf, ofNat, Nat.mod_eq_of_lt h]
+@[simp] theorem val_umax : (umax n).val = 2 ^ n - 1 := rfl
+@[simp] theorem val_wrapping_add (a b : Fin (2 ^ n)) : (wrapping_add a b).val = (a.val + b.val) % 2 ^ n := rfl
+@[simp] theorem val_saturating_sub (a b : Fin (2 ^ n)) : (saturating_sub a b).val = a.val - b.val := rfl
+theorem val_saturating_add (a b : Fin (2 ^ n)) :
+    (saturating_add a b).val = Nat.min (a.val + b.val) (2 ^ n - 1) := by
+  unfold saturating_add; split <;> simp [umax, Nat.min_def] <;> omega
+@[simp] theorem val_min (a b : Fin (2 ^ n)) : (Rust.min a b).val = Nat.min a.val b.val := by
+  unfold Rust.min; split <;> simp [Nat.min_def] <;> omega
+@[simp] theorem val_max (a b : Fin (2 ^ n)) : (Rust.max a b).val = Nat.max a.val b.val := by
+  unfold Rust.max; split <;> simp [Nat.max_def] <;> omega
+@[simp] theorem checked_add_eq (a b : Fin (2 ^ n)) :
+    checked_add a b = if h : a.val + b.val < 2 ^ n then some ⟨a.val + b.val, h⟩ else none := rfl
+@[simp] theorem checked_sub_eq (a b : Fin (2 ^ n)) :
+    checked_sub a b = if h : b.val ≤ a.val then some ⟨a.val - b.val, by omega⟩ else none := rfl
+
+@[simp] theorem Option.is_some_and_some (a : α) (f : α → Bool) : Option.is_some_and (some a) f = f a := rfl
+@[simp] theorem Option.is_some_and_none (f : α → Bool) : Option.is_some_and (none : Option α) f = false := rfl
+@[simp] theorem Option.is_none_or_some (a : α) (f : α → Bool) : Option.is_none_or (some a) f = f a := rfl
+@[simp] theorem Option.is_none_or_none (f : α → Bool) : Option.is_none_or (none : Option α) f = true := rfl
+@[simp] theorem Option.map_or_some {β : Type} (a : α) (d : β) (f : α → β) : Option.map_or (some a) d f = f a := rfl
+@[simp] theorem Option.map_or_none {β : Type} (d : β) (f : α → β) : Option.map_or (none : Option α) d f = d := rfl
+@[simp] theorem Option.then_some_true (a : α) : Option.then_some true a = some a := rfl
+@[simp] theorem Option.then_some_false (a : α) : Option.then_some false a = none := rfl
+
+@[simp] theorem Slice.range_ok {m : Nat} (a : Vector α m) (lo hi : usize) (h : lo.val ≤ hi.val ∧ hi.val ≤ m) :
+    Slice.range a lo hi = pure (a.toArray.extract lo.val hi.val) := by simp [Slice.range, h]
+@[simp] theorem Slice.rotate_left_ok (a : Array α) (k : usize) (h : k.val ≤ a.size) :
+    Slice.rotate_left a k = pure (a.extract k.val a.size ++ a.extract 0 k.val) := by
+  simp [Slice.rotate_left, h]
+@[simp] theorem Slice.len_eq {m : Nat} (a : Vector α m) : Slice.len a = usizeOf m := rfl
+
+theorem Slice.mapRangeM_pure {m : Nat} (a : Vector α m) (lo hi : usize) (g : α → α)
+    (h : lo.val ≤ hi.val ∧ hi.val ≤ m) :
+    Slice.mapRangeM a lo hi (fun e => pure (g e)) =
+      pure (Vector.ofFn fun i : Fin m => if lo.val ≤ i.val ∧ i.val < hi.val then g a[i] else a[i]) := by
+  unfold Slice.mapRangeM
+  rw [if_pos h]
+  have : (Vector.ofFn fun i : Fin m =>
+      if lo.val ≤ i.val ∧ i.val < hi.val then (pure (g a[i]) : M α) else pure a[i]) =
+      (Vector.ofFn fun i : Fin m => if lo.val ≤ i.val ∧ i.val < hi.val then g a[i] else a[i]).map pure := by
+    rw [Vector.map_ofFn]; congr 1; funext i; simp only [Function.comp]; split <;> rfl
+  rw [this, Vector.mapM_map]
+  have := Vector.mapM_pure (m := M) (xs := Vector.ofFn fun i : Fin m =>
+    if lo.val ≤ i.val ∧ i.val < hi.val then g a[i] else a[i]) id
+  rw [Vector.map_id] at this
+  simpa only [Function.comp_def, id] using this
+
+theorem filterAuxM_pure {β : Type} (l acc : List β) (p : β → M Bool) (q : β → Bool)
+    (h : ∀ x ∈ l, p x = pure (q x)) : List.filterAuxM p l acc = pure ((l.filter q).reverse ++ acc) := by
+  induction l generalizing acc with
+  | nil => simp [List.filterAuxM]
+  | cons x xs ih =>
+    simp only [List.filterAuxM, h x (by simp), pure_bind]
+    rw [ih _ (fun y hy => h y (by simp [hy]))]
+    cases hq : q x <;> simp [hq]
+
+/-- `filterM` with a predicate that cannot fail is `filter`. -/
+theorem filterM_pure {β : Type} (l : List β) (p : β → M Bool) (q : β → Bool)
+    (h : ∀ x ∈ l, p x = pure (q x)) : l.filterM p = pure (l.filter q) := by
+  simp [List.filterM, filterAuxM_pure l [] p q h]
+
+/-- A `for` loop over a list whose body always continues, with an invariant
+indexed by the number of items processed. -/
+theorem forIn_inv {β γ : Type} (l : List γ) (init : β) (f : γ → β → M (ForInStep β))
+    (I : Nat → β → Prop) (h0 : I 0 init)
+    (hstep : ∀ k (hk : k < l.length) b, I k b → ∃ b', f l[k] b = pure (.yield b') ∧ I (k + 1) b') :
+    ∃ b, forIn l init f = pure b ∧ I l.length b := by
+  induction l generalizing init I with
+  | nil => exact ⟨init, rfl, h0⟩
+  | cons x xs ih =>
+    obtain ⟨b1, hb1, hi1⟩ := hstep 0 (by simp) init h0
+    obtain ⟨b, hb, hi⟩ := ih b1 (fun k => I (k + 1)) hi1
+      (fun k hk b hb => by
+        have := hstep (k + 1) (by simp; omega) b hb
+        simpa only [List.getElem_cons_succ] using this)
+    refine ⟨b, ?_, by simpa using hi⟩
+    rw [List.forIn_cons]; simp only [List.getElem_cons_zero] at hb1; rw [hb1]; simpa using hb
+
+/-- `forIn_inv` in a form `apply` can match against a loop followed by more code. -/
+theorem forIn_bind_inv {β γ δ : Type} (l : List γ) (init : β) (f : γ → β → M (ForInStep β))
+    (k : β → M δ) (R : M δ) (I : Nat → β → Prop) (h0 : I 0 init)
+    (hstep : ∀ i (hi : i < l.length) b, I i b → ∃ b', f l[i] b = pure (.yield b') ∧ I (i + 1) b')
+    (hk : ∀ b, I l.length b → k b = R) : (forIn l init f >>= k) = R := by
+  obtain ⟨b, hb, hI⟩ := forIn_inv l init f I h0 hstep
+  rw [hb, pure_bind, hk b hI]
+
+/-- `forIn_inv` for a loop that ends the computation. -/
+theorem forIn_eq_inv {β γ : Type} (l : List γ) (init : β) (f : γ → β → M (ForInStep β)) (R : β)
+    (I : Nat → β → Prop) (h0 : I 0 init)
+    (hstep : ∀ i (hi : i < l.length) b, I i b → ∃ b', f l[i] b = pure (.yield b') ∧ I (i + 1) b')
+    (hfin : ∀ b, I l.length b → b = R) : forIn l init f = pure R := by
+  obtain ⟨b, hb, hI⟩ := forIn_inv l init f I h0 hstep
+  rw [hb, hfin b hI]
+
+/-! Loops (`while`, `loop`) unfold one iteration at a time. -/
+
+theorem loop_yield {β : Type} {f : Unit → β → M (ForInStep β)} {b b' : β}
+    (h : f () b = pure (.yield b')) : forIn Lean.Loop.mk b f = forIn Lean.Loop.mk b' f := by
+  show Lean.Loop.forIn _ b f = Lean.Loop.forIn _ b' f
+  rw [Lean.Loop.forIn_eq_of_monadTail, h]; simp
+
+theorem loop_done {β : Type} {f : Unit → β → M (ForInStep β)} {b b' : β}
+    (h : f () b = pure (.done b')) : forIn Lean.Loop.mk b f = pure b' := by
+  show Lean.Loop.forIn _ b f = _
+  rw [Lean.Loop.forIn_eq_of_monadTail, h]; simp
+
+end Lemmas
 
 /-! ## Traits
 

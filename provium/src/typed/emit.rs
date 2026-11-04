@@ -57,6 +57,8 @@ pub struct Local {
     pub pure_fn: Option<bool>,
     /// A `Drop` implementation to run when the local goes out of scope.
     pub drop: Option<String>,
+    /// The local is itself a `&mut` borrow (matching it binds by reference).
+    pub mut_ref: bool,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -290,6 +292,7 @@ impl<'a> Body<'a> {
             field_aliases: vec![],
             pure_fn: None,
             drop: None,
+            mut_ref: false,
         }
     }
 
@@ -1900,7 +1903,8 @@ impl<'a> Body<'a> {
                 let shift = matches!(b.op, Shr(_) | Shl(_));
                 let (l, lt) = self.value(&b.left, expect)?;
                 let (r, rt) = self.value(&b.right, if shift { None } else { Some(&lt) })?;
-                let r = if shift && matches!(self.resolve(&rt), Ty::IntLit) {
+                let literal = r.chars().all(|c| c.is_ascii_digit());
+                let r = if shift && !literal && matches!(self.resolve(&rt), Ty::IntLit) {
                     format!("({r} : Rust.u32)")
                 } else {
                     r
@@ -1955,6 +1959,20 @@ impl<'a> Body<'a> {
             _ => String::new(),
         };
         let pure = |f: &str| format!("Rust.{prefix}{f} {l} {r}");
+        // A literal shift amount below the width, or a nonzero literal divisor,
+        // cannot panic: the operation is pure.
+        let literal = r.parse::<u128>().ok();
+        let bits = match self.resolve(ty) {
+            Ty::Uint(b, _) => Some(b as u128),
+            _ => None,
+        };
+        match (op, literal, bits) {
+            (">>", Some(k), Some(b)) if k < b => return Ok(format!("Rust.shrK {l} {k}")),
+            ("<<", Some(k), Some(b)) if k < b => return Ok(format!("Rust.shlK {l} {k}")),
+            ("/", Some(k), Some(_)) if k > 0 => return Ok(format!("Rust.divK {l} {k}")),
+            ("%", Some(k), Some(_)) if k > 0 => return Ok(format!("Rust.remK {l} {k}")),
+            _ => {}
+        }
         Ok(match op {
             "+" if checked => self.bind(pure("add")),
             "-" if checked => self.bind(pure("sub")),
@@ -2152,7 +2170,11 @@ impl<'a> Body<'a> {
         let borrowed_local = match e {
             Expr::Path(p) if p.path.segments.len() == 1 => self
                 .lookup(&p.path.segments[0].ident.to_string())
-                .is_some_and(|id| self.locals[id].alias.is_some() || self.outputs.contains(&id)),
+                .is_some_and(|id| {
+                    self.locals[id].alias.is_some()
+                        || self.locals[id].mut_ref
+                        || self.outputs.contains(&id)
+                }),
             _ => false,
         };
         let is_mut_ref =
@@ -2316,6 +2338,9 @@ impl<'a> Body<'a> {
                 return self.expr(&arm.body, expect);
             }
         }
+        if let Some(g) = &arm.guard {
+            return self.guarded_arm(s, sty, place, arm, g, rest, expect, want);
+        }
         // Test the pattern (and guard); otherwise continue with the rest.
         self.push_scope(ScopeKind::Block);
         let (pats, binds) = self.arm_patterns(&arm.pat, sty, place)?;
@@ -2411,6 +2436,79 @@ impl<'a> Body<'a> {
         }
     }
 
+    /// A guarded arm: evaluate the pattern and guard once into an `Option` of
+    /// the arm's bindings, then run the body or the remaining arms.
+    #[allow(clippy::too_many_arguments)]
+    fn guarded_arm(
+        &mut self,
+        s: &str,
+        sty: &Ty,
+        place: Option<&Place>,
+        arm: &Arm,
+        guard: &Expr,
+        rest: &[Arm],
+        expect: Option<&Ty>,
+        want: bool,
+    ) -> R<V> {
+        self.push_scope(ScopeKind::Block);
+        let (pats, binds) = self.arm_patterns(&arm.pat, sty, place)?;
+        let r = self.branch(|b| {
+            b.bind_all(binds.clone());
+            b.value(guard, Some(&Ty::Bool)).map(|(t, ty)| V::of(t, ty))
+        });
+        self.scopes.pop();
+        let (gv, gl) = r?;
+        let gt = gv.term.unwrap_or_default();
+        let (tuple, tuple_pat) = binding_tuple(&binds);
+        let g = self.temp();
+        self.emit(format!("let {g} ← match {s} with"));
+        self.indent += 2;
+        self.emit(format!("| {} =>", pats.join(" | ")));
+        self.splice(gl, 2);
+        self.indent += 2;
+        self.emit(format!(
+            "pure (if {} then some {tuple} else none)",
+            paren(&gt)
+        ));
+        self.indent -= 2;
+        self.emit("| _ => pure none");
+        self.indent -= 2;
+        // The body with the arm's bindings, or the remaining arms.
+        self.push_scope(ScopeKind::Block);
+        let body = self.branch(|b| {
+            b.bind_arm(binds.clone());
+            b.expr(&arm.body, expect)
+        });
+        self.scopes.pop();
+        let (v, lines) = body?;
+        let (ev, el) =
+            self.branch(|b| b.arms_rest(s, sty, place, rest, expect.or(Some(&v.ty)), want))?;
+        let ty = if v.term.is_some() {
+            v.ty.clone()
+        } else {
+            ev.ty.clone()
+        };
+        let has_value = want && !self.resolve(&ty).is_unit() && !matches!(ty, Ty::Never);
+        let t = if has_value { Some(self.temp()) } else { None };
+        match &t {
+            Some(t) => self.emit(format!("let {t} ← match {g} with")),
+            None => self.emit(format!("match {g} with")),
+        }
+        let extra = if t.is_some() { 2 } else { 0 };
+        self.indent += extra;
+        self.emit(format!("| some {} =>", paren(&tuple_pat)));
+        self.emit_branch(&v, lines, 2, has_value);
+        self.emit("| none =>");
+        self.emit_branch(&ev, el, 2, has_value);
+        self.indent -= extra;
+        let reaches = v.term.is_some() || ev.term.is_some();
+        match t {
+            Some(t) if reaches => Ok(V::of(t, ty)),
+            _ if reaches => Ok(V::of("()", Ty::Unit)),
+            _ => Ok(V::never()),
+        }
+    }
+
     /// Patterns of one arm (or-patterns become alternatives sharing bindings).
     fn arm_patterns(
         &mut self,
@@ -2471,6 +2569,11 @@ impl<'a> Body<'a> {
             }
             _ => None,
         };
+        if let Some(src) = &mut_source {
+            if !has_jump(&f.body) {
+                return self.for_map(f, src);
+            }
+        }
         if let Some(src) = mut_source {
             let place = self.place(&src)?.ok_or("iter_mut over a non-place")?;
             let Pat::Ident(pi) = &*f.pat else {
@@ -2549,6 +2652,85 @@ impl<'a> Body<'a> {
         }
         self.scopes.pop();
         self.indent -= 2;
+        Ok(V::of("()", Ty::Unit))
+    }
+
+    /// `for x in &mut place { body }` whose body only updates `x` (no jumps):
+    /// a map of the body over the borrowed elements, in order.
+    fn for_map(&mut self, f: &syn::ExprForLoop, src: &Expr) -> R<V> {
+        let Pat::Ident(pi) = &*f.pat else {
+            return Err("for over borrowed elements needs a simple binding".into());
+        };
+        let (base, range) = match strip(src) {
+            Expr::Index(ix) if matches!(&*ix.index, Expr::Range(_)) => {
+                let base = self.place(&ix.expr)?.ok_or("iter_mut over a non-place")?;
+                let Expr::Range(r) = &*ix.index else {
+                    unreachable!()
+                };
+                let lo = match &r.start {
+                    Some(e) => self.value(e, Some(&Ty::usize()))?.0,
+                    None => "0".into(),
+                };
+                let cur = self.read_place(&base)?;
+                let hi = match &r.end {
+                    Some(e) => self.value(e, Some(&Ty::usize()))?.0,
+                    None => match self.resolve(&base.ty).peel() {
+                        Ty::Slice(_) => format!("(Rust.usizeOf {}.size)", paren(&cur)),
+                        _ => format!("(Rust.Slice.len {})", paren(&cur)),
+                    },
+                };
+                (base, Some((lo, hi)))
+            }
+            _ => (self.place(src)?.ok_or("iter_mut over a non-place")?, None),
+        };
+        let vector = self.read_place(&base)?;
+        let bt = self.resolve(&base.ty);
+        let et = elem_ty(&bt)?;
+        // The body as a closure from the element's old value to its new one.
+        self.push_scope(ScopeKind::Closure);
+        let rust = pi.ident.to_string();
+        let x = self.fresh(&rust);
+        let mut xl = Body::local(x.clone(), et.clone(), true);
+        xl.mut_ref = true;
+        self.declare(&rust, xl);
+        self.closure_rets.push(Ty::Unit);
+        let saved = std::mem::replace(&mut self.impure, false);
+        let r = self.capture(|s| s.block(&f.body, None));
+        let impure = std::mem::replace(&mut self.impure, saved);
+        self.closure_rets.pop();
+        self.scopes.pop();
+        let (_, lines) = r?;
+        let g = self.synthetic("f");
+        let run = if impure { "" } else { "Id.run " };
+        self.emit(format!("let {g} := fun {x} => {run}do"));
+        self.indent += 2;
+        self.emit(format!("let mut {x} := {x}"));
+        self.splice(lines, 0);
+        self.emit(format!("pure {x}"));
+        self.indent -= 2;
+        let monadic = if impure {
+            g.clone()
+        } else {
+            format!("(fun e => pure ({g} e))")
+        };
+        let slice = matches!(bt.peel(), Ty::Slice(_));
+        let new = match (&range, slice, impure) {
+            (None, false, false) => format!("{}.map {g}", paren(&vector)),
+            (None, _, _) => self.bind(format!("{}.mapM {monadic}", paren(&vector))),
+            (Some((lo, hi)), false, _) => self.bind(format!(
+                "Rust.Slice.mapRangeM {} {} {} {monadic}",
+                paren(&vector),
+                paren(lo),
+                paren(hi)
+            )),
+            (Some((lo, hi)), true, _) => self.bind(format!(
+                "Rust.Slice.mapRangeMA {} {} {} {monadic}",
+                paren(&vector),
+                paren(lo),
+                paren(hi)
+            )),
+        };
+        self.write_place(&base, new)?;
         Ok(V::of("()", Ty::Unit))
     }
 
@@ -2896,6 +3078,29 @@ struct Arm {
 enum Fields {
     Positional(Vec<Pat>),
     Named(Vec<(String, Pat)>),
+}
+
+/// Whether a block contains `break`, `continue`, `return` or `?` (outside closures).
+fn has_jump(b: &syn::Block) -> bool {
+    struct J(bool);
+    impl<'ast> syn::visit::Visit<'ast> for J {
+        fn visit_expr_break(&mut self, _: &'ast syn::ExprBreak) {
+            self.0 = true;
+        }
+        fn visit_expr_continue(&mut self, _: &'ast syn::ExprContinue) {
+            self.0 = true;
+        }
+        fn visit_expr_return(&mut self, _: &'ast syn::ExprReturn) {
+            self.0 = true;
+        }
+        fn visit_expr_try(&mut self, _: &'ast syn::ExprTry) {
+            self.0 = true;
+        }
+        fn visit_expr_closure(&mut self, _: &'ast syn::ExprClosure) {}
+    }
+    let mut j = J(false);
+    syn::visit::Visit::visit_block(&mut j, b);
+    j.0
 }
 
 fn strip(e: &Expr) -> &Expr {
