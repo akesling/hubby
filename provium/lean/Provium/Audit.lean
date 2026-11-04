@@ -11,6 +11,44 @@ private def mentions (expr : Lean.Expr) (name : Name) : Bool :=
   | .mdata _ e | .proj _ _ e => mentions e name
   | _ => false
 
+/-- Constants of an expression. -/
+private def consts (e : Lean.Expr) : Array Name :=
+  e.foldConsts #[] fun n acc => acc.push n
+
+/-- A declaration owned by a consumer module: neither generated, Provium's, nor the toolchain's. -/
+private def consumerOwned (env : Environment) (n : Name) : Bool :=
+  match env.getModuleIdxFor? n with
+  | none => true
+  | some i =>
+    let m := env.header.moduleNames[i.toNat]!
+    !(m == `Generated || (`Provium).isPrefixOf m || (`Init).isPrefixOf m || (`Lean).isPrefixOf m ||
+      (`Std).isPrefixOf m)
+
+/-- Whether `fnName` occurs in `e`, directly or through the types, bodies and
+    constructors of consumer-owned definitions `e` refers to. A statement about
+    a consumer's execution relation (say, an inductive whose constructors run
+    the generated function) is a statement about that function. -/
+private partial def reaches (env : Environment) (fnName : Name) (e : Lean.Expr) : Bool := Id.run do
+  let mut seen : NameSet := {}
+  let mut work : Array Name := consts e
+  while !work.isEmpty do
+    let n := work.back!
+    work := work.pop
+    if n == fnName then return true
+    if seen.contains n || !consumerOwned env n then continue
+    seen := seen.insert n
+    match env.find? n with
+    | some (.defnInfo d) => work := work ++ consts d.type ++ consts d.value
+    | some (.thmInfo _) => pure ()
+    | some (.inductInfo i) =>
+      work := work ++ consts i.type
+      for c in i.ctors do
+        if let some info := env.find? c then work := work ++ consts info.type
+    | some (.ctorInfo c) => work := work ++ consts c.type
+    | some info => work := work ++ consts info.type
+    | none => pure ()
+  return false
+
 /-- Accept only actual theorem declarations mentioning the designated generated
     function in their statement. Audit transitive axioms, including sorryAx and
     native_decide/bv_decide admissions, rather than searching proof source text. -/
@@ -19,7 +57,7 @@ private def checkTheorem (name fnName : Name) : CommandElabM Unit := do
   match info with
   | .thmInfo _ => pure ()
   | _ => throwError "Provium requires a theorem declaration: {name}"
-  if !mentions info.type fnName then
+  if !mentions info.type fnName && !reaches (← getEnv) fnName info.type then
     throwError "theorem {name} does not mention generated function {fnName} in its statement"
   let axioms ← collectAxioms name
   for axiomName in axioms do

@@ -6,7 +6,8 @@
   "proofs": "Proofs.lean",
   "obligations": [
     { "theorem": "Example.Proofs.push_len", "function": "Queue::push" },
-    { "theorem": "Example.Proofs.new_empty", "function": "Queue::new" }
+    { "theorem": "Example.Proofs.new_empty", "function": "Queue::new" },
+    { "theorem": "Example.Proofs.pushed_len", "function": "Queue::push" }
   ],
   "differential": {
     "source": "differential.rs",

@@ -24,4 +24,19 @@ theorem push_len {T : Type} {N : Nat} (q : Queue T N) (x : T)
     dif_pos h1]
   simp [show ¬ N = 0 by omega, dif_pos h2, show q.len.val + 1 < 18446744073709551616 by omega]
   exact ⟨_, rfl, rfl⟩
+
+/-- A consumer's execution relation: one successful push. -/
+inductive Pushed {T : Type} {N : Nat} : Queue T N → Queue T N → Prop
+  | push (q q' : Queue T N) (x : T) : Queue.push q x = pure (.Ok (), q') → Pushed q q'
+
+/-- A theorem about `Pushed` is about `Queue.push`, which its constructor runs. -/
+theorem pushed_len {T : Type} {N : Nat} (q q' : Queue T N)
+    (hn : N < 2 ^ 63) (hlen : q.len.val < N) (hhead : q.head.val < N) (h : Pushed q q') :
+    q'.len.val = q.len.val + 1 := by
+  cases h with
+  | push x hp =>
+    obtain ⟨q'', hq, hl⟩ := push_len q x hn hlen hhead
+    rw [hp] at hq
+    cases hq
+    exact hl
 end Example.Proofs

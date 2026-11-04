@@ -130,5 +130,38 @@ fn example_verifies() {
         report.contains("PROVIUM_VERIFIED Example.Proofs.push_len"),
         "{report}"
     );
+    assert!(
+        report.contains("PROVIUM_VERIFIED Example.Proofs.pushed_len"),
+        "{report}"
+    );
     assert!(report.contains("Differential: 16 scenarios"), "{report}");
+}
+
+/// A theorem reaches a generated function through a consumer relation whose
+/// constructors run it, but not a function the relation never runs.
+#[test]
+#[ignore = "requires the pinned Lean toolchain and Cargo"]
+fn obligations_must_reach_their_function() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let w = Work::new(&fs::read_to_string(root.join("examples/typed/src/lib.rs")).unwrap());
+    fs::copy(
+        root.join("examples/typed/Proofs.lean"),
+        w.0.join("Proofs.lean"),
+    )
+    .unwrap();
+    let mut project: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join("examples/typed/project.json")).unwrap())
+            .unwrap();
+    project["crate_root"] = "lib.rs".into();
+    project.as_object_mut().unwrap().remove("differential");
+    project["obligations"] = serde_json::json!([
+        { "theorem": "Example.Proofs.pushed_len", "function": "Queue::pop" }
+    ]);
+    fs::write(w.0.join("project.json"), project.to_string()).unwrap();
+    let error =
+        provium::typed::verify::verify(&w.0.join("project.json"), &w.0.join("out")).unwrap_err();
+    assert!(
+        error.contains("pushed_len does not mention generated function Example.Queue.pop"),
+        "{error}"
+    );
 }

@@ -82,8 +82,11 @@ differential scenario ──► native run (Cargo) ══ Lean #eval ──► m
 
 - **Kernel checking.** Generated code, consumer proofs and proof modules are
   checked by the pinned Lean with `--trust=0`; each obligation's theorem must
-  mention its generated function and use only `propext`, `Quot.sound` and
-  `Classical.choice`.
+  refer to its generated function and use only `propext`, `Quot.sound` and
+  `Classical.choice`. A theorem refers to a function when its statement
+  mentions it directly or through consumer definitions it uses: a theorem
+  over an execution relation whose constructors run `Node.step` refers to
+  `Node.step`.
 - **Source binding.** The manifest records hashes of every source, the
   captured build and every artifact; sources are rechecked after verification.
 - **Differential testing.** A project may name a scenario module written
@@ -116,5 +119,6 @@ differential scenario ──► native run (Cargo) ══ Lean #eval ──► m
 ## Status
 
 Implemented: everything above. Jarl's fixed `Node` engine (`node.rs`,
-`state.rs`, `membership.rs`, `ready.rs`) translates completely
-(`jarl/proofs/engine`).
+`state.rs`, `membership.rs`, `ready.rs`) translates completely, and
+`jarl/proofs/engine` proves election, state-machine and snapshot safety for
+every reachable cluster of it.
