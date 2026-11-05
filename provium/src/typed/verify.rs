@@ -40,7 +40,7 @@ pub struct Differential {
     pub seeds: u64,
 }
 
-const MOUNT: &str = "provium_differential";
+use super::lean::MOUNT;
 
 fn identifier(s: &str) -> bool {
     let mut c = s.chars();

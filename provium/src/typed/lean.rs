@@ -101,8 +101,20 @@ pub struct Names {
     pub consts: BTreeMap<String, String>,
 }
 
+/// The module path a differential scenario is mounted at.
+pub const MOUNT: &str = "provium_differential";
+
 impl Names {
     pub fn new(k: &Krate) -> Self {
+        // Items of a mounted differential scenario live in `Differential`, so
+        // they never shadow the crate's or a consumer's names.
+        let scoped = |p: &str, n: String| {
+            if p.starts_with(&format!("{MOUNT}::")) {
+                format!("Differential.{n}")
+            } else {
+                n
+            }
+        };
         let mut counts: BTreeMap<String, usize> = BTreeMap::new();
         let short = |p: &str| p.rsplit("::").next().unwrap().to_owned();
         for p in k
@@ -114,11 +126,14 @@ impl Names {
             *counts.entry(short(p)).or_default() += 1;
         }
         let name = |p: &str| {
-            if counts[&short(p)] == 1 {
-                short(p)
-            } else {
-                p.replace("::", "_")
-            }
+            scoped(
+                p,
+                if counts[&short(p)] == 1 {
+                    short(p)
+                } else {
+                    p.replace("::", "_")
+                },
+            )
         };
         let types: BTreeMap<_, _> = k
             .structs
@@ -155,8 +170,8 @@ impl Names {
                     }
                     candidate
                 }
-                None if free[&f.name] == 1 => ident(&f.name),
-                None => path.replace("::", "_"),
+                None if free[&f.name] == 1 => scoped(path, ident(&f.name)),
+                None => scoped(path, path.replace("::", "_")),
             };
             taken.insert(lean.clone());
             functions.insert(path.clone(), lean);
