@@ -1,6 +1,22 @@
 //! Rust types of the supported subset and their Lean renderings.
 use super::load::{tokens, Krate};
+use std::cell::Cell;
 use syn::Type;
+
+thread_local! {
+    /// The pointer width of the build being translated: the bits of `usize`.
+    static USIZE_BITS: Cell<u32> = const { Cell::new(64) };
+}
+
+/// Translate for a target with this pointer width (32 or 64).
+pub fn set_pointer_width(bits: u32) {
+    USIZE_BITS.with(|b| b.set(bits));
+}
+
+/// The bits of `usize` and `isize` in the current translation.
+pub fn pointer_width() -> u32 {
+    USIZE_BITS.with(Cell::get)
+}
 
 /// A compile-time length: a literal, a const generic, or a crate constant.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -46,7 +62,7 @@ pub enum Ty {
 
 impl Ty {
     pub fn usize() -> Ty {
-        Ty::Uint(64, "usize")
+        Ty::Uint(pointer_width(), "usize")
     }
     pub fn u64() -> Ty {
         Ty::Uint(64, "u64")
@@ -325,7 +341,7 @@ impl Scope<'_> {
                 "i16" => return Ok(Ty::Int(16, "i16")),
                 "i32" => return Ok(Ty::Int(32, "i32")),
                 "i64" => return Ok(Ty::Int(64, "i64")),
-                "isize" => return Ok(Ty::Int(64, "isize")),
+                "isize" => return Ok(Ty::Int(pointer_width(), "isize")),
                 "str" => return Ok(Ty::Str),
                 "Self" => {
                     return self

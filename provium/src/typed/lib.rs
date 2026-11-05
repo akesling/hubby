@@ -415,8 +415,13 @@ impl Body<'_> {
                 _ => None,
             };
             if let Some(to) = to {
-                let Ty::Uint(bits, _) = to else {
+                let Ty::Uint(bits, to_name) = to else {
                     unreachable!()
+                };
+                let width = if to_name == "usize" {
+                    "Rust.usizeBits".to_owned()
+                } else {
+                    bits.to_string()
                 };
                 let (t, from) = self.value(&c.args[0], None)?;
                 let lt = self.lean_ty(&to);
@@ -430,7 +435,7 @@ impl Body<'_> {
                         ty: to,
                     }),
                     ("try_from", Ty::Uint(..)) => Ok(V {
-                        term: Some(format!("(Rust.try_from (m := {bits}) {})", p(&t))),
+                        term: Some(format!("(Rust.try_from (m := {width}) {})", p(&t))),
                         ty: Ty::Result(Box::new(to), Box::new(Ty::TryFromIntError)),
                     }),
                     _ => Err(format!("unsupported conversion {joined}")),

@@ -1726,8 +1726,13 @@ impl<'a> Body<'a> {
                 "usize" => Ty::usize(),
                 _ => return Err(format!("unsupported constant {}", names.join("::"))),
             };
-            let Ty::Uint(bits, _) = ty else {
+            let Ty::Uint(bits, name) = ty else {
                 unreachable!()
+            };
+            let bits = if name == "usize" {
+                "Rust.usizeBits".to_owned()
+            } else {
+                bits.to_string()
             };
             return Ok(V::of(format!("(Rust.umax {bits})"), ty));
         }

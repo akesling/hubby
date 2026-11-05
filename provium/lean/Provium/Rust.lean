@@ -7,7 +7,7 @@ possibly failing operation lives in `Rust.M`: `throw` is a panic and the
 and its failures stay visible to proofs. Operations that cannot fail are pure.
 
 Scalars are `Fin (2 ^ bits)`, so `omega` and `simp [Fin.ext_iff]` reason about
-them directly. `usize` is 64 bits wide; the code generator rejects other targets.
+them directly. `usize` is `usizeBits` wide (the captured target's pointer width).
 -/
 
 namespace Rust
@@ -37,6 +37,13 @@ abbrev u8 := Fin (2 ^ 8)
 abbrev u16 := Fin (2 ^ 16)
 abbrev u32 := Fin (2 ^ 32)
 abbrev u64 := Fin (2 ^ 64)
+/-- The target's pointer width: the bits of `usize` and `isize`. Provium writes
+    this file per build with the captured target's width (32 or 64), so a
+    proof is checked against each build's own width; `usizeBits_eq` lets
+    `simp` see it. -/
+abbrev usizeBits : Nat := 64
+@[simp] theorem usizeBits_eq : usizeBits = 64 := rfl
+theorem usizeBits_range : 32 ≤ usizeBits ∧ usizeBits ≤ 64 := by decide
 abbrev usize := Fin (2 ^ 64)
 
 /-! ## Unsigned arithmetic -/
@@ -351,8 +358,8 @@ variable {n k : Nat} {α : Type}
 @[simp] theorem Slice.set_ok {m : Nat} (a : Vector α m) (i : usize) (v : α) (h : i.val < m) :
     Slice.set a i v = pure (a.set i.val v) := by simp [Slice.set, h]
 
-@[simp] theorem val_usizeOf (m : Nat) (h : m < 2 ^ 64) : (usizeOf m).val = m := by
-  simp [usizeOf, ofNat, Nat.mod_eq_of_lt h]
+@[simp] theorem val_usizeOf (m : Nat) (h : m < 2 ^ 64) : (usizeOf m).val = m :=
+  Nat.mod_eq_of_lt h
 @[simp] theorem val_umax : (umax n).val = 2 ^ n - 1 := rfl
 @[simp] theorem val_wrapping_add (a b : Fin (2 ^ n)) : (wrapping_add a b).val = (a.val + b.val) % 2 ^ n := rfl
 @[simp] theorem val_saturating_sub (a b : Fin (2 ^ n)) : (saturating_sub a b).val = a.val - b.val := rfl

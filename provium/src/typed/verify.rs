@@ -7,6 +7,36 @@ use std::{collections::BTreeMap, fs, path::Path, process::Command};
 
 const RUST: &str = include_str!("../../lean/Provium/Rust.lean");
 
+/// The runtime library for a target's pointer width.
+fn runtime_for(width: u32) -> String {
+    if width == 64 {
+        return RUST.to_owned();
+    }
+    let r = RUST
+        .replace(
+            "abbrev usizeBits : Nat := 64",
+            &format!("abbrev usizeBits : Nat := {width}"),
+        )
+        .replace(
+            "@[simp] theorem usizeBits_eq : usizeBits = 64 := rfl",
+            &format!("@[simp] theorem usizeBits_eq : usizeBits = {width} := rfl"),
+        )
+        .replace(
+            "theorem val_usizeOf (m : Nat) (h : m < 2 ^ 64)",
+            &format!("theorem val_usizeOf (m : Nat) (h : m < 2 ^ {width})"),
+        )
+        .replace(
+            "abbrev usize := Fin (2 ^ 64)",
+            &format!("abbrev usize := Fin (2 ^ {width})"),
+        )
+        .replace(
+            "abbrev isize := IntN 64",
+            &format!("abbrev isize := IntN {width}"),
+        );
+    assert_ne!(r, RUST, "runtime width markers missing");
+    r
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TypedProject {
@@ -112,9 +142,12 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
         }
     };
     let configuration = crate::cfg::Configuration::parse(&cfg_text)?;
-    if configuration.pointer_width() != Some(64) {
-        return Err("the typed backend supports 64-bit targets only".into());
-    }
+    let width = match configuration.pointer_width() {
+        Some(w @ (32 | 64)) => w,
+        _ => return Err("the typed backend supports 32- and 64-bit targets only".into()),
+    };
+    super::types::set_pointer_width(width as u32);
+    let runtime = runtime_for(width as u32);
     let profile = Profile::from_invocation(&cfg_text, &args)?;
     let debug_assertions = cfg_text.lines().any(|l| l.trim() == "debug_assertions");
     let extras: Vec<(String, std::path::PathBuf)> = project
@@ -181,7 +214,7 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
     let toolchain = format!("{TOOLCHAIN}\n");
     let mut artifacts: Vec<(&str, &str)> = vec![
         ("lean-toolchain", &toolchain),
-        ("Provium/Rust.lean", RUST),
+        ("Provium/Rust.lean", &runtime),
         ("Provium/Audit.lean", AUDIT),
         ("Generated.lean", &generated.lean),
         ("Proofs.lean", &proofs),
