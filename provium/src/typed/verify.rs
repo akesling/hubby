@@ -146,8 +146,8 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
         Some(w @ (32 | 64)) => w,
         _ => return Err("the typed backend supports 32- and 64-bit targets only".into()),
     };
-    super::types::set_pointer_width(width as u32);
-    let runtime = runtime_for(width as u32);
+    super::types::set_pointer_width(width);
+    let runtime = runtime_for(width);
     let profile = Profile::from_invocation(&cfg_text, &args)?;
     let debug_assertions = cfg_text.lines().any(|l| l.trim() == "debug_assertions");
     let extras: Vec<(String, std::path::PathBuf)> = project
