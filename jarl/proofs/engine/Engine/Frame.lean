@@ -12,15 +12,18 @@ and commitments.
 namespace Jarl.Engine
 open Jarl
 
-variable {V S : Type} {N CAP : Nat}
+variable {V S : Type} {N CAP : Nat} [Rust.Clone V] [Rust.Clone S]
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem setLive_self (C : Cluster V S N CAP) (k : Fin N) (n : Node V S N CAP) : (C.setLive k n).live k = n := by
   simp [Cluster.setLive]
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem setLive_other (C : Cluster V S N CAP) (k j : Fin N) (n : Node V S N CAP) (h : j ≠ k) :
     (C.setLive k n).live j = C.live j := by
   simp [Cluster.setLive, h]
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem leaderOk_congr (ids : Vector Id N) (C C' : Cluster V S N CAP) (G : Ghost V N) (j : Fin N)
     (e : C'.live j = C.live j) : LeaderOk ids C G j ↔ LeaderOk ids C' G j := by
   constructor
@@ -52,6 +55,7 @@ structure LocalOk (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V 
     n.role = .Candidate ∧ n.state.hard.term = T → lastId n.state = last
   committed : CommitOk G k n
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem setLive_inv (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (k : Fin N) (n : Node V S N CAP) (hl : LocalOk ids cfg C G k n) :
     Inv ids cfg (C.setLive k n) G := by

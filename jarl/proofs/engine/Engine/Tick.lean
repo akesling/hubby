@@ -11,7 +11,7 @@ starts a campaign for the next term.
 namespace Jarl.Engine
 open Jarl
 
-variable {V S : Type} {N CAP : Nat}
+variable {V S : Type} {N CAP : Nat} [Rust.Clone V] [Rust.Clone S]
 
 /-- Only the elapsed-time counters differ. -/
 def TimeOnly (n n' : Node V S N CAP) : Prop :=
@@ -31,6 +31,7 @@ inductive Ticked (n : Node V S N CAP) : Node V S N CAP → Prop
       (ht : n.state.hard.term.val + 1 < 2 ^ 64) →
       Campaigned n0 ⟨n.state.hard.term.val + 1, ht⟩ h n' → Ticked n n'
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem fixed_timeOnly (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n) (e a : Rust.u64) :
     Fixed ids { n with elapsed := e, leader_age := a } := { hf with layout := hf.layout, contig := hf.contig }
 

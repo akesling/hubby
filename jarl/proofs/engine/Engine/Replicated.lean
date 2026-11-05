@@ -11,7 +11,7 @@ as `advance_commit` allows, and replication descriptors can be queued.
 namespace Jarl.Engine
 open Jarl
 
-variable {V S : Type} {N CAP : Nat}
+variable {V S : Type} {N CAP : Nat} [Rust.Clone V] [Rust.Clone S]
 
 /-- The leader after recording a reply: role, votes, configuration, log and
     pending-save state are unchanged; the peer's match index is unchanged or
@@ -25,11 +25,13 @@ def Recorded (n m : Node V S N CAP) (p : Nat) (hp : p < N) (index : Rust.u64)
     (rej = none ∧ index.val ≤ (lastId n.state).index.val ∧ (n.matched[p]'hp).val < index.val ∧
       m.matched = n.matched.set p index hp))
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem fixed_misc (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n) (a : Vector Bool N)
     (nx mt : Vector Rust.u64 N) (ob : Vector (Option Outbound) N) :
     Fixed ids { n with active := a, next := nx, matched := mt, outbox := ob } :=
   { hf with layout := hf.layout, contig := hf.contig }
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- The early-return case: only `active` changed. -/
 theorem replicated_trivial (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n)
     (p : Nat) (hp : p < N) (index : Rust.u64) (rej : Option Rejection) (a : Vector Bool N) (nx : Vector Rust.u64 N)

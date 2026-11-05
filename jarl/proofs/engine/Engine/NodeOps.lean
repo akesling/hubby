@@ -12,7 +12,7 @@ safety does not depend on them.
 namespace Jarl.Engine
 open Jarl
 
-variable {V S : Type} {N CAP : Nat}
+variable {V S : Type} {N CAP : Nat} [Rust.Clone V] [Rust.Clone S]
 
 /-- Facts of every node of a fixed cluster of the distinct identities `ids`. -/
 structure Fixed (ids : Vector Id N) (n : Node V S N CAP) : Prop where
@@ -87,6 +87,7 @@ theorem membership_at_fixed (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed
     Node.membership_at n i = pure (0, stable ids) := by
   simp [Node.membership_at, hf.hooks, hf.bootstrap]
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem local_position (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n) :
     Rust.Iter.position (ids.map some).toList (fun p => p == some n.config.id) = some n.local := by
   have hl := hf.local_lt
@@ -248,6 +249,7 @@ def commitTo (n : Node V S N CAP) (i : Rust.u64) : Node V S N CAP :=
     { n with state := { n.state with hard := { n.state.hard with commit := i } }, dirty := true }
   else n
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem fixed_hard (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n) (h : HardState) (d : Bool) :
     Fixed ids { n with state := { n.state with hard := h }, dirty := d } :=
   { hf with layout := hf.layout, contig := hf.contig }
@@ -328,6 +330,7 @@ theorem advance_rel (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n) 
 def ownAppend (n : Node V S N CAP) (s' : State V S CAP) (idx : Rust.u64) (h : n.local.val < N) : Node V S N CAP :=
   { n with state := s', dirty := true, log_from := some idx, matched := n.matched.set n.local.val idx h }
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem fixed_state (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n) (s' : State V S CAP)
     (hl : Layout s') (hc : Contig s') (d : Bool) (lf : Option Rust.u64) (m : Vector Rust.u64 N) :
     Fixed ids { n with state := s', dirty := d, log_from := lf, matched := m } :=
@@ -389,6 +392,7 @@ theorem barrier_rel (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n) 
 def leaderInit (n : Node V S N CAP) (h : n.local.val < N) : Node V S N CAP :=
   { n with quorum_elapsed := 0, active := Rust.Slice.fill n.active false, role := .Leader, leader := some n.config.id, elapsed := 0, next := Rust.Slice.fill n.next (Rust.saturating_add (lastId n.state).index 1), matched := (Rust.Slice.fill n.matched 0).set n.local.val (lastId n.state).index h }
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem fixed_leaderInit (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n) :
     Fixed ids (leaderInit n hf.local_lt) := { hf with layout := hf.layout, contig := hf.contig }
 
@@ -396,17 +400,20 @@ theorem fixed_leaderInit (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed id
 def BecomeLeader (n n' : Node V S N CAP) : Prop :=
   ∃ (h : n.local.val < N) (n2 : Node V S N CAP), Barrier (leaderInit n h) n2 ∧ n' = bcast n2
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem fixed_commitTo (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n) (v : Rust.u64) :
     Fixed ids (commitTo n v) := by
   unfold commitTo; split
   · exact fixed_hard ids n hf _ true
   · exact hf
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem fixed_adv (ids : Vector Id N) (n n' : Node V S N CAP) (hf : Fixed ids n) (h : Adv n n') : Fixed ids n' := by
   rcases h with rfl | ⟨v, -, -, -, rfl⟩
   · exact hf
   · exact fixed_commitTo ids n hf v
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem fixed_barrier (ids : Vector Id N) (n n' : Node V S N CAP) (hf : Fixed ids n) (hb : Barrier n n') :
     Fixed ids n' := by
   rcases hb with rfl | ⟨s', idx, h, -, -, -, -, -, hl, hc, hA⟩
@@ -436,9 +443,11 @@ def requestVotes (n : Node V S N CAP) : Node V S N CAP :=
 def candidate (n : Node V S N CAP) (t : Rust.u64) (h : n.local.val < N) : Node V S N CAP :=
   { n with prevoting := none, state := { n.state with hard := { n.state.hard with term := t, voted_for := some n.config.id } }, dirty := true, role := .Candidate, leader := none, votes := (Rust.Slice.fill n.votes false).set n.local.val true h }
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem fixed_candidate (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n) (t : Rust.u64) :
     Fixed ids (candidate n t hf.local_lt) := { hf with layout := hf.layout, contig := hf.contig, prevoting := rfl }
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem fixed_timers (ids : Vector Id N) (n n' : Node V S N CAP) (hf : Fixed ids n) (h : Timers n n') :
     Fixed ids n' := by
   obtain ⟨r, d, rfl⟩ := h; exact { hf with layout := hf.layout, contig := hf.contig }
@@ -449,6 +458,7 @@ theorem countP_single (k : Nat) (h : k < N) (p : Fin N → Bool) (hp : ∀ j : F
     rw [List.count_eq_countP]; apply List.countP_congr; intro j _; simp [hp, Fin.ext_iff]
   rw [this, List.Nodup.count (List.nodup_finRange N)]; simp
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- Only the node's own vote is counted right after `campaign` starts. -/
 theorem candidate_votes (n : Node V S N CAP) (t : Rust.u64) (h : n.local.val < N) :
     (List.finRange N).countP (fun j => (candidate n t h).votes[j]) = 1 := by

@@ -71,8 +71,17 @@ pub struct Const {
     pub expr: syn::Expr,
 }
 
+/// A type alias, expanded where it is named.
+#[derive(Clone, Debug)]
+pub struct Alias {
+    pub module: String,
+    pub generics: syn::Generics,
+    pub ty: Type,
+}
+
 #[derive(Default)]
 pub struct Krate {
+    pub aliases: BTreeMap<String, Alias>,
     pub files: BTreeMap<PathBuf, String>,
     pub structs: BTreeMap<String, Struct>,
     pub enums: BTreeMap<String, Enum>,
@@ -472,8 +481,20 @@ impl Krate {
                     self.pending_impls
                         .push((module.to_owned(), file.to_owned(), i));
                 }
-                // Traits, macros and type aliases are not translated; a use of
-                // one fails to resolve with a diagnostic naming it.
+                Item::Type(t) => {
+                    let path = join(module, &t.ident.to_string());
+                    self.declare(module, &t.ident.to_string(), &path)?;
+                    self.aliases.insert(
+                        path,
+                        Alias {
+                            module: module.to_owned(),
+                            generics: t.generics.clone(),
+                            ty: *t.ty,
+                        },
+                    );
+                }
+                // Traits and macros are not translated; a use of one fails to
+                // resolve with a diagnostic naming it.
                 Item::Trait(_) | Item::Macro(_) | Item::ExternCrate(_) => {}
                 other => {
                     return Err(format!(

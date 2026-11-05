@@ -6,26 +6,31 @@ import Engine.LogFacts
 namespace Jarl.Engine
 open Jarl
 
-variable {V S : Type} {N CAP : Nat}
+variable {V S : Type} {N CAP : Nat} [Rust.Clone V] [Rust.Clone S]
 
 /-! ## The cluster after `persist` -/
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem persist_live_self (C : Cluster V S N CAP) (k : Fin N) (m : Node V S N CAP) :
     (C.persist k m).live k = m := by
   simp [Cluster.persist]
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem persist_live_other (C : Cluster V S N CAP) (k j : Fin N) (m : Node V S N CAP) (h : j ≠ k) :
     (C.persist k m).live j = C.live j := by
   simp [Cluster.persist, h]
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem persist_disk_self (C : Cluster V S N CAP) (k : Fin N) (m : Node V S N CAP) :
     (C.persist k m).disk k = (C.live k).state := by
   simp [Cluster.persist]
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem persist_disk_other (C : Cluster V S N CAP) (k j : Fin N) (m : Node V S N CAP) (h : j ≠ k) :
     (C.persist k m).disk j = C.disk j := by
   simp [Cluster.persist, h]
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem fixed_saved (ids : Vector Id N) (n : Node V S N CAP) (h : Fixed ids n) :
     Fixed ids { n with dirty := false, log_from := none, snapshot_changed := false } :=
   ⟨h.n_pos, h.n_lt, h.cap_pos, h.cap_lt, h.nodup, h.hooks, h.members, h.membership, h.bootstrap, h.peers,
@@ -38,21 +43,25 @@ theorem take_of_prefix {α : Type} {l l' : List α} (hp : l <+: l') {c : Nat} (h
   obtain ⟨r, rfl⟩ := hp
   exact List.take_append_of_le_length hc
 
+omit [Rust.Clone V] in
 theorem ackOk_le (G : Ghost V N) (t j j' : Nat) (h : AckOk G t j) (hj : j' ≤ j) : AckOk G t j' := by
   obtain ⟨L, hL, hle⟩ := h
   exact ⟨L, hL, by omega⟩
 
+omit [Rust.Clone V] in
 theorem ackOk_extends {G G' : Ghost V N} (e : Extends G G') (t j : Nat) (h : AckOk G t j) : AckOk G' t j := by
   obtain ⟨L, hL, hle⟩ := h
   obtain ⟨L', hL', hp⟩ := e.leader t L hL
   exact ⟨L', hL', Nat.le_trans hle hp.length_le⟩
 
+omit [Rust.Clone V] in
 theorem elect_inj (G : Ghost V N) (t : Nat) (a b : Fin N) (x y : List (Entry V))
     (h1 : G.elect t = some (a, x)) (h2 : G.elect t = some (b, y)) : a = b := by
   rw [h1] at h2
   simp only [Option.some.injEq, Prod.mk.injEq] at h2
   exact h2.1
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- Entries of a well-formed checkpoint's full log carry their positions. -/
 theorem fullLog_index (G : Ghost V N) (hw : Wf G) (s : State V S CAP) (h : StateOk G s) (i : Nat)
     (hi : i < (fullLog G s).length) : ((fullLog G s)[i]).id.index.val = i + 1 := by
@@ -73,6 +82,7 @@ theorem fullLog_index (G : Ghost V N) (hw : Wf G) (s : State V S CAP) (h : State
     rw [← h1, h2]
     exact ((hw.leader _ L hL).1 i hiL).1
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- A leader's log is consistent once it is its term's leader log. -/
 theorem leader_log_consistent (G G' : Ghost V N) (hw : Wf G) (e : Extends G G') (s : State V S CAP)
     (hs : StateOk G s) (T : Nat) (eL : List (Entry V)) (hcons : Consistent G eL) (hp : eL <+: fullLog G s)
@@ -90,6 +100,7 @@ theorem leader_log_consistent (G G' : Ghost V N) (hw : Wf G) (e : Extends G G') 
   · rw [hbeyond i hi (by omega)]
     exact ⟨_, hT, List.take_prefix _ _⟩
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem withOwn_extends (G : Ghost V N) (k : Fin N) (n : Node V S N CAP) (L : List (Entry V))
     (hL : G.leader n.state.hard.term.val = some L) (hp : L <+: fullLog G n.state) : Extends G (withOwn G k n) := by
   refine ⟨fun t L0 h => ?_, fun t x h => h, fun a h => List.mem_cons_of_mem _ h, fun b h => h⟩
@@ -100,6 +111,7 @@ theorem withOwn_extends (G : Ghost V N) (k : Fin N) (n : Node V S N CAP) (L : Li
     exact ⟨_, by simp [withOwn], hp⟩
   · exact ⟨L0, by simp [withOwn, ht, h], List.prefix_refl _⟩
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- Extending the ghost history extends a leader's own-log ghost. -/
 theorem withOwn_mono {G G' : Ghost V N} (e : Extends G G') (j : Fin N) (n : Node V S N CAP)
     (hs : StateOk G n.state) : Extends (withOwn G j n) (withOwn G' j n) := by
@@ -117,6 +129,7 @@ theorem withOwn_mono {G G' : Ghost V N} (e : Extends G G') (j : Fin N) (n : Node
     · left; rw [hf]; exact h
     · right; exact e.acks a h
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- The ghost of a leader that saved its log is well formed. -/
 theorem wf_withOwn (G : Ghost V N) (hw : Wf G) (k : Fin N) (n : Node V S N CAP) (hs : StateOk G n.state)
     (e : Extends G (withOwn G k n)) (eL : List (Entry V)) (hel : G.elect n.state.hard.term.val = some (k, eL))
@@ -158,6 +171,7 @@ theorem wf_withOwn (G : Ghost V N) (hw : Wf G) (k : Fin N) (n : Node V S N CAP) 
 
 /-! ## Transfer of the per-node clauses -/
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem candidateOk_transfer (ids : Vector Id N) (C C' : Cluster V S N CAP) {G G' : Ghost V N} (e : Extends G G')
     (hbal : G'.ballots = G.ballots) (j : Fin N) (hst : (C'.live j).state = (C.live j).state)
     (hv : (C'.live j).votes = (C.live j).votes) (hs : StateOk G (C.live j).state) (h : CandidateOk ids C G j) :
@@ -166,6 +180,7 @@ theorem candidateOk_transfer (ids : Vector Id N) (C C' : Cluster V S N CAP) {G G
   rw [hst, hv, fullLog_extends e _ hs, hbal]
   exact h
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem outOk_transfer (ids : Vector Id N) (C C' : Cluster V S N CAP) {G G' : Ghost V N} (e : Extends G G')
     (j j' : Fin N) (o : Outbound) (hst : (C'.live j).state = (C.live j).state)
     (hr : (C'.live j).role = (C.live j).role) (hsent : C'.sent = C.sent) (hs : StateOk G (C.live j).state)
@@ -187,6 +202,7 @@ theorem outOk_transfer (ids : Vector Id N) (C C' : Cluster V S N CAP) {G G' : Gh
   | PreVote _ => simp only [OutOk] at h
   | PreVoted _ _ => simp only [OutOk] at h
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem leaderOk_saved (ids : Vector Id N) (C C' : Cluster V S N CAP) (G' : Ghost V N) (j : Fin N)
     (hst : (C'.live j).state = (C.live j).state) (hm : (C'.live j).matched = (C.live j).matched)
     (eL : List (Entry V)) (h1 : G'.elect (C.live j).state.hard.term.val = some (j, eL))
@@ -205,6 +221,7 @@ theorem leaderOk_saved (ids : Vector Id N) (C C' : Cluster V S N CAP) (G' : Ghos
 
 /-! ## The invariant after saving, for a suitable ghost -/
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem persist_inv (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G G' : Ghost V N)
     (hi : Inv ids cfg C G) (k : Fin N) (e : Extends G G') (hel : G'.elect = G.elect)
     (hbal : G'.ballots = G.ballots) (hwf : Wf G')

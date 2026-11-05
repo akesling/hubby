@@ -15,13 +15,14 @@ pub fn run(seed: u64) -> u64 {
     let mut step = 0;
     while step < 300 {
         let r = mix(&mut rng);
-        let value = match r % 3 {
+        let value = match r % 4 {
             0 => match queue.push(r >> 8) {
                 Ok(()) => 1,
                 Err(Error::Full) => 2,
                 Err(Error::Empty) => 3,
             },
             1 => queue.pop().unwrap_or(7),
+            2 => u64::from(queue.push_cloned(&(r >> 16)).is_ok()) + 4,
             _ => queue.retain(|item| item % 3 != r % 3) as u64,
         };
         digest = (digest ^ value ^ queue.len() as u64).wrapping_mul(0x100000001b3);

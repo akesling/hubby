@@ -52,6 +52,23 @@ impl<T: Clone, const N: usize> Queue<T, N> {
         Ok(())
     }
 
+    /// Append a copy of an item, failing when full. The copy is made only once
+    /// there is room: a full queue never runs `T::clone`.
+    pub fn push_cloned(&mut self, item: &T) -> Result<(), Error> {
+        self.push_all(core::iter::once_with(|| item.clone()))
+    }
+
+    /// Append items in order while there is room.
+    pub fn push_all(&mut self, items: impl Iterator<Item = T>) -> Result<(), Error> {
+        if self.len == N {
+            return Err(Error::Full);
+        }
+        for item in items {
+            self.push(item)?;
+        }
+        Ok(())
+    }
+
     /// Remove the oldest item.
     pub fn pop(&mut self) -> Result<T, Error> {
         let item = self.slots[self.head].take().ok_or(Error::Empty)?;

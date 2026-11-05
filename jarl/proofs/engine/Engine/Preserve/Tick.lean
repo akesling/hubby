@@ -6,7 +6,7 @@ import Engine.LogFacts
 namespace Jarl.Engine
 open Jarl
 
-variable {V S : Type} {N CAP : Nat}
+variable {V S : Type} {N CAP : Nat} [Rust.Clone V] [Rust.Clone S]
 
 namespace PTick
 
@@ -16,6 +16,7 @@ theorem is_some_and_term (o : Option LogId) (T : Rust.u64)
   | none => simp at h
   | some id => exact ⟨id, rfl, by simpa using h⟩
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- What a `Barrier` step does to a node, in terms of full logs. -/
 theorem barrier_spec (ids : Vector Id N) (G : Ghost V N) (p n2 : Node V S N CAP) (hf : Fixed ids p)
     (hs : StateOk G p.state) (hB : Barrier p n2) :
@@ -87,17 +88,25 @@ theorem barrier_spec (ids : Vector Id N) (G : Ghost V N) (p n2 : Node V S N CAP)
     simp only [hfl2]
     rw [hvid, hid2]; simp [ownAppend, hh]
 
+omit [Rust.Clone V] [Rust.Clone S] in
 @[local simp] theorem bcast_state (n : Node V S N CAP) : (bcast n).state = n.state := rfl
+omit [Rust.Clone V] [Rust.Clone S] in
 @[local simp] theorem bcast_role (n : Node V S N CAP) : (bcast n).role = n.role := rfl
+omit [Rust.Clone V] [Rust.Clone S] in
 @[local simp] theorem bcast_dirty (n : Node V S N CAP) : (bcast n).dirty = n.dirty := rfl
+omit [Rust.Clone V] [Rust.Clone S] in
 @[local simp] theorem bcast_matched (n : Node V S N CAP) : (bcast n).matched = n.matched := rfl
+omit [Rust.Clone V] [Rust.Clone S] in
 @[local simp] theorem bcast_local (n : Node V S N CAP) : (bcast n).local = n.local := rfl
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem bcast_outbox (n : Node V S N CAP) (j : Fin N) :
     (bcast n).outbox[j] = if j.val ≠ n.local.val then some .Replicate else n.outbox[j] := by
   simp [bcast, Fin.getElem_fin]
 
+omit [Rust.Clone V] [Rust.Clone S] in
 @[local simp] theorem bcast_config (n : Node V S N CAP) : (bcast n).config = n.config := rfl
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem fixed_bcast (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n) : Fixed ids (bcast n) :=
   { hf with layout := hf.layout, contig := hf.contig }
 
@@ -108,6 +117,7 @@ theorem majority_of_countP (P : Fin N → Prop) (f : Fin N → Bool) (hf : ∀ j
     apply List.countP_mono_left; intro w _ hw; simpa using hf w hw
   omega
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- A leader `p` (node `k`, possibly dirty) running `barrier` then `broadcast` keeps its local clauses. -/
 theorem leader_local (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (k : Fin N) (p n2 : Node V S N CAP)
@@ -232,12 +242,14 @@ theorem leader_local (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster
     · cases ho; simp [hrole, hr]
     · rw [hout2, hout j] at ho; cases ho
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem config_id (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (k : Fin N) : (C.live k).config.id = ids[k] := by
   have hf := (hi.fixed k).1
   rw [← hf.local_id]
   simp only [Fin.getElem_fin, hi.slot k]
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem sent_vote (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (env : Envelope V S) (h : env ∈ C.sent) (T : Rust.u64) (last : LogId) (c : Fin N)
     (hfrom : env.from = ids[c]) (hm : env.message = .Vote T last) : T.val ≤ (C.disk c).hard.term.val := by
@@ -245,6 +257,7 @@ theorem sent_vote (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V 
   rw [hm] at h2
   exact (h2 c hfrom).1
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- Only the elapsed-time counters changed. -/
 theorem localOk_time (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (k : Fin N) (e a : Rust.u64) :
@@ -286,6 +299,7 @@ theorem localOk_time (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster
     rw [hm] at h2
     exact (h2 k hfrom).2.1 hc
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem setLive_live (C : Cluster V S N CAP) (k : Fin N) : C.setLive k (C.live k) = C := by
   cases C
   simp only [Cluster.setLive, Cluster.mk.injEq, and_true]
@@ -308,6 +322,7 @@ theorem majority_other (k : Fin N) (hN : ¬ N / 2 < 1) (P : Fin N → Prop) (h :
   unfold Majority at h
   omega
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem stateOk_cand (G : Ghost V N) (s : State V S CAP) (hs : StateOk G s) (T : Rust.u64)
     (hT : s.hard.term.val < T.val) (v : Option Id) :
     StateOk G { s with hard := { s.hard with term := T, voted_for := v } } := by
@@ -317,10 +332,12 @@ theorem stateOk_cand (G : Ghost V N) (s : State V S CAP) (hs : StateOk G s) (T :
   · rw [hfl]; intro e he; have := hs.terms e he; show _ ≤ T.val; omega
   · intro h0; have : T.val = 0 := h0; omega
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem requestVotes_outbox (n : Node V S N CAP) (j : Fin N) :
     (requestVotes n).outbox[j] = if j.val ≠ n.local.val then some .Vote else n.outbox[j] := by
   simp [requestVotes, Fin.getElem_fin]
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- A campaign with at least two slots: a candidate of the next term requesting votes. -/
 theorem campaign_local (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (k : Fin N) (T : Rust.u64) (n' : Node V S N CAP)
@@ -419,14 +436,17 @@ theorem campaign_local (ids : Vector Id N) (cfg : Fin N → Config N) (C : Clust
 def singleGhost (G : Ghost V N) (t1 : Nat) (k : Fin N) (L0 : List (Entry V)) : Ghost V N :=
   { G with leader := fun T => if T = t1 then some L0 else G.leader T, elect := fun T => if T = t1 then some (k, L0) else G.elect T, ballots := (t1, k, k, L0) :: G.ballots }
 
+omit [Rust.Clone V] in
 theorem ackOk_le (G : Ghost V N) (t j j' : Nat) (h : AckOk G t j') (hj : j ≤ j') : AckOk G t j := by
   obtain ⟨L, hL, hl⟩ := h; exact ⟨L, hL, by omega⟩
 
+omit [Rust.Clone V] in
 theorem ackOk_extends {G G' : Ghost V N} (e : Extends G G') (t j : Nat) (h : AckOk G t j) : AckOk G' t j := by
   obtain ⟨L, hL, hl⟩ := h
   obtain ⟨L', hL', hp⟩ := e.leader t L hL
   exact ⟨L', hL', Nat.le_trans hl hp.length_le⟩
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- A single node about to win term `t + 1` by its own vote: record the election. -/
 theorem single_elect (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (k : Fin N) (hN1 : N = 1) (hidle : Idle (C.live k)) (hrl : (C.live k).role ≠ .Leader) :
@@ -642,6 +662,7 @@ theorem single_elect (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster
     · left; rw [hfle]; exact committed_mono hext _ b
     · rw [hall j] at hr; exact absurd hr hrl
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- A single node that just won term `T` by its own vote runs `barrier` and `broadcast`. -/
 theorem single_local (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (k : Fin N) (hN1 : N = 1) (T : Rust.u64) (p n2 : Node V S N CAP)
@@ -690,6 +711,7 @@ theorem single_local (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster
     · exact absurd hr hrl
   · exact hB
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem fixed_requestVotes (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n) : Fixed ids (requestVotes n) :=
   { hf with layout := hf.layout, contig := hf.contig }
 

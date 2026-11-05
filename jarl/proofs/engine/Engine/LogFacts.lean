@@ -10,14 +10,16 @@ a snapshot, and how it relates to `idAt`, `State.get` and `lastId`.
 namespace Jarl.Engine
 open Jarl
 
-variable {V S : Type} {N CAP : Nat}
+variable {V S : Type} {N CAP : Nat} [Rust.Clone V] [Rust.Clone S]
 
 /-- The boundary prefix of a checkpoint's full log. -/
 def boundary (G : Ghost V N) (s : State V S CAP) : List (Entry V) :=
   if s.base.index.val = 0 then [] else G.prefix s.base.term.val s.base.index.val
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem fullLog_def (G : Ghost V N) (s : State V S CAP) : fullLog G s = boundary G s ++ ret s := rfl
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem boundary_len (G : Ghost V N) (s : State V S CAP) (h : StateOk G s) :
     (boundary G s).length = s.base.index.val := by
   unfold boundary
@@ -26,21 +28,26 @@ theorem boundary_len (G : Ghost V N) (s : State V S CAP) (h : StateOk G s) :
   · obtain ⟨L, hL, hle, -⟩ := h.base (by omega)
     simp [Ghost.prefix, hL]; omega
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem fullLog_length (G : Ghost V N) (s : State V S CAP) (h : StateOk G s) :
     (fullLog G s).length = (lastId s).index.val := by
   rw [fullLog_def, List.length_append, boundary_len G s h, lastId_eq s h.contig]
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- Same boundary and retained entries, same full log. -/
 theorem fullLog_congr (G : Ghost V N) (s s' : State V S CAP) (hb : s'.base = s.base) (hr : ret s' = ret s) :
     fullLog G s' = fullLog G s := by
   simp [fullLog_def, boundary, hb, hr]
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem base_of_snapshot (s s' : State V S CAP) (h : s'.snapshot = s.snapshot) : s'.base = s.base := by
   simp [State.base, h]
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem base_some (s : State V S CAP) (snap : Snapshot S) (h : s.snapshot = some snap) : s.base = snap.last := by
   simp [State.base, h]
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem base_zero (G : Ghost V N) (s : State V S CAP) (h : StateOk G s) (h0 : s.base.index.val = 0) :
     s.base = LogId.default := by
   cases hs : s.snapshot with
@@ -48,6 +55,7 @@ theorem base_zero (G : Ghost V N) (s : State V S CAP) (h : StateOk G s) (h0 : s.
   | some snap =>
     have := h.snapshot (by simp [hs]); omega
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- The boundary's last entry is the boundary identity. -/
 theorem boundary_last (G : Ghost V N) (s : State V S CAP) (h : StateOk G s) (hpos : 0 < s.base.index.val) :
     ∃ hl : s.base.index.val - 1 < (boundary G s).length, ((boundary G s)[s.base.index.val - 1]).id = s.base := by
@@ -59,6 +67,7 @@ theorem boundary_last (G : Ghost V N) (s : State V S CAP) (h : StateOk G s) (hpo
   simp only [this, List.getElem_take]
   exact hid
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem fullLog_getElem_ret (G : Ghost V N) (s : State V S CAP) (h : StateOk G s) (i : Nat)
     (hlo : s.base.index.val ≤ i) (hl : i < (fullLog G s).length) :
     ∃ hr : i - s.base.index.val < (ret s).length, (fullLog G s)[i] = (ret s)[i - s.base.index.val] := by
@@ -72,11 +81,13 @@ theorem fullLog_getElem_ret (G : Ghost V N) (s : State V S CAP) (h : StateOk G s
   rw [List.getElem_append_right (by omega)]
   simp only [hb]
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- Appending to the retained entries appends to the full log. -/
 theorem fullLog_append (G : Ghost V N) (s s' : State V S CAP) (l : List (Entry V))
     (hb : s'.snapshot = s.snapshot) (hr : ret s' = ret s ++ l) : fullLog G s' = fullLog G s ++ l := by
   simp [fullLog_def, boundary, base_of_snapshot s s' hb, hr]
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- The entry at index `i` (`1 ≤ i ≤ last`) of a full log. -/
 theorem fullLog_get (G : Ghost V N) (s : State V S CAP) (h : StateOk G s) (i : Nat)
     (hlo : s.base.index.val < i) (hhi : i ≤ (lastId s).index.val) :
@@ -93,6 +104,7 @@ theorem fullLog_get (G : Ghost V N) (s : State V S CAP) (h : StateOk G s) (i : N
   rw [List.getElem?_eq_getElem (by omega)]
   congr 2; omega
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- `idAt` reads identities of the full log, and the boundary itself. -/
 theorem idAt_fullLog (G : Ghost V N) (s : State V S CAP) (h : StateOk G s)
     (i : Nat) (hi : 0 < i) (id : LogId) :
@@ -132,6 +144,7 @@ theorem idAt_fullLog (G : Ghost V N) (s : State V S CAP) (h : StateOk G s)
         simp only [Option.map_some, hx]
     · rw [if_neg hlt]; simp; omega
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem lastOf_fullLog (G : Ghost V N) (s : State V S CAP) (h : StateOk G s) :
     lastOf (fullLog G s) = lastId s := by
   have hb := boundary_len G s h
@@ -153,6 +166,7 @@ theorem lastOf_fullLog (G : Ghost V N) (s : State V S CAP) (h : StateOk G s) :
       simp only [hb, Option.map_some, Option.getD_some]
       exact hid
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem idAt_zero (G : Ghost V N) (s : State V S CAP) (h : StateOk G s) (id : LogId) :
     idAt s 0 = some id ↔ s.base.index.val = 0 ∧ id = LogId.default := by
   unfold idAt
@@ -164,6 +178,7 @@ theorem idAt_zero (G : Ghost V N) (s : State V S CAP) (h : StateOk G s) (id : Lo
   · rw [if_neg (Ne.symm h0), if_neg (by omega)]
     simp [h0]
 
+omit [Rust.Clone V] in
 /-- Two prefixes of a consistent log's leader logs: the prefix through an entry of
     a consistent log is that entry's term's leader prefix. -/
 theorem consistent_take_prefix (G : Ghost V N) (l : List (Entry V)) (hc : Consistent G l) (i : Nat)
@@ -175,6 +190,7 @@ theorem consistent_take_prefix (G : Ghost V N) (l : List (Entry V)) (hc : Consis
   rw [List.prefix_iff_eq_take] at hp
   rw [hp, hlen]
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- `append` replacing the suffix from the entry's index (see `Replaced`). -/
 theorem fullLog_replaced (G : Ghost V N) (s s' : State V S CAP) (e : Entry V) (h : StateOk G s)
     (hlo : s.base.index.val < e.id.index.val) (_hhi : e.id.index.val ≤ (lastId s).index.val + 1)
@@ -190,6 +206,7 @@ theorem fullLog_replaced (G : Ghost V N) (s s' : State V S CAP) (e : Entry V) (h
   rw [List.take_append, List.take_of_length_le (l := B) (by omega), List.append_assoc, hbl]
   congr 3; omega
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- Installing a snapshot whose boundary is in the log keeps the full log. -/
 theorem fullLog_install_keep (G : Ghost V N) (s s' : State V S CAP) (snap : Snapshot S) (h : StateOk G s)
     (hc : Consistent G (fullLog G s)) (hm : idAt s snap.last.index.val = some snap.last) (hpos : 0 < snap.last.index.val)
@@ -210,6 +227,7 @@ theorem fullLog_install_keep (G : Ghost V N) (s s' : State V S CAP) (snap : Snap
   generalize hB : boundary G s = B at hbl ⊢
   rw [List.drop_append, List.drop_of_length_le (l := B) (by omega), List.nil_append, hbl]
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- Installing a snapshot outside the log replaces it by the boundary's prefix. -/
 theorem fullLog_install_reset (G : Ghost V N) (s' : State V S CAP) (snap : Snapshot S)
     (hr : ret s' = []) (hs : s'.snapshot = some snap) (hpos : 0 < snap.last.index.val) :
@@ -220,6 +238,7 @@ theorem fullLog_install_reset (G : Ghost V N) (s' : State V S CAP) (snap : Snaps
 
 /-! ## Extending the ghost history -/
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem fullLog_extends {G G' : Ghost V N} (e : Extends G G') (s : State V S CAP) (h : StateOk G s) :
     fullLog G' s = fullLog G s := by
   rw [fullLog_def, fullLog_def]
@@ -230,6 +249,7 @@ theorem fullLog_extends {G G' : Ghost V N} (e : Extends G G') (s : State V S CAP
   · obtain ⟨L, hL, hle, -⟩ := h.base (by omega)
     exact prefix_extends e _ _ L hL hle
 
+omit [Rust.Clone V] in
 theorem consistent_extends {G G' : Ghost V N} (e : Extends G G') (l : List (Entry V)) (h : Consistent G l) :
     Consistent G' l := by
   intro k hk
@@ -237,6 +257,7 @@ theorem consistent_extends {G G' : Ghost V N} (e : Extends G G') (l : List (Entr
   obtain ⟨L', hL', hp'⟩ := e.leader _ L hL
   exact ⟨h1, L', hL', hp.trans hp'⟩
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem stateOk_extends {G G' : Ghost V N} (e : Extends G G') (s : State V S CAP) (h : StateOk G s) :
     StateOk G' s := by
   have hf := fullLog_extends e s h
@@ -248,6 +269,7 @@ theorem stateOk_extends {G G' : Ghost V N} (e : Extends G G') (s : State V S CAP
     rw [← List.IsPrefix.getElem hp hl]; exact hid
   · rw [hf]; exact h.terms
 
+omit [Rust.Clone V] in
 theorem kept_extends {G G' : Ghost V N} (e : Extends G G') (w : Fin N) (t j b : Nat) (l : List (Entry V))
     (hk : Kept G w t j b l) (ha : AckOk G t j) : Kept G' w t j b l := by
   obtain ⟨L, hL, hj⟩ := ha
@@ -258,12 +280,14 @@ theorem kept_extends {G G' : Ghost V N} (e : Extends G G') (w : Fin N) (t j b : 
   · exact Or.inl hk
   · exact Or.inr ⟨t', h1, h2, c, eL, e.elect _ _ hel, hc, hn⟩
 
+omit [Rust.Clone V] in
 theorem kept_mono_bound (G : Ghost V N) (w : Fin N) (t j b b' : Nat) (l : List (Entry V)) (hb : b ≤ b')
     (hk : Kept G w t j b l) : Kept G w t j b' l := by
   rcases hk with hk | ⟨t', h1, h2, hl⟩
   · exact Or.inl hk
   · exact Or.inr ⟨t', h1, by omega, hl⟩
 
+omit [Rust.Clone V] in
 theorem kept_of_prefix (G : Ghost V N) (w : Fin N) (t j b : Nat) (l l' : List (Entry V)) (hp : l <+: l')
     (hk : Kept G w t j b l) : Kept G w t j b l' := by
   rcases hk with hk | hk

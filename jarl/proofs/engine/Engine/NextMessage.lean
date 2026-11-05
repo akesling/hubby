@@ -10,7 +10,7 @@ the current checkpoint. Failed builds drop the descriptor.
 namespace Jarl.Engine
 open Jarl
 
-variable {V S : Type} {N CAP : Nat}
+variable {V S : Type} {N CAP : Nat} [Rust.Clone V] [Rust.Clone S]
 
 /-- The message `next_message` builds from descriptor `o` for peer slot `k`. -/
 inductive Built (n : Node V S N CAP) (k : Fin N) : Outbound → Message V S → Prop
@@ -34,10 +34,12 @@ theorem fail_ne_pure {α : Type} (s : String) (b : α) : (Rust.fail s : Rust.M �
   simp [Rust.fail, throw, throwThe, MonadExceptOf.throw, pure, ExceptT.pure, ExceptT.mk]
   intro h; cases h
 
+omit [Rust.Clone V] in
 theorem entry_map_id (o : Option (Entry V)) :
     Option.map (fun e => ({ id := e.id, value := e.value } : Entry V)) o = o := by
   cases o <;> rfl
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem nm_none (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n) (hd : n.dirty = false)
     (j : Nat) (hj : j < N) (r : Option (Envelope V S)) (n' : Node V S N CAP)
     (h : (pure (none, { n with outbox := n.outbox.set j none hj, dirty := false }) : Rust.M _) = pure (r, n')) :
@@ -52,6 +54,7 @@ theorem nm_none (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n) (hd 
   simp only [Fin.getElem_fin, Vector.getElem_set]
   split <;> simp
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem nm_some (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n) (hd : n.dirty = false)
     (j : Nat) (hj : j < N) (o : Outbound) (ho : n.outbox[j] = some o) (msg : Message V S)
     (hb : Built n ⟨j, hj⟩ o msg) (r : Option (Envelope V S)) (n' : Node V S N CAP)

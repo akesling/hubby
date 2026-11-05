@@ -14,7 +14,7 @@ are excluded by hypothesis: no fixed node produces them.
 namespace Jarl.Engine
 open Jarl
 
-variable {V S : Type} {N CAP : Nat}
+variable {V S : Type} {N CAP : Nat} [Rust.Clone V] [Rust.Clone S]
 
 /-- Queue descriptor `o` for slot `a`. -/
 def queue (n : Node V S N CAP) (a : Fin N) (o : Outbound) : Node V S N CAP :=
@@ -95,6 +95,7 @@ def FixedMessage (m : Message V S) : Prop :=
   | .PreVote .. | .PreVoted .. | .AppendBatch .. => False
   | _ => True
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem fixed_req (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n) (x : Option Id) :
     Fixed ids { n with request_from := x } := { hf with layout := hf.layout, contig := hf.contig }
 
@@ -141,6 +142,7 @@ theorem granted_eq (v : Option Id) (src : Id) (l o : LogId) :
   rw [Bool.eq_iff_iff]
   cases v <;> simp [Rust.Option.is_none_or, upToDate, Fin.lt_def, Fin.le_def, Fin.ext_iff] <;> omega
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem vote_same (n1 : Node V S N CAP) (src : Id) (hv : n1.state.hard.voted_for = some src) :
     ({ n1 with state := { n1.state with hard := { n1.state.hard with voted_for := some src } }, dirty := (n1.dirty || decide (n1.state.hard.voted_for ≠ some src)) } : Node V S N CAP) = n1 := by
   rcases n1 with ⟨_, ⟨⟨_, _, _⟩, _, _, _⟩⟩
@@ -163,7 +165,7 @@ theorem observe_split {β : Type} (ids : Vector Id N) (n : Node V S N CAP) (hf :
     have ht' : t.val ≤ n.state.hard.term.val := by rw [Fin.lt_def] at ht; omega
     exact ⟨_, Or.inl ⟨ht', rfl⟩, fixed_req ids n hf _, ht', h⟩
 
-theorem step_rel (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n) (a : Fin N)
+theorem step_rel [Rust.LawfulClone S] (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n) (a : Fin N)
     (env : Envelope V S) (hsrc : env.from = ids[a]) (hm : FixedMessage env.message)
     (r : Rust.Result Unit Error) (n' : Node V S N CAP) (h : Node.step n env = pure (r, n')) :
     Stepped n a env.from env.message n' := by
@@ -289,14 +291,18 @@ theorem step_rel (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n) (a 
           install_spec n2.state snap (by have := hF2.cap_lt; omega) hF2.layout hF2.contig
         have hc' := install_contig n2.state s' _ hF2.layout hF2.contig hsn hr
         by_cases c3 : (State.id_at n2.state snap.last.index != some snap.last) = true
-        · rw [if_pos c3, hins, pure_bind] at h
+        · rw [if_pos c3] at h
+          obtain ⟨sc, hsc, h⟩ := bind_eq_pure _ _ _ h
+          rw [Rust.LawfulClone.clone_eq _ _ hsc, hins, pure_bind] at h
           have hX : Fixed ids { n2 with state := s', log_from := Rust.checked_add snap.last.index 1 } :=
             { hF2 with layout := hl', contig := hc' }
           rw [refresh_fixed ids _ hX, pure_bind, reply_peer _ _ _ _ hN, pure_bind] at h
           obtain rfl := (congrArg Prod.snd (pure_inj h))
           exact Stepped.install t snap n1 n2 _ none hI hO hT hFol
             (Or.inr ⟨c1, rfl, Or.inr ⟨c2.1, c2.2, s', _, hins, rfl⟩⟩)
-        · rw [if_neg c3, hins, pure_bind] at h
+        · rw [if_neg c3] at h
+          obtain ⟨sc, hsc, h⟩ := bind_eq_pure _ _ _ h
+          rw [Rust.LawfulClone.clone_eq _ _ hsc, hins, pure_bind] at h
           have hX : Fixed ids { n2 with state := s' } := { hF2 with layout := hl', contig := hc' }
           rw [refresh_fixed ids _ hX, pure_bind, reply_peer _ _ _ _ hN, pure_bind] at h
           obtain rfl := (congrArg Prod.snd (pure_inj h))

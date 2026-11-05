@@ -6,7 +6,7 @@ import Engine.LogFacts
 namespace Jarl.Engine
 open Jarl
 
-variable {V S : Type} {N CAP : Nat}
+variable {V S : Type} {N CAP : Nat} [Rust.Clone V] [Rust.Clone S]
 
 namespace Deliver
 
@@ -50,6 +50,7 @@ theorem step_same (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n) (e
   exact (congrArg Prod.snd (pure_inj h)).symm
 
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem setLive_live (C : Cluster V S N CAP) (k : Fin N) : C.setLive k (C.live k) = C := by
   cases C with
   | mk live disk sent =>
@@ -64,6 +65,7 @@ theorem ids_inj (ids : Vector Id N) (hnd : ids.toList.Nodup) (i j : Fin N) (h : 
   have h' : ids.toList[i.val]'(by simp) = ids.toList[j.val]'(by simp) := by simpa using h
   exact Fin.ext ((List.getElem_inj hnd).mp h')
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem id_slot (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (k : Fin N) : (C.live k).config.id = ids[k] := by
   have hf := (hi.fixed k).1
@@ -81,6 +83,7 @@ theorem majority_only (P : Fin N → Prop) (k : Fin N) (h : ∀ w, P w → w = k
   rw [countP_single k.val k.isLt _ (fun j => rfl)] at this
   omega
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem no_early_elect (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (a k : Fin N) (hak : a ≠ k) (T : Nat) (eL : List (Entry V))
     (he : G.elect T = some (k, eL)) : ¬ (C.disk k).hard.term.val < T := by
@@ -93,6 +96,7 @@ theorem no_early_elect (ids : Vector Id N) (cfg : Fin N → Config N) (C : Clust
     omega) hmaj
   exact hak (Fin.ext (by have := a.isLt; have := k.isLt; omega))
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem ballot_up (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (a k : Fin N) (hak : a ≠ k) (T : Nat) (c : Fin N) (v : List (Entry V))
     (hb : (T, k, c, v) ∈ G.ballots) (hlt : (C.live k).state.hard.term.val < T) : False := by
@@ -102,6 +106,7 @@ theorem ballot_up (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V 
   · rw [← hkc] at he
     exact no_early_elect ids cfg C G hi a k hak T v he (by omega)
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem idle_consistent (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (k : Fin N) (hd : (C.live k).dirty = false) :
     Consistent G (fullLog G (C.live k).state) := by
@@ -110,6 +115,7 @@ theorem idle_consistent (ids : Vector Id N) (cfg : Fin N → Config N) (C : Clus
     rw [← he hd]; exact (hi.wf.leader _ L hL).1
   · exact hi.consistent_live k hr
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- What observing a message's term changes. -/
 theorem observed_facts (n0 n1 : Node V S N CAP) (src : Id) (t : Rust.u64) (h : Observed n0 src t n1) :
     n1.config = n0.config ∧ n1.local = n0.local ∧ n1.votes = n0.votes ∧ n1.matched = n0.matched ∧
@@ -122,15 +128,18 @@ theorem observed_facts (n0 n1 : Node V S N CAP) (src : Id) (t : Rust.u64) (h : O
   · exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, Or.inl ⟨ht, rfl, rfl, rfl⟩⟩
   · exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, Or.inr ⟨ht, rfl, rfl, rfl⟩⟩
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem fixed_observed (ids : Vector Id N) (n0 n1 : Node V S N CAP) (hf : Fixed ids n0) (src : Id) (t : Rust.u64)
     (h : Observed n0 src t n1) : Fixed ids n1 := by
   rcases h with ⟨ht, rfl⟩ | ⟨ht, r, d, rfl⟩
   · exact { hf with layout := hf.layout, contig := hf.contig }
   · exact { hf with layout := hf.layout, contig := hf.contig, prevoting := rfl }
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem fixed_queue (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n) (a : Fin N) (o : Outbound) :
     Fixed ids (queue n a o) := { hf with layout := hf.layout, contig := hf.contig }
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem queue_outbox (n : Node V S N CAP) (hI : ∀ j : Fin N, n.outbox[j] = none) (a j : Fin N) (o o' : Outbound)
     (h : (queue n a o).outbox[j] = some o') : j = a ∧ o' = o := by
   simp only [queue, Fin.getElem_fin, Vector.getElem_set] at h
@@ -139,9 +148,11 @@ theorem queue_outbox (n : Node V S N CAP) (hI : ∀ j : Fin N, n.outbox[j] = non
   · have := hI j; simp only [Fin.getElem_fin] at this; rw [this] at h; cases h
 
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem state_hard_eta (s : State V S CAP) : ({ s with hard := s.hard } : State V S CAP) = s := by
   cases s; rfl
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- `LocalOk` for a node whose log is node `k`'s, idle, with a new hard state. -/
 theorem local_light (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (a k : Fin N) (hak : a ≠ k) (hd0 : (C.live k).dirty = false)
@@ -185,6 +196,7 @@ theorem local_light (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster 
     have := hi.ballot_cand T w k v hb h1 (by rw [← ht, h2])
     rw [hs]; exact this
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem commit_same (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (k : Fin N) (hd0 : (C.live k).dirty = false)
     (n : Node V S N CAP) (h : HardState) (hs : n.state = { (C.live k).state with hard := h })
@@ -193,6 +205,7 @@ theorem commit_same (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster 
   · left; rw [hs]; simp only [hc]; exact h1
   · rw [hd0] at h2; cases h2
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem leader_transfer (ids : Vector Id N) (C : Cluster V S N CAP) (G : Ghost V N) (k : Fin N)
     (hL : LeaderOk ids C G k) (hd0 : (C.live k).dirty = false) (n : Node V S N CAP)
     (hf : fullLog G n.state = fullLog G (C.live k).state) (ht : n.state.hard.term = (C.live k).state.hard.term)
@@ -208,6 +221,7 @@ theorem leader_transfer (ids : Vector Id N) (C : Cluster V S N CAP) (G : Ghost V
   · exact hmt
   · exact hown
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem cand_transfer (ids : Vector Id N) (C : Cluster V S N CAP) (G : Ghost V N) (k : Fin N)
     (hc : CandidateOk ids C G k) (n : Node V S N CAP)
     (hf : fullLog G n.state = fullLog G (C.live k).state) (ht : n.state.hard.term = (C.live k).state.hard.term)
@@ -217,6 +231,7 @@ theorem cand_transfer (ids : Vector Id N) (C : Cluster V S N CAP) (G : Ghost V N
   simp only [setLive_self, hf, ht, hv, hvf]
   exact hc
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem sent_vote (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (env : Envelope V S) (hm : env ∈ C.sent) (T : Rust.u64) (last : LogId)
     (hmsg : env.message = .Vote T last) (c : Fin N) (hc : env.from = ids[c]) :
@@ -227,6 +242,7 @@ theorem sent_vote (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V 
   rw [hmsg] at h
   exact h c hc
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem sent_voted (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (env : Envelope V S) (hm : env ∈ C.sent) (T : Rust.u64)
     (hmsg : env.message = .Voted T true) (w c : Fin N) (hw : env.from = ids[w]) (hc : env.to = ids[c]) :
@@ -235,6 +251,7 @@ theorem sent_voted (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V
   rw [hmsg] at h
   exact h rfl w c hw hc
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem sent_replicated (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (env : Envelope V S) (hm : env ∈ C.sent) (T j : Rust.u64)
     (hmsg : env.message = .Replicated T j none) (w : Fin N) (hw : env.from = ids[w]) :
@@ -243,6 +260,7 @@ theorem sent_replicated (ids : Vector Id N) (cfg : Fin N → Config N) (C : Clus
   rw [hmsg] at h
   exact h rfl w hw
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem votes_keep (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (k : Fin N) (n : Node V S N CAP)
     (h : n.role = .Candidate → (C.live k).role = .Candidate ∧
@@ -254,6 +272,7 @@ theorem votes_keep (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V
   obtain ⟨h1, h2, h3⟩ := h hr
   rw [h3]; exact this.2.1 ⟨h1, by rw [← h2, ht]⟩
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem outbox_queue (ids : Vector Id N) (C : Cluster V S N CAP) (G : Ghost V N) (k a : Fin N)
     (n0 n : Node V S N CAP) (hI : ∀ j : Fin N, n0.outbox[j] = none) (o : Outbound)
     (hob : n.outbox = n0.outbox.set a.val (some o) a.isLt) (hO : OutOk ids C G k a o) :
@@ -267,6 +286,7 @@ theorem outbox_queue (ids : Vector Id N) (C : Cluster V S N CAP) (G : Ghost V N)
     subst this; rw [← Option.some.inj h]; exact hO
   · have := hI j; simp only [Fin.getElem_fin] at this; rw [this] at h; cases h
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem outbox_queue_self (k a : Fin N) (hak : a ≠ k) (n0 n : Node V S N CAP) (hI : ∀ j : Fin N, n0.outbox[j] = none)
     (o : Outbound) (hob : n.outbox = n0.outbox.set a.val (some o) a.isLt) : n.outbox[k] = none := by
   rw [hob]
@@ -275,6 +295,7 @@ theorem outbox_queue_self (k a : Fin N) (hak : a ≠ k) (n0 n : Node V S N CAP) 
   have := hI k; simpa using this
 
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- `LocalOk` for a node with node `k`'s state, role, votes and match indexes. -/
 theorem local_keep (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (a k : Fin N) (hak : a ≠ k) (hd0 : (C.live k).dirty = false)
@@ -297,6 +318,7 @@ theorem local_keep (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V
     exact cand_transfer ids C G k (hi.candidate k hr) n (by rw [hst]) (by rw [hst]) hv (by rw [hst])
   · exact votes_keep ids cfg C G hi k n (fun hr => ⟨hrole ▸ hr, by rw [hst], by rw [hst]⟩)
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- `LocalOk` for a node that stepped down to a higher term without a vote. -/
 theorem local_up (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (a k : Fin N) (hak : a ≠ k) (hd0 : (C.live k).dirty = false)
@@ -319,11 +341,13 @@ theorem local_up (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S
   · exact votes_keep ids cfg C G hi k n (fun hr => by rw [hrole] at hr; cases hr)
 
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem outbox_none_ok (ids : Vector Id N) (C : Cluster V S N CAP) (G : Ghost V N) (k : Fin N)
     (n : Node V S N CAP) (hI : ∀ j : Fin N, n.outbox[j] = none) :
     ∀ j o, n.outbox[j] = some o → OutOk ids C G k j o := by
   intro j o h; rw [hI j] at h; cases h
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem case_stale (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (a k : Fin N) (hak : a ≠ k) (src : Id) (m : Message V S) (n1 n' : Node V S N CAP)
     (hI : Idle (C.live k)) (hO : Observed (C.live k) src m.term n1) (hlt : m.term.val < n1.state.hard.term.val)
@@ -344,15 +368,18 @@ theorem case_stale (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V
       (outbox_queue_self k a hak n1 _ hI' _ rfl)
 
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem state_eq_of (s s0 : State V S CAP) (h1 : s.snapshot = s0.snapshot) (h2 : s.entries = s0.entries)
     (h3 : s.len = s0.len) : s = { s0 with hard := s.hard } := by
   cases s; cases s0; simp_all
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem state_vf_same (s : State V S CAP) (x : Option Id) (h : s.hard.voted_for = x) :
     ({ s with hard := { s.hard with voted_for := x } } : State V S CAP) = s := by
   rcases s with ⟨⟨_, _, _⟩, _, _, _⟩
   simp only at h; subst h; rfl
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem case_vote (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (a k : Fin N) (hak : a ≠ k) (src dst : Id) (hsrc : src = ids[a]) (hdst : dst = ids[k])
     (t : Rust.u64) (last : LogId) (ht0 : t.val ≠ 0) (hm : ⟨src, dst, .Vote t last⟩ ∈ C.sent)
@@ -472,11 +499,13 @@ theorem case_vote (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V 
   · exact commit_same ids cfg C G hi k hI.1 n _ hs (by rw [hns, hco, hco1])
 
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem adv_local (m m' : Node V S N CAP) (h : Adv m m') : m'.local = m.local := by
   rcases h with rfl | ⟨v, -, -, -, rfl⟩
   · rfl
   · unfold commitTo; split <;> rfl
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- The early-return case: only `active` changed. -/
 theorem replicated_trivial2 (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n)
     (p : Nat) (hp : p < N) (index : Rust.u64) (rej : Option Rejection) (a : Vector Bool N) (nx : Vector Rust.u64 N)
@@ -586,6 +615,7 @@ theorem majority_of_countP (P : Fin N → Prop) (b : Fin N → Bool) (h : ∀ j,
     apply List.countP_congr; intro x _; simp only [decide_eq_true_eq]; exact (h x).symm
   omega
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem adv_point (G : Ghost V N) (s : State V S CAP) (hs : StateOk G s) (v T : Rust.u64)
     (hb : s.base.index.val < v.val)
     (h : Rust.Option.is_some_and (State.id_at s v) (fun id => id.term == T) = true) :
@@ -599,6 +629,7 @@ theorem adv_point (G : Ghost V N) (s : State V S CAP) (hs : StateOk G s) (v T : 
     obtain ⟨-, hl, he⟩ := (idAt_fullLog G s hs v.val (by omega) id).mp hid
     exact ⟨hl, by rw [he]; exact h⟩
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem adv_cases (m m' : Node V S N CAP) (h : Adv m m') : m' = m ∨ ∃ v : Rust.u64,
     N / 2 < (List.finRange N).countP (fun j => decide (v.val ≤ (m.matched[j]).val)) ∧
     m.state.hard.commit < v ∧
@@ -608,6 +639,7 @@ theorem adv_cases (m m' : Node V S N CAP) (h : Adv m m') : m' = m ∨ ∃ v : Ru
   · exact Or.inl rfl
   · exact Or.inr ⟨v, h1, h2, h3, by simp [commitTo, h2]⟩
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- `LocalOk` for the node right after observing a message's term. -/
 theorem local_observed (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (a k : Fin N) (hak : a ≠ k) (hI : Idle (C.live k)) (src : Id) (t : Rust.u64)
@@ -767,6 +799,7 @@ theorem case_replicated (ids : Vector Id N) (cfg : Fin N → Config N) (C : Clus
       · simp [Ghost.prefix, withOwn, h]
 
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- A candidate counting the vote of `a`. -/
 theorem local_count (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (a k : Fin N) (hak : a ≠ k) (hI : Idle (C.live k))
@@ -801,6 +834,7 @@ theorem local_count (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster 
   · exact votes_keep ids cfg C G hi k n (fun hr => ⟨hrole ▸ hr, by rw [hst], by rw [hst]⟩)
 
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem withOwn_extends {G G' : Ghost V N} (e : Extends G G') (j : Fin N) (m : Node V S N CAP)
     (hs : StateOk G m.state) : Extends (withOwn G j m) (withOwn G' j m) := by
   have hf := fullLog_extends e m.state hs
@@ -814,6 +848,7 @@ theorem withOwn_extends {G G' : Ghost V N} (e : Extends G G') (j : Fin N) (m : N
     · left; rw [h, hf]
     · right; exact e.acks x h
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem commitOk_extends {G G' : Ghost V N} (e : Extends G G') (j : Fin N) (m : Node V S N CAP)
     (hs : StateOk G m.state) (h : CommitOk G j m) : CommitOk G' j m := by
   have hf := fullLog_extends e m.state hs
@@ -821,6 +856,7 @@ theorem commitOk_extends {G G' : Ghost V N} (e : Extends G G') (j : Fin N) (m : 
   · left; rw [hf]; exact committed_mono e _ h
   · right; refine ⟨h1, h2, ?_⟩; rw [hf]; exact committed_mono (withOwn_extends e j m hs) _ h3
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- The frame for a step that also records new history about node `k`. -/
 theorem setLive_grow (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G G' : Ghost V N)
     (hi : Inv ids cfg C G) (k : Fin N) (n : Node V S N CAP)
@@ -1026,6 +1062,7 @@ theorem setLive_grow (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster
     · rw [setLive_other C k j n hj]; exact commitOk_extends ext j _ (hi.live j) (hi.committed j).2
 
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- What `become_leader` does to a candidate with at least two slots. -/
 theorem win_node (ids : Vector Id N) (G : Ghost V N) (nv n' : Node V S N CAP) (k : Fin N)
     (hF : Fixed ids nv) (hloc : nv.local.val = k.val) (_hd : nv.dirty = false)
@@ -1120,6 +1157,7 @@ def winGhost (G : Ghost V N) (T : Nat) (k : Fin N) (eL : List (Entry V)) : Ghost
     acks := G.acks,
     ballots := (T, k, k, eL) :: G.ballots }
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem case_win (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (a k : Fin N) (hak : a ≠ k) (src : Id) (t : Rust.u64) (ht0 : t.val ≠ 0)
     (n1 nv n' : Node V S N CAP) (hI : Idle (C.live k)) (hO : Observed (C.live k) src t n1)
@@ -1369,6 +1407,7 @@ theorem case_win (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S
 
 
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem sent_append (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (env : Envelope V S) (hm : env ∈ C.sent) (T : Rust.u64) (prev : LogId)
     (entry : Option (Entry V)) (commit : Rust.u64) (hmsg : env.message = .Append T prev entry commit) :
@@ -1383,6 +1422,7 @@ theorem sent_append (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster 
   rw [hmsg] at h
   exact h
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem sent_install (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (env : Envelope V S) (hm : env ∈ C.sent) (T : Rust.u64) (snap : Snapshot S)
     (hmsg : env.message = .Install T snap) :
@@ -1394,6 +1434,7 @@ theorem sent_install (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster
   rw [hmsg] at h
   exact h
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem stateOk_hard (G : Ghost V N) (s : State V S CAP) (hs : StateOk G s) (h : HardState)
     (ht : s.hard.term.val ≤ h.term.val) (hc1 : s.hard.commit.val ≤ h.commit.val)
     (hc2 : h.commit.val ≤ (lastId s).index.val) (hu : h.term.val = 0 → h.voted_for = none) :
@@ -1401,6 +1442,7 @@ theorem stateOk_hard (G : Ghost V N) (s : State V S CAP) (hs : StateOk G s) (h :
   ⟨hs.layout, hs.contig, hs.base, hs.snapshot, fun e he => Nat.le_trans (hs.terms e he) ht,
     Nat.le_trans hs.commit_ge hc1, hc2, hu⟩
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem commitTo_cases (n : Node V S N CAP) (i : Rust.u64) : commitTo n i = n ∨
     (n.state.hard.commit < i ∧
       commitTo n i = { n with state := { n.state with hard := { n.state.hard with commit := i } }, dirty := true }) := by
@@ -1408,12 +1450,14 @@ theorem commitTo_cases (n : Node V S N CAP) (i : Rust.u64) : commitTo n i = n �
   · rename_i h; exact Or.inr ⟨h, rfl⟩
   · exact Or.inl rfl
 
+omit [Rust.Clone V] in
 theorem committed_prefix (G : Ghost V N) (p q : List (Entry V)) (h : Committed G p) (hq : q <+: p) :
     Committed G q := by
   rcases h with rfl | ⟨t, j, hc, hp⟩
   · left; exact List.eq_nil_of_prefix_nil hq
   · right; exact ⟨t, j, hc, hq.trans hp⟩
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem match_take (G : Ghost V N) (s : State V S CAP) (hs : StateOk G s) (hc : Consistent G (fullLog G s))
     (L : List (Entry V)) (hL : Consistent G L) (idx : Nat) (id : LogId) (hid : idAt s idx = some id)
     (hL' : 0 < idx → ∃ h : idx - 1 < L.length, L[idx - 1].id = id) :
@@ -1426,6 +1470,7 @@ theorem match_take (G : Ghost V N) (s : State V S CAP) (hs : StateOk G s) (hc : 
     rw [show idx - 1 + 1 = idx by omega] at this
     exact ⟨this, by omega⟩
 
+omit [Rust.Clone V] in
 /-- An acknowledged prefix survives a replacement by a prefix of the leader log of
     term `t`, or that term's leader (another node) lacks it. -/
 theorem kept_replace (G : Ghost V N) (k a : Fin N) (hak : a ≠ k) (t t' j B : Nat) (old l' L eLt : List (Entry V))
@@ -1441,6 +1486,7 @@ theorem kept_replace (G : Ghost V N) (k a : Fin N) (hak : a ≠ k) (t t' j B : N
       exact hpl (prefix_le G t' j L hL)
   · exact Or.inr ⟨t3, h1, by omega, hl⟩
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- An observed node's vote matches `k`'s ballots of its term. -/
 theorem ballots_observed (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (a k : Fin N) (hak : a ≠ k) (src : Id) (t : Rust.u64) (n1 : Node V S N CAP)
@@ -1452,6 +1498,7 @@ theorem ballots_observed (ids : Vector Id N) (cfg : Fin N → Config N) (C : Clu
   · rw [h] at ht; simp only at ht
     exact absurd (ballot_up ids cfg C G hi a k hak T c v hb (by omega)) id
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- `LocalOk` for a follower. -/
 theorem local_follower (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (a k : Fin N) (hak : a ≠ k) (n : Node V S N CAP)
@@ -1499,6 +1546,7 @@ structure Pre (ids : Vector Id N) (C : Cluster V S N CAP) (G : Ghost V N) (k : F
   committed : Committed G ((fullLog G n2.state).take n2.state.hard.commit.val)
   term : n2.state.hard.term.val = t
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem pre_of (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (k : Fin N) (hI : Idle (C.live k)) (src : Id) (t : Rust.u64) (n1 n2 : Node V S N CAP)
     (ht0 : t.val ≠ 0) (hO : Observed (C.live k) src t n1) (hT : n1.state.hard.term = t)
@@ -1537,6 +1585,7 @@ theorem pre_of (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N
   · show n1.state.hard.term.val = t.val
     rw [hT]
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- `LocalOk` once a follower has queued its reply. -/
 theorem local_reply (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (a k : Fin N) (hak : a ≠ k) (hI : Idle (C.live k)) (src : Id) (t : Rust.u64)
@@ -1580,30 +1629,35 @@ theorem local_reply (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster 
     rw [hnt]; exact hP.reply hr
 
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem post_same (ids : Vector Id N) (C : Cluster V S N CAP) (G : Ghost V N) (k : Fin N) (t : Nat)
     (n2 : Node V S N CAP) (hP : Pre ids C G k t n2) (r1 : Rust.u64) (r2 : Option Rejection) (hr : r2.isSome) :
     Post ids G k t n2 n2 r1 r2 :=
   ⟨hP.fixed, rfl, rfl, rfl, rfl, rfl, rfl, hP.live, hP.cons, fun t' j h => (hP.acks t' j h).2,
     fun h => ⟨rfl, h⟩, hP.committed, fun h => by rw [h] at hr; cases hr⟩
 
+omit [Rust.Clone V] in
 theorem prefix_take_of (p L : List (Entry V)) (m : Nat) (hp : p <+: L) (hm : p.length ≤ m) : p <+: L.take m := by
   rw [List.prefix_iff_eq_take] at hp
   rw [hp]
   have : List.take p.length L = List.take p.length (L.take m) := by rw [List.take_take, Nat.min_eq_left hm]
   rw [this]; exact List.take_prefix _ _
 
+omit [Rust.Clone V] in
 theorem take_of_take (l L : List (Entry V)) (idx i : Nat) (h : l.take idx = L.take idx) (hi : i ≤ idx) :
     l.take i = L.take i := by
   have h1 : l.take i = (l.take idx).take i := by rw [List.take_take, Nat.min_eq_left hi]
   have h2 : L.take i = (L.take idx).take i := by rw [List.take_take, Nat.min_eq_left hi]
   rw [h1, h2, h]
 
+omit [Rust.Clone V] in
 theorem committed_take (G : Ghost V N) (L : List (Entry V)) (i c : Nat) (h : Committed G (L.take c)) (hi : i ≤ c) :
     Committed G (L.take i) := by
   refine committed_prefix G _ _ h ?_
   have : L.take i = (L.take c).take i := by rw [List.take_take, Nat.min_eq_left hi]
   rw [this]; exact List.take_prefix _ _
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem post_commit (ids : Vector Id N) (C : Cluster V S N CAP) (G : Ghost V N) (k : Fin N) (t : Nat)
     (n2 : Node V S N CAP) (hP : Pre ids C G k t n2) (L : List (Entry V)) (hL : G.leader t = some L)
     (idx : Nat) (htake : (fullLog G n2.state).take idx = L.take idx) (hidx : idx ≤ (fullLog G n2.state).length)
@@ -1630,6 +1684,7 @@ theorem post_commit (ids : Vector Id N) (C : Cluster V S N CAP) (G : Ghost V N) 
       exact committed_take G L _ _ hcomm hi2
 
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem post_replace (ids : Vector Id N) (C : Cluster V S N CAP) (G : Ghost V N) (k a : Fin N) (hak : a ≠ k)
     (t : Nat) (n2 : Node V S N CAP) (hP : Pre ids C G k t n2) (L eLt : List (Entry V)) (hL : G.leader t = some L)
     (hLc : Consistent G L) (hLt : ∀ e ∈ L, 0 < e.id.term.val ∧ e.id.term.val ≤ t)
@@ -1712,6 +1767,7 @@ theorem post_replace (ids : Vector Id N) (C : Cluster V S N CAP) (G : Ghost V N)
 
 
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem post_keep (ids : Vector Id N) (C : Cluster V S N CAP) (G : Ghost V N) (k : Fin N) (t : Nat)
     (n2 : Node V S N CAP) (hP : Pre ids C G k t n2) (r1 : Rust.u64) (r2 : Option Rejection)
     (hr : r2 = none → G.prefix t r1.val <+: fullLog G n2.state ∧ AckOk G t r1.val) :
@@ -1719,6 +1775,7 @@ theorem post_keep (ids : Vector Id N) (C : Cluster V S N CAP) (G : Ghost V N) (k
   ⟨hP.fixed, rfl, rfl, rfl, rfl, rfl, rfl, hP.live, hP.cons, fun t' j h => (hP.acks t' j h).2,
     fun h => ⟨rfl, h⟩, hP.committed, hr⟩
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem post_install (ids : Vector Id N) (C : Cluster V S N CAP) (G : Ghost V N) (k a : Fin N) (hak : a ≠ k)
     (t : Nat) (n2 : Node V S N CAP) (hP : Pre ids C G k t n2) (L eLt : List (Entry V)) (hL : G.leader t = some L)
     (hLc : Consistent G L) (hLt : ∀ e ∈ L, 0 < e.id.term.val ∧ e.id.term.val ≤ t)
@@ -1828,7 +1885,7 @@ theorem post_install (ids : Vector Id N) (C : Cluster V S N CAP) (G : Ghost V N)
       · omega
       · rw [h, List.take_take, Nat.min_self]; exact hcomm
 
-theorem case_append (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
+theorem case_append [Rust.LawfulClone V] (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (a k : Fin N) (hak : a ≠ k) (src dst : Id) (hsrc : src = ids[a])
     (t : Rust.u64) (ht0 : t.val ≠ 0) (prev : LogId) (entry : Option (Entry V)) (commit : Rust.u64)
     (hm : ⟨src, dst, .Append t prev entry commit⟩ ∈ C.sent)
@@ -1841,11 +1898,8 @@ theorem case_append (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster 
   obtain ⟨hLc, hLt, ca, eLt, he, hpe, -⟩ := hi.wf.leader t.val L hL
   have hca : ca = a := ids_inj ids (hi.fixed k).1.nodup _ _ ((hsender ca eLt he).symm.trans hsrc)
   rw [hca] at he
-  obtain ⟨r', n', hap, hF3, hcases⟩ := append_rel ids n2 hP.fixed prev entry commit hP.live.commit_ge
-    hP.live.commit_le (fun e h => (hent e h).2.2)
-  rw [hap] at hx
-  obtain ⟨hrr, hnn⟩ := Prod.mk.inj (pure_inj hx)
-  subst hrr hnn
+  obtain ⟨hF3, hcases⟩ := append_rel ids n2 hP.fixed prev entry commit hP.live.commit_ge
+    hP.live.commit_le (fun e h => (hent e h).2.2) r n3 hx
   refine local_reply ids cfg C G hi a k hak hI src t n1 n2 _ hO hT hn2 _ _ ?_
   have hprevL : prev.index.val ≤ L.length := by
     by_cases h0 : prev.index.val = 0
@@ -1871,6 +1925,7 @@ theorem case_append (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster 
       hlt s' hrep commit hcomm _ hF3 rfl
 
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem case_install (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (a k : Fin N) (hak : a ≠ k) (src dst : Id) (hsrc : src = ids[a])
     (t : Rust.u64) (ht0 : t.val ≠ 0) (snap : Snapshot S) (hm : ⟨src, dst, .Install t snap⟩ ∈ C.sent)
@@ -1921,6 +1976,7 @@ theorem case_install (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster
       exact List.take_prefix _ _
   · exact post_install ids C G k a hak _ n2 hP L eLt hL hLc hLt he hpe snap hpos hsl hLs hcomm ⟨h1, h2⟩ s' hins lf
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- The counted vote's ballot (the candidate's log is at least as up to date). -/
 theorem voted_ballot (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (a k : Fin N) (src dst : Id) (hsrc : src = ids[a]) (hdst : dst = ids[k])
@@ -1933,6 +1989,7 @@ theorem voted_ballot (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster
     exact ⟨vlog, hb', hi.ballot_cand _ a k vlog hb' hcand rfl⟩
   · exact absurd ⟨hcand, by rw [hT]⟩ (hi.elect_cand _ k eL he)
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem case_count (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (a k : Fin N) (_hak : a ≠ k) (src : Id) (t : Rust.u64)
     (n1 : Node V S N CAP) (hI : Idle (C.live k)) (hO : Observed (C.live k) src t n1)
@@ -1952,7 +2009,7 @@ theorem case_count (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V
 end Deliver
 
 open Deliver in
-theorem preserve_deliver (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
+theorem preserve_deliver [Rust.LawfulClone V] [Rust.LawfulClone S] (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (k : Fin N) (env : Envelope V S) (r : Rust.Result Unit Error) (n : Node V S N CAP)
     (hm : env ∈ C.sent) (h : Node.step (C.live k) env = pure (r, n)) :
     ∃ G', Extends G G' ∧ Inv ids cfg (C.setLive k n) G' := by

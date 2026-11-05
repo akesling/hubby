@@ -7,7 +7,7 @@ import Engine.NodeOps
 namespace Jarl.Engine
 open Jarl
 
-variable {V S : Type} {N CAP : Nat}
+variable {V S : Type} {N CAP : Nat} [Rust.Clone V] [Rust.Clone S]
 
 /-- No pending save or outgoing message (`available` succeeds). -/
 def Idle (n : Node V S N CAP) : Prop :=
@@ -34,6 +34,7 @@ theorem bind_eq_pure {α β : Type} (x : Rust.M α) (f : α → Rust.M β) (b : 
     · exact ⟨a, rfl, h⟩
   exact key x.run h
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem install_contig (s s' : State V S CAP) (snap : Snapshot S) (hl : Layout s) (hc : Contig s)
     (hsn : s'.snapshot = some snap)
     (hr : ret s' = (if idAt s snap.last.index.val = some snap.last
@@ -81,14 +82,24 @@ theorem new_tail (ids : Vector Id N) (n0 n : Node V S N CAP) (hf0 : Fixed ids n0
   subst h
   exact ⟨fixed_timers ids _ _ hf0 ht, ht⟩
 
+omit [Rust.Clone V] [Rust.Clone S] in
+/-- A `for` loop followed by more code that returned: every iteration that
+returned continued, so the invariant held at the end of the loop. -/
 theorem forIn_bind_elim {β γ δ : Type} (l : List γ) (init : β) (f : γ → β → Rust.M (ForInStep β))
-    (k : β → Rust.M δ) (R : Rust.M δ) (I : Nat → β → Prop) (h0 : I 0 init)
-    (hstep : ∀ i (hi : i < l.length) b, I i b → ∃ b', f l[i] b = pure (.yield b') ∧ I (i + 1) b')
-    (h : (forIn l init f >>= k) = R) : ∃ b, I l.length b ∧ k b = R := by
-  obtain ⟨b, hb, hI⟩ := Rust.forIn_inv l init f I h0 hstep
-  rw [hb, pure_bind] at h
-  exact ⟨b, hI, h⟩
+    (k : β → Rust.M δ) (R : δ) (I : Nat → β → Prop) (h0 : I 0 init)
+    (hstep : ∀ i (hi : i < l.length) b, I i b → ∀ s, f l[i] b = pure s → ∃ b', s = .yield b' ∧ I (i + 1) b')
+    (h : (forIn l init f >>= k) = pure R) : ∃ b, I l.length b ∧ k b = pure R := by
+  induction l generalizing init I with
+  | nil => rw [List.forIn_nil, pure_bind] at h; exact ⟨init, h0, h⟩
+  | cons x xs ih =>
+    rw [List.forIn_cons, bind_assoc] at h
+    obtain ⟨s, hs, h2⟩ := bind_eq_pure _ _ _ h
+    obtain ⟨b1, rfl, hi1⟩ := hstep 0 (by simp) init h0 s hs
+    obtain ⟨b, hb, hk⟩ := ih b1 (fun j => I (j + 1)) hi1
+      (fun j hj b hb s hs => hstep (j + 1) (by simp; omega) b hb s (by simpa only [List.getElem_cons_succ] using hs)) h2
+    exact ⟨b, by simpa using hb, hk⟩
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem proposed_getElem (n : Node V S N CAP) (vs : List V) (k : Nat) (hk : k < vs.length) :
     (proposed n vs)[k]'(by simp [proposed]; exact hk) =
       { id := { index := Rust.ofNat ((lastId n.state).index.val + 1 + k), term := n.state.hard.term },
@@ -98,9 +109,11 @@ theorem proposed_getElem (n : Node V S N CAP) (vs : List V) (k : Nat) (hk : k < 
 /-- `propose_many(count, values)`: an idle leader with room appends the batch
     atomically and replicates it; any other outcome leaves the node unchanged. -/
 theorem propose_many_rel (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n)
-    (vs : List V) (count : Rust.usize) (hc : count.val = vs.length)
+    (vs : List V) (values : List (Rust.M V)) (hvlen : values.length = vs.length)
+    (hval : ∀ i (hi : i < vs.length), Rust.Faithful (values[i]'(hvlen ▸ hi)) vs[i])
+    (count : Rust.usize) (hc : count.val = vs.length)
     (r : Rust.Result ProposalRange Error) (n' : Node V S N CAP)
-    (h : Node.propose_many n count vs = pure (r, n')) :
+    (h : Node.propose_many n count values = pure (r, n')) :
     n' = n ∨
       (Idle n ∧ n.role = .Leader ∧ 0 < vs.length ∧ (lastId n.state).index.val + vs.length < 2 ^ 64 ∧
         ∃ (s' : State V S CAP) (n2 : Node V S N CAP),
@@ -162,9 +175,12 @@ theorem propose_many_rel (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed id
       sk.snapshot = n.state.snapshot ∧ Layout sk ∧ Contig sk)
     ⟨n.state, rfl, by simp, rfl, rfl, hl, hcont⟩ ?step h)
   case step =>
-    intro k hk b ⟨sk, hb, hr, hh, hs, hlk, hck⟩
+    intro k hk b ⟨sk, hb, hr, hh, hs, hlk, hck⟩ st hst
     subst hb
-    rw [enumerate_length] at hk
+    simp only [enumerate_get] at hst
+    obtain ⟨v, hv, hst⟩ := bind_eq_pure _ _ _ hst
+    rw [enumerate_length, hvlen] at hk
+    obtain rfl := hval k hk v hv
     have hkv : (Rust.ofNat k : Rust.usize).val = k := by simp [Rust.ofNat]; omega
     have hlenk : (ret sk).length = (ret n.state).length + k := by
       rw [hr]; simp [hplen]; omega
@@ -175,7 +191,8 @@ theorem propose_many_rel (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed id
       { id := { index := ⟨_, hadd⟩, term := n.state.hard.term }, value := some vs[k] } hcap hlk
       (by rw [len_eq _ hlk]; omega)
     refine ⟨_, ?_, s2, rfl, ?_, hh2.trans hh, hs2.trans hs, hl2, ?_⟩
-    · simp only [enumerate_get, Rust.add_ok _ _ hadd, pure_bind, hp]
+    · simp only [Rust.add_ok _ _ hadd, pure_bind, hp] at hst
+      exact (pure_inj hst).symm
     · rw [hr2, hr, List.take_add_one, List.getElem?_eq_getElem (by rw [hplen]; exact hk),
         proposed_getElem n vs k hk]
       have hidx : (⟨_, hadd⟩ : Rust.u64) = Rust.ofNat ((lastId n.state).index.val + 1 + k) := by
@@ -256,6 +273,7 @@ theorem compact_with_rel (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed id
         simp only [this, Bool.false_eq_true, if_false] at h
         exact Or.inl ⟨hrole, (congrArg Prod.snd (pure_inj h)).symm⟩
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- `Ready::persisted` clears the pending-save flags. -/
 theorem persisted_eq (n : Node V S N CAP) :
     Ready.persisted ⟨n⟩ = ⟨{ n with dirty := false, log_from := none, snapshot_changed := false }⟩ := by

@@ -22,6 +22,7 @@ struct Emitted {
     text: String,
     calls: BTreeSet<String>,
     impure: bool,
+    lent: Option<Vec<String>>,
 }
 
 fn generic_binders(g: &Generics, bounds: &[(String, String)]) -> String {
@@ -58,8 +59,13 @@ fn bounds(generics: &[&syn::Generics]) -> Vec<(String, String)> {
     let mut add = |t: String, b: &syn::TypeParamBound| {
         if let syn::TypeParamBound::Trait(tb) = b {
             let name = tb.path.segments.last().unwrap().ident.to_string();
-            if matches!(name.as_str(), "PartialEq" | "Eq") && !out.iter().any(|(x, _)| *x == t) {
-                out.push((t, "DecidableEq".to_owned()));
+            let class = match name.as_str() {
+                "PartialEq" | "Eq" => "DecidableEq",
+                "Clone" => "Rust.Clone",
+                _ => return,
+            };
+            if !out.iter().any(|(x, c)| *x == t && c == class) {
+                out.push((t, class.to_owned()));
             }
         }
     };
@@ -107,6 +113,62 @@ fn has_fn(k: &Krate, t: &Ty, seen: &mut BTreeSet<String>) -> bool {
         }
         _ => false,
     }
+}
+
+/// The hand-written `PartialEq::eq` of a crate type, if any.
+fn manual_eq(k: &Krate, p: &str) -> Option<String> {
+    k.functions
+        .values()
+        .find(|f| {
+            f.owner.as_deref() == Some(p)
+                && f.name == "eq"
+                && f.trait_name.as_deref() == Some("PartialEq")
+        })
+        .map(|f| f.path.clone())
+}
+
+/// Whether a type's Rust equality reaches a hand-written `PartialEq`, so Lean's
+/// structural equality is not its meaning.
+fn has_manual_eq(k: &Krate, t: &Ty, seen: &mut BTreeSet<String>) -> bool {
+    match t {
+        Ty::Tuple(v) => v.iter().any(|t| has_manual_eq(k, t, seen)),
+        Ty::Array(t, _) | Ty::Slice(t) | Ty::Ref(_, t) | Ty::Option(t) | Ty::Iter(t) => {
+            has_manual_eq(k, t, seen)
+        }
+        Ty::Result(a, b) => has_manual_eq(k, a, seen) || has_manual_eq(k, b, seen),
+        Ty::Adt(p, a, _) => {
+            if a.iter().any(|t| has_manual_eq(k, t, seen)) {
+                return true;
+            }
+            if !seen.insert(p.clone()) {
+                return false;
+            }
+            manual_eq(k, p).is_some()
+                || field_types(k, p)
+                    .unwrap_or_default()
+                    .iter()
+                    .any(|t| has_manual_eq(k, t, seen))
+        }
+        _ => false,
+    }
+}
+
+/// Every crate type reachable from `needed` through field types.
+fn type_closure(k: &Krate, needed: &BTreeSet<String>) -> R<BTreeSet<String>> {
+    let mut all = needed.clone();
+    let mut work: Vec<String> = needed.iter().cloned().collect();
+    while let Some(p) = work.pop() {
+        let mut d = BTreeSet::new();
+        for t in field_types(k, &p)? {
+            adt_deps(&t, &mut d);
+        }
+        for q in d {
+            if all.insert(q.clone()) {
+                work.push(q);
+            }
+        }
+    }
+    Ok(all)
 }
 
 fn field_types(k: &Krate, p: &str) -> R<Vec<Ty>> {
@@ -194,6 +256,7 @@ fn emit_types(
     k: &Krate,
     names: &Names,
     needed: &BTreeSet<String>,
+    manual_eqs: &BTreeMap<String, String>,
 ) -> R<(String, BTreeSet<String>)> {
     // Close over field types.
     let mut all = needed.clone();
@@ -288,8 +351,12 @@ fn emit_types(
         );
         let fns = has_fn(k, &self_ty, &mut BTreeSet::new());
         let mut deriving = vec![];
-        if !fns && derives.iter().any(|d| d.ends_with("PartialEq")) {
-            deriving.push("DecidableEq");
+        // Rust's derived equality is structural unless a field's type has a
+        // hand-written `PartialEq`; then it is that equality, field-wise.
+        let derived_eq = !fns && derives.iter().any(|d| d.ends_with("PartialEq"));
+        let manual_inside = derived_eq && has_manual_eq(k, &self_ty, &mut BTreeSet::new());
+        if derived_eq {
+            deriving.push(if manual_inside { "BEq" } else { "DecidableEq" });
         }
         if !fns {
             deriving.push("Repr");
@@ -333,6 +400,25 @@ fn emit_types(
             out.push_str(&format!("  deriving {}\n", deriving.join(", ")));
         }
         out.push('\n');
+        if derives.iter().any(|d| d.ends_with("Clone")) {
+            out.push_str(&clone_instances(k, names, p, &g, &scope, &self_ty)?);
+        }
+        // A generic type's derived equality at arguments that only have Rust's
+        // `==` (a hand-written `PartialEq` inside): field-wise, below the
+        // decidable equality used whenever the arguments have one.
+        if derived_eq && !manual_inside && !g.types.is_empty() {
+            out.push_str(&structural_beq(k, names, p, &g, &self_ty)?);
+        }
+        // A hand-written `PartialEq`: its translated `eq` is the type's `==`.
+        if let Some(eq) = manual_eqs.get(p) {
+            out.push_str(eq);
+            out.push_str(&format!(
+                "instance{} : BEq {} := ⟨{}.eq⟩\n\n",
+                generic_binders(&g, &[]),
+                paren_ty(&names.ty(&self_ty)),
+                lean
+            ));
+        }
         // A derived `Default`: every field's default value.
         if derives.iter().any(|d| d.ends_with("Default")) {
             let s = k
@@ -353,6 +439,155 @@ fn emit_types(
         }
     }
     Ok((out, consts))
+}
+
+/// A low-priority field-wise `BEq`, as Rust derives `PartialEq`.
+fn structural_beq(k: &Krate, names: &Names, p: &str, g: &Generics, self_ty: &Ty) -> R<String> {
+    let lean = &names.types[p];
+    let beqs = g
+        .types
+        .iter()
+        .map(|t| (t.clone(), "BEq".to_owned()))
+        .collect::<Vec<_>>();
+    let mut out = format!(
+        "/-- Derived `PartialEq` for `{p}` at arguments with only `==`. -/\ninstance (priority := low){} : BEq {} where\n",
+        generic_binders(g, &beqs),
+        paren_ty(&names.ty(self_ty))
+    );
+    let all = |n: usize, a: &str, b: &str| {
+        if n == 0 {
+            "true".to_owned()
+        } else {
+            (0..n)
+                .map(|i| format!("{a}{i} == {b}{i}"))
+                .collect::<Vec<_>>()
+                .join(" && ")
+        }
+    };
+    if let Some(s) = k.structs.get(p) {
+        let fields: Vec<String> = s
+            .fields
+            .iter()
+            .map(|(n, _)| {
+                if s.tuple {
+                    format!("f{}", &n[1..])
+                } else {
+                    ident(n)
+                }
+            })
+            .collect();
+        let body = if fields.is_empty() {
+            "true".to_owned()
+        } else {
+            fields
+                .iter()
+                .map(|f| format!("a.{f} == b.{f}"))
+                .collect::<Vec<_>>()
+                .join(" && ")
+        };
+        out.push_str(&format!("  beq a b := {body}\n\n"));
+        return Ok(out);
+    }
+    let e = &k.enums[p];
+    out.push_str("  beq\n");
+    for v in &e.variants {
+        let c = format!("{lean}.{}", ident(&v.name));
+        let n = v.fields.len();
+        let xs = |x: &str| (0..n).map(|i| format!(" {x}{i}")).collect::<String>();
+        out.push_str(&format!(
+            "    | {c}{}, {c}{} => {}\n",
+            xs("a"),
+            xs("b"),
+            all(n, "a", "b")
+        ));
+    }
+    if e.variants.len() > 1 {
+        out.push_str("    | _, _ => false\n");
+    }
+    out.push('\n');
+    Ok(out)
+}
+
+/// Instances for a derived `Clone`. Without type parameters it copies; with
+/// them, each field that reaches a parameter is cloned with the consumer's
+/// `Clone`, and the instance is lawful when the parameters' instances are.
+fn clone_instances(
+    k: &Krate,
+    names: &Names,
+    p: &str,
+    g: &Generics,
+    scope: &TyScope,
+    self_ty: &Ty,
+) -> R<String> {
+    let t = paren_ty(&names.ty(self_ty));
+    if g.types.is_empty() {
+        let b = generic_binders(g, &[]);
+        return Ok(format!(
+            "instance{b} : Rust.Clone {t} := ⟨pure⟩\ninstance{b} : Rust.LawfulClone {t} := ⟨Rust.pure_clone_eq⟩\n\n"
+        ));
+    }
+    let lean = &names.types[p];
+    let class = |classes: &[&str]| {
+        g.types
+            .iter()
+            .flat_map(|t| classes.iter().map(|c| (t.clone(), (*c).to_owned())))
+            .collect::<Vec<_>>()
+    };
+    let field = |v: String, t: &Ty| {
+        if t.has_param() {
+            format!("(← Rust.Clone.clone {v})")
+        } else {
+            v
+        }
+    };
+    let mut out = format!(
+        "/-- Derived `Clone` for `{p}`. -/\ninstance{} : Rust.Clone {t} where\n",
+        generic_binders(g, &class(&["Rust.Clone"]))
+    );
+    if let Some(s) = k.structs.get(p) {
+        let mut fields = vec![];
+        for (n, ft) in &s.fields {
+            let f = if s.tuple {
+                format!("f{}", &n[1..])
+            } else {
+                ident(n)
+            };
+            fields.push(format!(
+                "{f} := {}",
+                field(format!("x.{f}"), &scope.ty(ft)?)
+            ));
+        }
+        out.push_str(&format!(
+            "  clone x := do pure {{ {} }}\n",
+            fields.join(", ")
+        ));
+    } else {
+        out.push_str("  clone\n");
+        for v in &k.enums[p].variants {
+            let c = format!("{lean}.{}", ident(&v.name));
+            if v.fields.is_empty() {
+                out.push_str(&format!("    | {c} => pure {c}\n"));
+                continue;
+            }
+            let mut binds = vec![];
+            let mut args = vec![];
+            for (i, (_, ft)) in v.fields.iter().enumerate() {
+                let b = format!("a{i}");
+                args.push(field(b.clone(), &scope.ty(ft)?));
+                binds.push(b);
+            }
+            out.push_str(&format!(
+                "    | {c} {} => do pure ({c} {})\n",
+                binds.join(" "),
+                args.join(" ")
+            ));
+        }
+    }
+    out.push_str(&format!(
+        "\ninstance{} : Rust.LawfulClone {t} := ⟨by rust_lawful_clone⟩\n\n",
+        generic_binders(g, &class(&["Rust.Clone", "Rust.LawfulClone"]))
+    ));
+    Ok(out)
 }
 
 fn default_value(names: &Names, t: &Ty) -> R<String> {
@@ -428,6 +663,7 @@ fn emit_function(cx: &Ctx, f: &Function) -> R<Emitted> {
             .cloned(),
     );
     let mut params = vec![];
+    let mut lent_param = None;
     let mut prologue = vec![];
     let mut out_tys = vec![];
     for input in &f.sig.inputs {
@@ -446,7 +682,7 @@ fn emit_function(cx: &Ctx, f: &Function) -> R<Emitted> {
                 )
             }
             syn::FnArg::Typed(t) => {
-                let ty = scope.ty(&t.ty)?;
+                let ty = scope.ty(&t.ty)?.param_iter();
                 match &*t.pat {
                     syn::Pat::Ident(pi) => (pi.ident.to_string(), ty, pi.mutability.is_some()),
                     syn::Pat::Wild(_) => ("_".to_owned(), ty, false),
@@ -472,6 +708,9 @@ fn emit_function(cx: &Ctx, f: &Function) -> R<Emitted> {
             prologue.push(format!("let mut {lean} := {lean}"));
         }
         let id = body.declare(&rust, Body::local(lean.clone(), ty.peel().clone(), mutable));
+        if lent {
+            lent_param = Some(id);
+        }
         if output {
             body.outputs.push(id);
             out_tys.push(ty.peel().clone());
@@ -493,6 +732,23 @@ fn emit_function(cx: &Ctx, f: &Function) -> R<Emitted> {
     body.finish_lines(&mut lines)
         .map_err(|e| format!("{}: {e}", f.path))?;
     let impure = body.impure;
+    // A borrow of the lent receiver still pending at the end is the result's.
+    let lent = match &body.pending_borrow {
+        Some((_, place)) if lent_param.is_some_and(|id| id == place.root) => Some(
+            place
+                .projs
+                .iter()
+                .map(|p| match p {
+                    super::emit::Proj::Field(f) => Ok(f.clone()),
+                    other => Err(format!(
+                        "{}: returned borrow of a non-field projection {other:?}",
+                        f.path
+                    )),
+                })
+                .collect::<R<Vec<_>>>()?,
+        ),
+        _ => None,
+    };
     let name = &cx.names.functions[&f.path];
     let ib = bounds(&[&f.impl_generics, &f.sig.generics]);
     let sig = format!(
@@ -536,6 +792,7 @@ fn emit_function(cx: &Ctx, f: &Function) -> R<Emitted> {
         text,
         calls: body.calls.clone(),
         impure,
+        lent,
     })
 }
 
@@ -565,39 +822,77 @@ pub fn generate(k: &Krate, roots: &[String], opts: &Options) -> R<Generated> {
             return Err(format!("unknown root function {r}"));
         }
     }
+    let mut roots: Vec<String> = roots.to_vec();
+    let mut lent_fields: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let mut pure: BTreeSet<String> = k.functions.keys().cloned().collect();
     let mut emitted: BTreeMap<String, Emitted>;
+    let mut needed;
+    let mut manual: BTreeMap<String, String>;
     loop {
-        let cx = Ctx {
-            k,
-            names: &names,
-            pure_fns: &pure,
-            overflow_checks: opts.overflow_checks,
-            debug_assertions: opts.debug_assertions,
-        };
-        emitted = BTreeMap::new();
-        let mut work: Vec<String> = roots.to_vec();
-        while let Some(p) = work.pop() {
-            if emitted.contains_key(&p) {
-                continue;
+        loop {
+            let cx = Ctx {
+                k,
+                names: &names,
+                pure_fns: &pure,
+                overflow_checks: opts.overflow_checks,
+                debug_assertions: opts.debug_assertions,
+                lent_fields: &lent_fields,
+            };
+            emitted = BTreeMap::new();
+            let mut work: Vec<String> = roots.clone();
+            while let Some(p) = work.pop() {
+                if emitted.contains_key(&p) {
+                    continue;
+                }
+                let e = emit_function(&cx, &k.functions[&p])?;
+                for c in &e.calls {
+                    if !emitted.contains_key(c) {
+                        work.push(c.clone());
+                    }
+                }
+                emitted.insert(p, e);
             }
-            let e = emit_function(&cx, &k.functions[&p])?;
-            for c in &e.calls {
-                if !emitted.contains_key(c) {
-                    work.push(c.clone());
+            let before = pure.len();
+            for (p, e) in &emitted {
+                if e.impure {
+                    pure.remove(p);
                 }
             }
-            emitted.insert(p, e);
-        }
-        let before = pure.len();
-        for (p, e) in &emitted {
-            if e.impure {
-                pure.remove(p);
+            let lent: BTreeMap<String, Vec<String>> = emitted
+                .iter()
+                .filter_map(|(p, e)| e.lent.clone().map(|l| (p.clone(), l)))
+                .collect();
+            let lent_changed = lent != lent_fields;
+            lent_fields = lent;
+            if pure.len() == before && !lent_changed {
+                break;
             }
         }
-        if pure.len() == before {
+        // Types: everything named in the translated functions' signatures and
+        // bodies. A needed type's hand-written `eq` is translated too.
+        needed = BTreeSet::new();
+        for e in emitted.values() {
+            for (path, lean) in &names.types {
+                if mentions(&e.text, lean) {
+                    needed.insert(path.clone());
+                }
+            }
+        }
+        manual = BTreeMap::new();
+        for t in type_closure(k, &needed)? {
+            if let Some(f) = manual_eq(k, &t) {
+                manual.insert(t, f);
+            }
+        }
+        let missing: Vec<String> = manual
+            .values()
+            .filter(|f| !roots.contains(f))
+            .cloned()
+            .collect();
+        if missing.is_empty() {
             break;
         }
+        roots.extend(missing);
     }
     // Functions in call order.
     let mut order = vec![];
@@ -627,17 +922,20 @@ pub fn generate(k: &Krate, roots: &[String], opts: &Options) -> R<Generated> {
     for p in emitted.keys() {
         visit(p, &emitted, &mut done, &mut vec![], &mut order)?;
     }
-    // Types: everything named in the translated functions' signatures and bodies.
-    let mut needed = BTreeSet::new();
-    for p in &order {
-        let text = &emitted[p].text;
-        for (path, lean) in &names.types {
-            if mentions(text, lean) {
-                needed.insert(path.clone());
-            }
+    // A hand-written `eq` is placed after its type, so later types can derive
+    // equality from it; it may call no other crate function.
+    let mut eq_texts = BTreeMap::new();
+    for (t, f) in &manual {
+        let e = &emitted[f];
+        if !e.calls.is_empty() || e.impure {
+            return Err(format!(
+                "{f}: a hand-written PartialEq must be pure and call no crate function"
+            ));
         }
+        eq_texts.insert(t.clone(), e.text.clone());
     }
-    let (types, mut consts) = emit_types(k, &names, &needed)?;
+    order.retain(|p| !manual.values().any(|f| f == p));
+    let (types, mut consts) = emit_types(k, &names, &needed, &eq_texts)?;
     for p in &order {
         for (path, lean) in &names.consts {
             if mentions(&emitted[p].text, lean) {

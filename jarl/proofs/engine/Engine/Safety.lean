@@ -16,7 +16,7 @@ proposals and an adversarial network:
 namespace Jarl.Engine
 open Jarl
 
-variable {V S : Type} {N CAP : Nat}
+variable {V S : Type} {N CAP : Nat} [Rust.Clone V] [Rust.Clone S]
 
 /-- Reachable from `C` by any number of cluster steps. -/
 inductive Steps (cfg : Fin N → Config N) : Cluster V S N CAP → Cluster V S N CAP → Prop
@@ -28,7 +28,7 @@ inductive Steps (cfg : Fin N → Config N) : Cluster V S N CAP → Cluster V S N
 def Exposes (n : Node V S N CAP) (e : Entry V) : Prop :=
   n.dirty = false ∧ e ∈ ret n.state ∧ e.id.index.val ≤ n.state.hard.commit.val
 
-theorem steps_inv (ids : Vector Id N) (cfg : Fin N → Config N) (C C' : Cluster V S N CAP) (G : Ghost V N)
+theorem steps_inv [Rust.LawfulClone V] [Rust.LawfulClone S] (ids : Vector Id N) (cfg : Fin N → Config N) (C C' : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (hs : Steps cfg C C') : ∃ G', Extends G G' ∧ Inv ids cfg C' G' := by
   induction hs generalizing G with
   | refl => exact ⟨G, Extends.refl G, hi⟩
@@ -37,6 +37,7 @@ theorem steps_inv (ids : Vector Id N) (cfg : Fin N → Config N) (C C' : Cluster
     obtain ⟨G2, e2, h2⟩ := ih G1 h1
     exact ⟨G2, e1.trans e2, h2⟩
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- The boundary prefix of a full log has exactly `base.index` entries. -/
 theorem boundary_length (G : Ghost V N) (s : State V S CAP) (h : StateOk G s) :
     (if s.base.index.val = 0 then [] else G.prefix s.base.term.val s.base.index.val).length = s.base.index.val := by
@@ -45,6 +46,7 @@ theorem boundary_length (G : Ghost V N) (s : State V S CAP) (h : StateOk G s) :
   · obtain ⟨L, hL, hle, -⟩ := h.base (by omega)
     simp [Ghost.prefix, hL]; omega
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- A retained entry sits in the full log at its index. -/
 theorem ret_in_fullLog (G : Ghost V N) (s : State V S CAP) (h : StateOk G s) (e : Entry V) (he : e ∈ ret s) :
     ∃ hl : e.id.index.val - 1 < (fullLog G s).length, (fullLog G s)[e.id.index.val - 1] = e := by
@@ -59,6 +61,7 @@ theorem ret_in_fullLog (G : Ghost V N) (s : State V S CAP) (h : StateOk G s) (e 
   rw [List.getElem_append_right (by omega)]
   congr 1; omega
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- An exposed entry is the entry at its index of a committed prefix. -/
 theorem exposed_committed (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (k : Fin N) (e : Entry V) (he : Exposes (C.live k) e) :
@@ -73,7 +76,7 @@ theorem exposed_committed (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cl
   refine ⟨_, (hi.committed k).1, by simp; omega, ?_⟩
   rw [List.getElem_take]; exact hget
 
-theorem state_machine_safety (ids : Vector Id N) (cfg : Fin N → Config N) (C C' : Cluster V S N CAP)
+theorem state_machine_safety [Rust.LawfulClone V] [Rust.LawfulClone S] (ids : Vector Id N) (cfg : Fin N → Config N) (C C' : Cluster V S N CAP)
     (G : Ghost V N) (hi : Inv ids cfg C G) (hs : Steps cfg C C') (k k' : Fin N) (e e' : Entry V)
     (he : Exposes (C.live k) e) (he' : Exposes (C'.live k') e') (hidx : e.id.index = e'.id.index) : e = e' := by
   obtain ⟨G', hext, hi'⟩ := steps_inv ids cfg C C' G hi hs
@@ -92,6 +95,7 @@ theorem state_machine_safety (ids : Vector Id N) (cfg : Fin N → Config N) (C C
 def ExposesSnapshot (n : Node V S N CAP) (snap : Snapshot S) : Prop :=
   n.dirty = false ∧ n.state.snapshot = some snap
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- An exposed snapshot's boundary is the identity at its index of a committed prefix. -/
 theorem snapshot_committed (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (k : Fin N) (snap : Snapshot S) (h : ExposesSnapshot (C.live k) snap) :
@@ -122,7 +126,7 @@ theorem snapshot_committed (ids : Vector Id N) (cfg : Fin N → Config N) (C : C
 
 /-- Snapshot safety: an exposed snapshot boundary agrees with every entry and
     snapshot boundary exposed at the same index, at any times. -/
-theorem snapshot_safety (ids : Vector Id N) (cfg : Fin N → Config N) (C C' : Cluster V S N CAP)
+theorem snapshot_safety [Rust.LawfulClone V] [Rust.LawfulClone S] (ids : Vector Id N) (cfg : Fin N → Config N) (C C' : Cluster V S N CAP)
     (G : Ghost V N) (hi : Inv ids cfg C G) (hs : Steps cfg C C') (k k' : Fin N) (snap : Snapshot S)
     (h : ExposesSnapshot (C.live k) snap) :
     (∀ e, Exposes (C'.live k') e → e.id.index = snap.last.index → e.id = snap.last) ∧

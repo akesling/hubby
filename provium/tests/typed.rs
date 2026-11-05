@@ -92,6 +92,48 @@ impl S {
 }
 
 #[test]
+fn aliases_equality_and_stateful_array_closures() {
+    let w = Work::new(
+        r#"
+#[derive(Clone, Copy, Debug)]
+pub struct Set { items: [Option<u64>; 2] }
+impl PartialEq for Set {
+    fn eq(&self, other: &Self) -> bool {
+        self.items.iter().flatten().all(|x| other.items.iter().flatten().any(|y| y == x))
+    }
+}
+#[derive(Clone, Debug, PartialEq)]
+pub enum Item { Raw(u64), Group(Set) }
+pub type Pair = [Option<u64>; 2];
+pub struct Bag { slots: Pair, len: usize }
+impl Bag {
+    pub fn moved(mut self) -> [Option<u64>; 4] {
+        core::array::from_fn(|i| if i < self.len { self.slots[i].take() } else { None })
+    }
+    pub fn same(a: &Item, b: &Item) -> bool { a == b }
+    pub fn wrap(x: Option<u64>) -> Option<Item> { x.map(Item::Raw) }
+}
+"#,
+    );
+    let lean = w
+        .generate(&["Bag::moved", "Bag::same", "Bag::wrap"])
+        .unwrap();
+    // The alias is expanded.
+    assert!(
+        lean.contains("slots : (Vector (Option Rust.u64) 2)"),
+        "{lean}"
+    );
+    // A hand-written `PartialEq` is the type's `==`; types around it derive `BEq`.
+    assert!(lean.contains("instance : BEq Set := ⟨Set.eq⟩"), "{lean}");
+    assert!(lean.contains("  deriving BEq, Repr"), "{lean}");
+    // A closure mutating captured state runs as a loop over the indices.
+    assert!(lean.contains("for i in List.range 4 do"), "{lean}");
+    assert!(lean.contains("Rust.Slice.ofArray 4"), "{lean}");
+    // A constructor named as a function is its eta-expansion.
+    assert!(lean.contains("Item.Raw eta_0"), "{lean}");
+}
+
+#[test]
 fn unsupported_constructs_are_rejected_with_their_function() {
     for (source, root, message) in [
         (

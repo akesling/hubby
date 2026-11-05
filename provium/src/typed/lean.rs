@@ -211,6 +211,7 @@ impl Names {
             Ty::Param(p) if p.starts_with('?') && !p.starts_with("?INT") => "_".into(),
             Ty::Param(p) => ident(p),
             Ty::Iter(t) => format!("(List {})", self.ty(t)),
+            Ty::Lazy(t) => format!("(Rust.M {})", self.ty(t)),
             Ty::Fn(a, r) => {
                 let mut s = String::from("(");
                 for t in a {

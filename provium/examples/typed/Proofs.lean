@@ -6,11 +6,11 @@ namespace Example.Proofs
 open Example
 
 /-- A new queue is empty. -/
-theorem new_empty {T : Type} {N : Nat} : (Queue.new : Queue T N).is_empty = true := by
+theorem new_empty {T : Type} {N : Nat} [Rust.Clone T] : (Queue.new : Queue T N).is_empty = true := by
   simp [Queue.new, Queue.is_empty]
 
 /-- Pushing onto a queue that is not full succeeds and adds one item. -/
-theorem push_len {T : Type} {N : Nat} (q : Queue T N) (x : T)
+theorem push_len {T : Type} {N : Nat} [Rust.Clone T] (q : Queue T N) (x : T)
     (hn : N < 2 ^ 63) (hlen : q.len.val < N) (hhead : q.head.val < N) :
     ∃ q', Queue.push q x = pure (.Ok (), q') ∧ q'.len.val = q.len.val + 1 := by
   have hN : (Rust.usizeOf N).val = N := by
@@ -26,11 +26,11 @@ theorem push_len {T : Type} {N : Nat} (q : Queue T N) (x : T)
   exact ⟨_, rfl, rfl⟩
 
 /-- A consumer's execution relation: one successful push. -/
-inductive Pushed {T : Type} {N : Nat} : Queue T N → Queue T N → Prop
+inductive Pushed {T : Type} {N : Nat} [Rust.Clone T] : Queue T N → Queue T N → Prop
   | push (q q' : Queue T N) (x : T) : Queue.push q x = pure (.Ok (), q') → Pushed q q'
 
 /-- A theorem about `Pushed` is about `Queue.push`, which its constructor runs. -/
-theorem pushed_len {T : Type} {N : Nat} (q q' : Queue T N)
+theorem pushed_len {T : Type} {N : Nat} [Rust.Clone T] (q q' : Queue T N)
     (hn : N < 2 ^ 63) (hlen : q.len.val < N) (hhead : q.head.val < N) (h : Pushed q q') :
     q'.len.val = q.len.val + 1 := by
   cases h with
@@ -39,4 +39,23 @@ theorem pushed_len {T : Type} {N : Nat} (q q' : Queue T N)
     rw [hp] at hq
     cases hq
     exact hl
+
+/-- A full queue rejects `push_cloned` without running `T::clone`: the result is
+    the same for every `Clone`, including one that always panics. -/
+theorem full_skips_clone {T : Type} {N : Nat} [Rust.Clone T] (q : Queue T N) (x : T)
+    (hfull : q.len = Rust.usizeOf N) :
+    Queue.push_cloned q x = pure (.Err .Full, q) := by
+  simp [Queue.push_cloned, Queue.push_all, hfull]
+
+/-- When the clone returns the item, `push_cloned` is `push`. -/
+theorem push_cloned_len {T : Type} {N : Nat} [Rust.Clone T] (q : Queue T N) (x : T)
+    (hc : Rust.Clone.clone x = pure x)
+    (hn : N < 2 ^ 63) (hlen : q.len.val < N) (hhead : q.head.val < N) :
+    ∃ q', Queue.push_cloned q x = pure (.Ok (), q') ∧ q'.len.val = q.len.val + 1 := by
+  obtain ⟨q', hq, hl⟩ := push_len q x hn hlen hhead
+  have hne : ¬ q.len = Rust.usizeOf N := by
+    intro h; rw [h] at hlen
+    simp [Rust.usizeOf, Rust.ofNat, Nat.mod_eq_of_lt (by omega : N < 2 ^ 64)] at hlen
+  refine ⟨q', ?_, hl⟩
+  simp [Queue.push_cloned, Queue.push_all, hne, hc, hq]
 end Example.Proofs

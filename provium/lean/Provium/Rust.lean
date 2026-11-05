@@ -299,6 +299,10 @@ def contains [DecidableEq α] {n : Nat} (a : Vector α n) (x : α) : Bool := a.t
 def iter {n : Nat} (a : Vector α n) : List α := a.toList
 /-- `core::array::from_fn`. -/
 def from_fn (n : Nat) (f : usize → α) : Vector α n := Vector.ofFn fun i => f (ofNat i.val)
+/-- The array of a loop's `n` collected items (`from_fn` with a closure that
+    mutates captured state, inlined as a loop). -/
+def ofArray (n : Nat) (a : Array α) : M (Vector α n) :=
+  if h : a.size = n then pure ⟨a, h⟩ else fail "unreachable: from_fn produced a wrong length"
 def from_fnM (n : Nat) (f : usize → M α) : M (Vector α n) :=
   (Vector.ofFn fun i : Fin n => f (ofNat i.val)).mapM id
 end Slice
@@ -459,9 +463,129 @@ end Lemmas
 
 /-! ## Traits
 
-`Clone` translates to the identity: values have no identity in Lean, and
-application `Clone` implementations are assumed to return an equal value
-without panicking. Derived `PartialEq` translates to Lean's decidable equality.
+`Clone` on a type that mentions no type parameter translates to the identity:
+such types' `Clone` is derived (or `Copy`) all the way down, and values have no
+identity in Lean. A type parameter's `Clone` is the consumer's: `Rust.Clone` is
+an arbitrary operation that may panic or diverge, and a derived `Clone` on a
+generic type clones each field with it. Theorems that need a faithful clone
+assume `LawfulClone`: a clone that returns, returns an equal value.
+Derived `PartialEq` translates to Lean's decidable equality.
 -/
+
+/-- Rust `Clone::clone` for a type the translation does not see: any operation. -/
+class Clone (α : Type) where
+  clone : α → M α
+
+/-- A clone that returns a value returns an equal one; it may still panic or diverge. -/
+class LawfulClone (α : Type) [Clone α] : Prop where
+  clone_eq : ∀ x y : α, Clone.clone x = pure y → y = x
+
+/-- Scalars are `Copy`: their clone returns the value. -/
+instance {n : Nat} : Clone (Fin n) := ⟨pure⟩
+instance {n : Nat} : Clone (IntN n) := ⟨pure⟩
+instance : Clone Bool := ⟨pure⟩
+instance : Clone Unit := ⟨pure⟩
+instance : Clone String := ⟨pure⟩
+
+instance {α : Type} [Clone α] : Clone (Option α) where
+  clone
+    | none => pure none
+    | some x => do pure (some (← Clone.clone x))
+
+instance {α : Type} [Clone α] : Clone (List α) := ⟨List.mapM Clone.clone⟩
+instance {α : Type} [Clone α] : Clone (Array α) where
+  clone a := do pure (← a.toList.mapM Clone.clone).toArray
+instance {α : Type} {n : Nat} [Clone α] : Clone (Vector α n) where
+  clone v := do
+    let a : Array α ← Clone.clone v.toArray
+    if h : a.size = n then pure ⟨a, h⟩ else fail "unreachable: clone changed an array's length"
+instance {α β : Type} [Clone α] [Clone β] : Clone (α × β) where
+  clone p := do pure ((← Clone.clone p.1), (← Clone.clone p.2))
+
+section Lawful
+variable {α β : Type}
+
+theorem bind_eq_pure {γ δ : Type} {x : M γ} {f : γ → M δ} {y : δ} (h : (x >>= f) = pure y) :
+    ∃ a, x = pure a ∧ f a = pure y := by
+  have h' := congrArg ExceptT.run h
+  simp only [ExceptT.run_bind, ExceptT.run_pure] at h'
+  rcases hx : x.run with _ | (e | a) <;> rw [hx] at h'
+  · simp at h'
+  · simp at h'
+  · refine ⟨a, ?_, ?_⟩
+    · apply ExceptT.ext; rw [hx]; rfl
+    · apply ExceptT.ext; simpa using h'
+
+theorem pure_inj {γ : Type} {a b : γ} (h : (pure a : M γ) = pure b) : a = b := by
+  have := congrArg ExceptT.run h
+  simpa [ExceptT.run_pure] using this
+
+theorem pure_clone_eq {γ : Type} (x y : γ) (h : (pure x : M γ) = pure y) : y = x := (pure_inj h).symm
+instance {n : Nat} : LawfulClone (Fin n) := ⟨pure_clone_eq⟩
+instance {n : Nat} : LawfulClone (IntN n) := ⟨pure_clone_eq⟩
+instance : LawfulClone Bool := ⟨pure_clone_eq⟩
+instance : LawfulClone Unit := ⟨pure_clone_eq⟩
+instance : LawfulClone String := ⟨pure_clone_eq⟩
+
+instance [Clone α] [LawfulClone α] : LawfulClone (Option α) where
+  clone_eq x y h := by
+    cases x with
+    | none => exact (pure_inj h).symm
+    | some a =>
+      obtain ⟨b, hb, h2⟩ := bind_eq_pure h
+      rw [LawfulClone.clone_eq a b hb] at h2
+      exact (pure_inj h2).symm
+
+instance [Clone α] [LawfulClone α] [Clone β] [LawfulClone β] : LawfulClone (α × β) where
+  clone_eq p y h := by
+    obtain ⟨a, ha, h2⟩ := bind_eq_pure h
+    obtain ⟨b, hb, h3⟩ := bind_eq_pure h2
+    rw [LawfulClone.clone_eq _ _ ha, LawfulClone.clone_eq _ _ hb] at h3
+    exact (pure_inj h3).symm
+
+theorem list_mapM_clone [Clone α] [LawfulClone α] :
+    ∀ (l r : List α), l.mapM Clone.clone = (pure r : M (List α)) → r = l
+  | [], r, h => by simp only [List.mapM_nil] at h; exact (pure_inj h).symm
+  | a :: l, r, h => by
+    simp only [List.mapM_cons] at h
+    obtain ⟨b, hb, h2⟩ := bind_eq_pure h
+    obtain ⟨c, hc, h3⟩ := bind_eq_pure h2
+    rw [LawfulClone.clone_eq _ _ hb, list_mapM_clone l c hc] at h3
+    exact (pure_inj h3).symm
+
+instance [Clone α] [LawfulClone α] : LawfulClone (List α) := ⟨list_mapM_clone⟩
+
+instance [Clone α] [LawfulClone α] : LawfulClone (Array α) where
+  clone_eq x y h := by
+    obtain ⟨l, hl, h2⟩ := bind_eq_pure h
+    rw [list_mapM_clone _ _ hl] at h2
+    simpa using (pure_inj h2).symm
+
+instance {n : Nat} [Clone α] [LawfulClone α] : LawfulClone (Vector α n) where
+  clone_eq x y h := by
+    obtain ⟨a, ha, h2⟩ := bind_eq_pure h
+    rw [LawfulClone.clone_eq _ _ ha] at h2
+    simp only [Vector.size_toArray, dite_true] at h2
+    exact (pure_inj h2).symm
+/-- A computation that, if it returns, returns `x`. -/
+def Faithful {γ : Type} (m : M γ) (x : γ) : Prop := ∀ y, m = pure y → y = x
+
+theorem faithful_pure {γ : Type} (x : γ) : Faithful (pure x) x := fun _ h => (pure_inj h).symm
+
+theorem faithful_bind {γ δ : Type} {m : M γ} {x : γ} {f : γ → M δ} {z : δ}
+    (hm : Faithful m x) (hf : Faithful (f x) z) : Faithful (m >>= f) z := fun y h => by
+  obtain ⟨a, ha, h2⟩ := bind_eq_pure h
+  rw [hm a ha] at h2; exact hf y h2
+
+theorem faithful_clone [Clone α] [LawfulClone α] (x : α) : Faithful (Clone.clone x) x :=
+  LawfulClone.clone_eq x
+end Lawful
+
+/-- Prove a derived `Clone` instance lawful from its fields' instances. -/
+macro "rust_lawful_clone" : tactic =>
+  `(tactic| (intro x; cases x <;>
+    exact (by repeat (first
+      | apply Rust.faithful_bind (Rust.faithful_clone _)
+      | apply Rust.faithful_pure))))
 
 end Rust

@@ -6,9 +6,10 @@ import Engine.LogFacts
 namespace Jarl.Engine
 open Jarl
 
-variable {V S : Type} {N CAP : Nat}
+variable {V S : Type} {N CAP : Nat} [Rust.Clone V] [Rust.Clone S]
 
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- Replacing only the outbox by a sub-outbox keeps node `k`'s clauses. -/
 theorem localOk_outbox (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (k : Fin N) (ob : Vector (Option Outbound) N)
@@ -56,9 +57,11 @@ theorem localOk_outbox (ids : Vector Id N) (cfg : Fin N → Config N) (C : Clust
 
 
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem fixed_bcast (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n) : Fixed ids (bcast n) :=
   { hf with layout := hf.layout, contig := hf.contig }
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- `advance_commit` on a dirty leader: only the commit index may change, and the
     new commitment is backed by the acknowledgments and the leader's own log. -/
 theorem adv_facts (ids : Vector Id N) (G : Ghost V N) (k : Fin N) (m n2 : Node V S N CAP) (hfm : Fixed ids m)
@@ -102,6 +105,7 @@ theorem adv_facts (ids : Vector Id N) (G : Ghost V N) (k : Fin N) (m n2 : Node V
         · exact ⟨(m.matched[w]).val, hw, List.mem_cons_of_mem _ (hacks w hwk (by omega))⟩
       · simp [Ghost.prefix, withOwn]
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- A leader whose log grows by entries of its term keeps its clauses. -/
 theorem localOk_leader (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (k : Fin N) (n : Node V S N CAP) (hr0 : (C.live k).role = .Leader)
@@ -156,6 +160,7 @@ theorem localOk_leader (ids : Vector Id N) (cfg : Fin N → Config N) (C : Clust
     · exact hown
   · rw [hob j o ho]; unfold OutOk; rw [setLive_self]; exact hrole
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- A leader appends entries of its term (`m`), possibly advances its commit
     index, and broadcasts. -/
 theorem localOk_leader_adv (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
@@ -189,6 +194,7 @@ theorem localOk_leader_adv (ids : Vector Id N) (cfg : Fin N → Config N) (C : C
     rw [if_neg (by rw [hslot]; simp)]
     have := hob k; simp only [Fin.getElem_fin] at this; exact this
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- Appending entries of the current term keeps a checkpoint's facts. -/
 theorem stateOk_append (G : Ghost V N) (s s' : State V S CAP) (l : List (Entry V)) (h : StateOk G s)
     (hs : s'.snapshot = s.snapshot) (hh : s'.hard = s.hard) (hr : ret s' = ret s ++ l)
@@ -209,6 +215,7 @@ theorem stateOk_append (G : Ghost V N) (s s' : State V S CAP) (l : List (Entry V
     simp only [List.length_append]; omega
   · rw [hh]; exact h.unvoted
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem committed_append (G : Ghost V N) (s : State V S CAP) (l : List (Entry V)) (h : StateOk G s)
     (hc : Committed G ((fullLog G s).take s.hard.commit.val)) :
     Committed G ((fullLog G s ++ l).take s.hard.commit.val) := by
@@ -216,10 +223,12 @@ theorem committed_append (G : Ghost V N) (s : State V S CAP) (l : List (Entry V)
   rw [← fullLog_length G s h] at this
   rw [List.take_append_of_le_length this]; exact hc
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem localOk_self (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (k : Fin N) : LocalOk ids cfg C G k (C.live k) :=
   localOk_outbox ids cfg C G hi k (C.live k).outbox (hi.fixed k).1 (fun _ _ h => h)
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- A non-leader whose checkpoint changes without changing its full log, hard
     state or last identity (a compaction) keeps its clauses. -/
 theorem localOk_samelog (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
@@ -308,11 +317,14 @@ theorem preserve_restart (ids : Vector Id N) (cfg : Fin N → Config N) (C : Clu
   · rw [hs] at ht ⊢; exact (hi.ballots T k c v h).2.2.1 ht
 
 theorem preserve_propose (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
-    (hi : Inv ids cfg C G) (k : Fin N) (vs : List V) (count : Rust.usize) (hc : count.val = vs.length)
+    (hi : Inv ids cfg C G) (k : Fin N) (vs : List V) (values : List (Rust.M V))
+    (hvlen : values.length = vs.length)
+    (hval : ∀ i (hi : i < vs.length), Rust.Faithful (values[i]'(hvlen ▸ hi)) vs[i])
+    (count : Rust.usize) (hc : count.val = vs.length)
     (r : Rust.Result ProposalRange Error) (n : Node V S N CAP)
-    (h : Node.propose_many (C.live k) count vs = pure (r, n)) : Inv ids cfg (C.setLive k n) G := by
+    (h : Node.propose_many (C.live k) count values = pure (r, n)) : Inv ids cfg (C.setLive k n) G := by
   have hf := (hi.fixed k).1
-  rcases propose_many_rel ids (C.live k) hf vs count hc r n h with rfl |
+  rcases propose_many_rel ids (C.live k) hf vs values hvlen hval count hc r n h with rfl |
     ⟨⟨hd, -, hob⟩, hr0, hpos, hbound, s', n2, hr, hh, hs, hl', hc', hadv, rfl⟩
   · exact setLive_inv ids cfg C G hi k _ (localOk_self ids cfg C G hi k)
   apply setLive_inv ids cfg C G hi k _

@@ -37,6 +37,10 @@ pub enum Ty {
     Iter(Box<Ty>),
     /// Closures, function pointers and `impl Fn*` arguments.
     Fn(Vec<Ty>, Box<Ty>),
+    /// An item of an iterator passed between functions whose production (a
+    /// consumer `Clone`, or a closure that may panic) is deferred until the
+    /// consumer pulls it: a `Rust.M` computation.
+    Lazy(Box<Ty>),
     TryFromIntError,
 }
 
@@ -59,6 +63,30 @@ impl Ty {
     }
     pub fn mut_ref(&self) -> bool {
         matches!(self, Ty::Ref(true, _))
+    }
+    /// Whether the type mentions a type parameter outside function types: its
+    /// `Clone` is then (in part) the consumer's rather than the identity.
+    pub fn has_param(&self) -> bool {
+        match self {
+            Ty::Param(_) => true,
+            Ty::Tuple(v) => v.iter().any(Ty::has_param),
+            Ty::Array(t, _) | Ty::Slice(t) | Ty::Option(t) | Ty::Iter(t) | Ty::Lazy(t) => {
+                t.has_param()
+            }
+            // Cloning a shared reference copies it.
+            Ty::Ref(..) => false,
+            Ty::Adt(_, a, _) => a.iter().any(Ty::has_param),
+            Ty::Result(a, b) => a.has_param() || b.has_param(),
+            _ => false,
+        }
+    }
+    /// An `impl Iterator` parameter whose items reach a type parameter yields
+    /// deferred items: its source may clone (or run a closure) lazily.
+    pub fn param_iter(self) -> Ty {
+        match self {
+            Ty::Iter(i) if i.has_param() => Ty::Iter(Box::new(Ty::Lazy(i))),
+            t => t,
+        }
     }
     /// Whether values of this type may contain a mutable borrow.
     pub fn holds_mut_borrow(&self, k: &Krate) -> bool {
@@ -99,6 +127,7 @@ impl Ty {
             Ty::Option(t) => Ty::Option(Box::new(s(t))),
             Ty::Result(a, b) => Ty::Result(Box::new(s(a)), Box::new(s(b))),
             Ty::Iter(t) => Ty::Iter(Box::new(s(t))),
+            Ty::Lazy(t) => Ty::Lazy(Box::new(s(t))),
             Ty::Fn(a, r) => Ty::Fn(a.iter().map(s).collect(), Box::new(s(r))),
             t => t.clone(),
         }
@@ -326,6 +355,21 @@ impl Scope<'_> {
             "::core::num::TryFromIntError" => Ok(Ty::TryFromIntError),
             p if self.krate.structs.contains_key(p) || self.krate.enums.contains_key(p) => {
                 Ok(Ty::Adt(p.to_owned(), tys, lens))
+            }
+            p if self.krate.aliases.contains_key(p) => {
+                let a = &self.krate.aliases[p];
+                let mut g = Generics::default();
+                g.extend(&a.generics)?;
+                let scope = Scope {
+                    krate: self.krate,
+                    module: &a.module,
+                    generics: &g,
+                    self_ty: None,
+                };
+                let t = scope.ty(&a.ty)?;
+                let sub_t: Vec<(String, Ty)> = g.types.iter().cloned().zip(tys).collect();
+                let sub_l: Vec<(String, Len)> = g.consts.iter().cloned().zip(lens).collect();
+                Ok(t.subst(&sub_t, &sub_l))
             }
             _ => Err(format!("unsupported type {}", tokens(p))),
         }

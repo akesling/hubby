@@ -17,7 +17,7 @@ same as crashing the node; `restart` rebuilds a node from its checkpoint.
 namespace Jarl.Engine
 open Jarl
 
-variable {V S : Type} {N CAP : Nat}
+variable {V S : Type} {N CAP : Nat} [Rust.Clone V] [Rust.Clone S]
 
 structure Cluster (V S : Type) (N CAP : Nat) where
   live : Fin N → Node V S N CAP

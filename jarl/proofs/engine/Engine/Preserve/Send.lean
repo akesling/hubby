@@ -6,20 +6,23 @@ import Engine.LogFacts
 namespace Jarl.Engine
 open Jarl
 
-variable {V S : Type} {N CAP : Nat}
+variable {V S : Type} {N CAP : Nat} [Rust.Clone V] [Rust.Clone S]
 
 /-- The ghost with the same leader logs and elections, and new acks and ballots. -/
 def grow (G : Ghost V N) (A : List (Fin N × Nat × Nat)) (B : List (Nat × Fin N × Fin N × List (Entry V))) :
     Ghost V N := ⟨G.leader, G.elect, A, B⟩
 
+omit [Rust.Clone V] in
 theorem grow_extends (G : Ghost V N) (A : List (Fin N × Nat × Nat)) (B : List (Nat × Fin N × Fin N × List (Entry V)))
     (ha : ∀ a ∈ G.acks, a ∈ A) (hb : ∀ b ∈ G.ballots, b ∈ B) : Extends G (grow G A B) :=
   ⟨fun _ L h => ⟨L, h, List.prefix_refl L⟩, fun _ _ h => h, ha, hb⟩
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem stateOk_grow (G : Ghost V N) (A : List (Fin N × Nat × Nat)) (B : List (Nat × Fin N × Fin N × List (Entry V)))
     (s : State V S CAP) (h : StateOk G s) : StateOk (grow G A B) s :=
   ⟨h.layout, h.contig, h.base, h.snapshot, h.terms, h.commit_ge, h.commit_le, h.unvoted⟩
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem withOwn_grow (G : Ghost V N) (A : List (Fin N × Nat × Nat)) (B : List (Nat × Fin N × Fin N × List (Entry V)))
     (ha : ∀ a ∈ G.acks, a ∈ A) (hb : ∀ b ∈ G.ballots, b ∈ B) (k : Fin N) (n : Node V S N CAP) :
     Extends (withOwn G k n) (withOwn (grow G A B) k n) := by
@@ -29,12 +32,14 @@ theorem withOwn_grow (G : Ghost V N) (A : List (Fin N × Nat × Nat)) (B : List 
   · exact Or.inl h
   · exact Or.inr (ha _ h)
 
+omit [Rust.Clone V] in
 theorem committed_of_prefix (G : Ghost V N) (p q : List (Entry V)) (h : Committed G p) (hq : q <+: p) :
     Committed G q := by
   rcases h with rfl | ⟨t, j, hc, hp⟩
   · exact Or.inl (List.prefix_nil.mp hq)
   · exact Or.inr ⟨t, j, hc, hq.trans hp⟩
 
+omit [Rust.Clone V] in
 theorem prefix_prefix (G : Ghost V N) (t j i : Nat) (h : j ≤ i) : G.prefix t j <+: G.prefix t i := by
   unfold Ghost.prefix
   rw [show ((G.leader t).getD []).take j = (((G.leader t).getD []).take i).take j by
@@ -45,6 +50,7 @@ theorem ids_inj (ids : Vector Id N) (hnd : ids.toList.Nodup) (a b : Fin N) (h : 
   have h' : ids.toList[a.val]'(by simp) = ids.toList[b.val]'(by simp) := by simpa using h
   exact Fin.ext ((List.getElem_inj hnd).mp h')
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- Growing the acknowledgments and ballots preserves the invariant, given the
     obligations of the new elements. -/
 theorem inv_grow (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
@@ -134,6 +140,7 @@ theorem inv_grow (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S
     · exact Or.inl (committed_mono E _ h)
     · exact Or.inr ⟨r, d, committed_mono (withOwn_grow G A B ha hb k (C.live k)) _ h⟩
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- Recording a new message. -/
 theorem inv_send (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (env : Envelope V S) (hs : SentOk ids C G env) :
@@ -172,6 +179,7 @@ theorem inv_send (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S
     · exact hi.sent e h
 
 
+omit [Rust.Clone V] [Rust.Clone S] in
 /-- Only the outbox of node `k` changes, by dropping descriptors. -/
 theorem send_localOk_outbox (ids : Vector Id N) (cfg : Fin N → Config N) (C : Cluster V S N CAP) (G : Ghost V N)
     (hi : Inv ids cfg C G) (k : Fin N) (O : Vector (Option Outbound) N)

@@ -12,7 +12,7 @@ any two committed prefixes are compatible (`committed_compatible`).
 namespace Jarl.Engine
 open Jarl
 
-variable {V S : Type} {N CAP : Nat}
+variable {V S : Type} {N CAP : Nat} [Rust.Clone V] [Rust.Clone S]
 
 /-- A checkpoint's own facts: its snapshot boundary is an entry of a leader
     log, entries are no newer than its term, and `base ≤ commit ≤ last`. -/

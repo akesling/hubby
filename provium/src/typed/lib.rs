@@ -1,9 +1,10 @@
 //! Calls: crate functions, constructors, closures, macros and the core library
 //! operations the typed backend interprets.
-use super::emit::{function_generics, Body, Place, R, V};
+use super::emit::{function_generics, Body, Place, ScopeKind, R, V};
 use super::lean::ident;
 use super::load::{tokens, Function};
 use super::types::{Generics, Len, Scope as TyScope, Ty};
+use std::collections::BTreeSet;
 use syn::Expr;
 
 fn strip(e: &Expr) -> &Expr {
@@ -77,6 +78,79 @@ const SHORT_CIRCUIT: &[&str] = &[
 
 impl Body<'_> {
     /// Translate an argument expected to be a function of `args` returning `ret`.
+    /// An iterator argument whose items the callee pulls lazily: the list of
+    /// item computations, each run only when the callee's loop reaches it.
+    pub fn lazy_iter(&mut self, e: &Expr, item: &Ty) -> R<String> {
+        let (l, _, src) = self.lazy_items(e, Some(item))?;
+        Ok(match src {
+            Some(l) => format!("{}.map pure", p(&l)),
+            None => l,
+        })
+    }
+
+    /// The deferred items of an iterator expression and their type: a source
+    /// (`once_with`, or any pure iterator) followed by `cloned` and `map`
+    /// stages, composed per item so each stage runs only when pulled. A pure
+    /// source is returned as the plain list (third component), so its first
+    /// stage maps over it directly.
+    fn lazy_items(&mut self, e: &Expr, item: Option<&Ty>) -> R<(String, Ty, Option<String>)> {
+        let clone_of = |t: &Ty| {
+            if t.has_param() {
+                "Rust.Clone.clone"
+            } else {
+                "pure"
+            }
+        };
+        if let Expr::Call(c) = strip(e) {
+            if let Expr::Path(pp) = strip(&c.func) {
+                let name = tokens(&pp.path).replace(' ', "");
+                if matches!(name.as_str(), "core::iter::once_with" | "iter::once_with") {
+                    let f = self.fn_arg(&c.args[0], &[], item.cloned())?;
+                    return Ok((format!("[{} ()]", p(&f.monadic())), f.ret, None));
+                }
+            }
+        }
+        if let Expr::MethodCall(m) = strip(e) {
+            let stage = match m.method.to_string().as_str() {
+                "cloned" if m.args.is_empty() => Some(None),
+                "map" if m.args.len() == 1 => Some(Some(&m.args[0])),
+                _ => None,
+            };
+            if let Some(stage) = stage {
+                let (l, it, src) = self.lazy_items(&m.receiver, None)?;
+                let (f, ret) = match stage {
+                    None => {
+                        let it = it.peel().clone();
+                        if let Some(x) = item {
+                            self.unify(x, &it);
+                        }
+                        (clone_of(&it).to_owned(), it)
+                    }
+                    Some(f) => {
+                        let f = self.fn_arg(f, &[it], item.cloned())?;
+                        (p(&f.monadic()), f.ret)
+                    }
+                };
+                let l = match src {
+                    Some(src) => format!("{}.map {f}", p(&src)),
+                    None => format!("{}.map (fun m => m >>= {f})", p(&l)),
+                };
+                return Ok((l, ret, None));
+            }
+        }
+        let (l, t) = self.value(e, None)?;
+        if self.effectful_iters.contains(&l) {
+            return Err("a lazily consumed iterator over a stage that may panic".into());
+        }
+        match self.resolve(&t).peel() {
+            Ty::Iter(i) => match &**i {
+                Ty::Lazy(x) => Ok((l, (**x).clone(), None)),
+                x => Ok((format!("{}.map pure", p(&l)), x.clone(), Some(l))),
+            },
+            other => Err(format!("expected an iterator, found {other:?}")),
+        }
+    }
+
     pub fn fn_arg(&mut self, e: &Expr, args: &[Ty], ret: Option<Ty>) -> R<FnArg> {
         match strip(e) {
             Expr::Closure(c) => {
@@ -91,6 +165,27 @@ impl Body<'_> {
                 })
             }
             Expr::Reference(r) => self.fn_arg(&r.expr, args, ret),
+            // A tuple-variant or tuple-struct constructor named as a value: its
+            // eta-expansion.
+            Expr::Path(pp)
+                if !args.is_empty()
+                    && pp.path.segments.len() > 1
+                    && pp
+                        .path
+                        .segments
+                        .last()
+                        .is_some_and(|s| s.ident.to_string().starts_with(char::is_uppercase)) =>
+            {
+                let xs: Vec<String> = (0..args.len()).map(|i| format!("eta_{i}")).collect();
+                let src = format!(
+                    "|{}| {}({})",
+                    xs.join(", "),
+                    tokens(&pp.path).replace(' ', ""),
+                    xs.join(", ")
+                );
+                let c: Expr = syn::parse_str(&src).map_err(|e| e.to_string())?;
+                self.fn_arg(&c, args, ret)
+            }
             other => {
                 let (t, ty) = self.value(other, None)?;
                 let pure_local = match strip(other) {
@@ -122,6 +217,38 @@ impl Body<'_> {
                 })
             }
         }
+    }
+
+    fn array_loop(&mut self, cl: &syn::ExprClosure, et: &Ty, len: &Len, l: &str) -> R<V> {
+        if has_jump_expr(&cl.body) {
+            return Err("from_fn closure that mutates captured state and jumps".into());
+        }
+        let acc = self.synthetic("acc");
+        let ety = self.lean_ty(et);
+        self.emit(format!("let mut {acc} : Array {ety} := #[]"));
+        let i = self.synthetic("i");
+        self.emit(format!("for {i} in List.range {l} do"));
+        self.indent += 2;
+        self.push_scope(ScopeKind::Loop);
+        match &cl.inputs[0] {
+            syn::Pat::Ident(pi) => {
+                let rust = pi.ident.to_string();
+                let name = self.fresh(&rust);
+                self.emit(format!("let {name} := Rust.usizeOf {i}"));
+                self.declare(&rust, Body::local(name, Ty::usize(), false));
+            }
+            syn::Pat::Wild(_) => {}
+            other => return Err(format!("unsupported from_fn parameter {}", tokens(other))),
+        }
+        let (v, _) = self.value(&cl.body, Some(et))?;
+        self.emit(format!("{acc} := {acc}.push {}", p(&v)));
+        self.drop_scope();
+        self.indent -= 2;
+        let t = self.bind(format!("Rust.Slice.ofArray {l} {acc}"));
+        Ok(V {
+            term: Some(t),
+            ty: Ty::Array(Box::new(et.clone()), len.clone()),
+        })
     }
 
     // ---------------------------------------------------------------- calls
@@ -238,8 +365,15 @@ impl Body<'_> {
                 let Some(Ty::Array(et, len)) = expect.map(|t| self.resolve(t)) else {
                     return Err("array::from_fn needs a known array type".into());
                 };
-                let f = self.fn_arg(&c.args[0], &[Ty::usize()], Some((*et).clone()))?;
                 let l = self.cx.names.len(&len);
+                // A closure that mutates captured state runs as the body of a
+                // loop over the indices, in order, as `from_fn` calls it.
+                if let Expr::Closure(cl) = strip(&c.args[0]) {
+                    if cl.inputs.len() == 1 && mutates_captured(cl) {
+                        return self.array_loop(cl, &et, &len, &l);
+                    }
+                }
+                let f = self.fn_arg(&c.args[0], &[Ty::usize()], Some((*et).clone()))?;
                 if f.pure {
                     return Ok(V {
                         term: Some(format!("Rust.Slice.from_fn {l} {}", p(&f.term))),
@@ -430,7 +564,7 @@ impl Body<'_> {
                     params.push((mutable, impl_self.clone().unwrap()));
                 }
                 syn::FnArg::Typed(t) => {
-                    let ty = scope.ty(&t.ty)?;
+                    let ty = scope.ty(&t.ty)?.param_iter();
                     params.push((ty.mut_ref(), ty));
                 }
             }
@@ -487,6 +621,14 @@ impl Body<'_> {
                 write_backs.push(place);
                 continue;
             }
+            if let Ty::Iter(i) = self.resolve(&pty_s).peel() {
+                if let Ty::Lazy(item) = &**i {
+                    let item = (**item).clone();
+                    let t = self.lazy_iter(arg, &item)?;
+                    all.push(p(&t));
+                    continue;
+                }
+            }
             let (t, at) = self.value(arg, Some(&pty_s))?;
             // Unsizing: an array reference passed as a slice.
             let t = match (self.resolve(&pty_s).peel(), self.resolve(&at).peel()) {
@@ -508,6 +650,18 @@ impl Body<'_> {
             write_backs.drain(..).next()
         } else {
             None
+        };
+        // The callee's result may borrow a field of the lent argument.
+        let lent = match (lent, self.cx.lent_fields.get(&f.path)) {
+            (Some(mut place), Some(fields)) => {
+                for fl in fields {
+                    let (_, fty) = self.field_ty(&place.ty, fl)?;
+                    place.projs.push(super::emit::Proj::Field(fl.clone()));
+                    place.ty = fty;
+                }
+                Some(place)
+            }
+            (l, _) => l,
         };
         let mut ret = ret.subst(&sub_t, &sub_l);
         if let (Some(x), Ty::Adt(..)) = (expect, &ret) {
@@ -695,6 +849,17 @@ impl Body<'_> {
                 }
                 if self.effectful_iters.contains(&recv) {
                     self.effectful_iters.insert(recv.clone());
+                }
+                // A clone that reaches a type parameter runs the consumer's `Clone`.
+                if matches!(name.as_str(), "clone" | "cloned") && t.has_param() {
+                    if self.effectful_iters.contains(&recv) {
+                        return Err("cloning the items of an effectful iterator".into());
+                    }
+                    let c = self.bind(format!("Rust.Clone.clone {r}"));
+                    return Ok(V {
+                        term: Some(c),
+                        ty: t,
+                    });
                 }
                 return Ok(V {
                     term: Some(recv),
@@ -1363,4 +1528,101 @@ fn ret_known(t: &Ty) -> bool {
         }
         _ => true,
     }
+}
+
+/// Whether a closure assigns to, or calls a mutating method on, a variable it
+/// does not bind itself.
+fn mutates_captured(c: &syn::ExprClosure) -> bool {
+    use syn::visit::Visit;
+    const MUTATING: &[&str] = &[
+        "take",
+        "replace",
+        "push",
+        "insert",
+        "get_or_insert",
+        "get_or_insert_with",
+        "set",
+        "swap",
+        "fill",
+        "iter_mut",
+        "as_mut",
+        "remove",
+        "clear",
+        "pop",
+    ];
+    fn root(e: &Expr) -> Option<String> {
+        match e {
+            Expr::Path(p) if p.path.segments.len() == 1 => {
+                Some(p.path.segments[0].ident.to_string())
+            }
+            Expr::Field(f) => root(&f.base),
+            Expr::Index(i) => root(&i.expr),
+            Expr::Paren(p) => root(&p.expr),
+            Expr::Unary(u) => root(&u.expr),
+            Expr::MethodCall(m) if m.method == "as_mut" || m.method == "iter_mut" => {
+                root(&m.receiver)
+            }
+            _ => None,
+        }
+    }
+    #[derive(Default)]
+    struct V {
+        bound: BTreeSet<String>,
+        written: BTreeSet<String>,
+    }
+    impl<'ast> Visit<'ast> for V {
+        fn visit_pat_ident(&mut self, p: &'ast syn::PatIdent) {
+            self.bound.insert(p.ident.to_string());
+            syn::visit::visit_pat_ident(self, p);
+        }
+        fn visit_expr_assign(&mut self, a: &'ast syn::ExprAssign) {
+            self.written.extend(root(&a.left));
+            syn::visit::visit_expr_assign(self, a);
+        }
+        fn visit_expr_binary(&mut self, b: &'ast syn::ExprBinary) {
+            if matches!(
+                b.op,
+                syn::BinOp::AddAssign(_)
+                    | syn::BinOp::SubAssign(_)
+                    | syn::BinOp::MulAssign(_)
+                    | syn::BinOp::DivAssign(_)
+                    | syn::BinOp::RemAssign(_)
+                    | syn::BinOp::BitAndAssign(_)
+                    | syn::BinOp::BitOrAssign(_)
+                    | syn::BinOp::BitXorAssign(_)
+                    | syn::BinOp::ShlAssign(_)
+                    | syn::BinOp::ShrAssign(_)
+            ) {
+                self.written.extend(root(&b.left));
+            }
+            syn::visit::visit_expr_binary(self, b);
+        }
+        fn visit_expr_method_call(&mut self, m: &'ast syn::ExprMethodCall) {
+            if MUTATING.contains(&m.method.to_string().as_str()) {
+                self.written.extend(root(&m.receiver));
+            }
+            syn::visit::visit_expr_method_call(self, m);
+        }
+        fn visit_expr_reference(&mut self, r: &'ast syn::ExprReference) {
+            if r.mutability.is_some() {
+                self.written.extend(root(&r.expr));
+            }
+            syn::visit::visit_expr_reference(self, r);
+        }
+    }
+    let mut v = V::default();
+    for p in &c.inputs {
+        v.visit_pat(p);
+    }
+    v.visit_expr(&c.body);
+    v.written.iter().any(|w| !v.bound.contains(w))
+}
+
+/// Whether an expression returns, breaks, continues or uses `?` outside nested closures.
+fn has_jump_expr(e: &Expr) -> bool {
+    let b = syn::Block {
+        brace_token: Default::default(),
+        stmts: vec![syn::Stmt::Expr(e.clone(), None)],
+    };
+    super::emit::has_jump(&b)
 }

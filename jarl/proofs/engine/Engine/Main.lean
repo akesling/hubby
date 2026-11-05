@@ -12,7 +12,7 @@ node, with node `k` having identity `ids[k]`. -/
 namespace Jarl.Engine
 open Jarl
 
-variable {V S : Type} {N CAP : Nat}
+variable {V S : Type} {N CAP : Nat} [Rust.Clone V] [Rust.Clone S]
 
 /-- The configuration assumptions under which the theorems below hold. -/
 structure Assumptions (ids : Vector Id N) (cfg : Fin N → Config N) (CAP : Nat) : Prop where
@@ -23,7 +23,7 @@ structure Assumptions (ids : Vector Id N) (cfg : Fin N → Config N) (CAP : Nat)
   members : ∀ k, (cfg k).members = ids
   identity : ∀ k, (cfg k).id = ids[k]
 
-theorem reach_inv (ids : Vector Id N) (cfg : Fin N → Config N) (ha : Assumptions ids cfg CAP)
+theorem reach_inv [Rust.LawfulClone V] [Rust.LawfulClone S] (ids : Vector Id N) (cfg : Fin N → Config N) (ha : Assumptions ids cfg CAP)
     (C : Cluster V S N CAP) (h : Reach cfg C) : ∃ G, Inv ids cfg C G := by
   induction h with
   | init C hC =>
@@ -35,7 +35,7 @@ theorem reach_inv (ids : Vector Id N) (cfg : Fin N → Config N) (ha : Assumptio
     exact ⟨G', hi'⟩
 
 /-- Election safety: at most one node is leader in any term. -/
-theorem election_safety (ids : Vector Id N) (cfg : Fin N → Config N) (ha : Assumptions ids cfg CAP)
+theorem election_safety [Rust.LawfulClone V] [Rust.LawfulClone S] (ids : Vector Id N) (cfg : Fin N → Config N) (ha : Assumptions ids cfg CAP)
     (C : Cluster V S N CAP) (h : Reach cfg C) (k k' : Fin N)
     (hk : (C.live k).role = .Leader) (hk' : (C.live k').role = .Leader)
     (ht : (C.live k).state.hard.term = (C.live k').state.hard.term) : k = k' := by
@@ -48,7 +48,7 @@ theorem election_safety (ids : Vector Id N) (cfg : Fin N → Config N) (ha : Ass
 
 /-- State machine safety: two entries a node exposes as committed (anywhere
     along one execution) at the same index are equal. -/
-theorem raft_state_machine_safety (ids : Vector Id N) (cfg : Fin N → Config N)
+theorem raft_state_machine_safety [Rust.LawfulClone V] [Rust.LawfulClone S] (ids : Vector Id N) (cfg : Fin N → Config N)
     (ha : Assumptions ids cfg CAP) (C C' : Cluster V S N CAP) (h : Reach cfg C) (hs : Steps cfg C C')
     (k k' : Fin N) (e e' : Entry V) (he : Exposes (C.live k) e) (he' : Exposes (C'.live k') e')
     (hidx : e.id.index = e'.id.index) : e = e' := by
@@ -57,7 +57,7 @@ theorem raft_state_machine_safety (ids : Vector Id N) (cfg : Fin N → Config N)
 
 /-- Snapshot safety: an exposed snapshot's boundary agrees with every entry and
     snapshot exposed later at its index. -/
-theorem raft_snapshot_safety (ids : Vector Id N) (cfg : Fin N → Config N)
+theorem raft_snapshot_safety [Rust.LawfulClone V] [Rust.LawfulClone S] (ids : Vector Id N) (cfg : Fin N → Config N)
     (ha : Assumptions ids cfg CAP) (C C' : Cluster V S N CAP) (h : Reach cfg C) (hs : Steps cfg C C')
     (k k' : Fin N) (snap : Snapshot S) (hx : ExposesSnapshot (C.live k) snap) :
     (∀ e, Exposes (C'.live k') e → e.id.index = snap.last.index → e.id = snap.last) ∧

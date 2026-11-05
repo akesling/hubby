@@ -2,12 +2,14 @@
   "kind": "typed",
   "crate_root": "src/lib.rs",
   "namespace": "Example",
-  "roots": ["Queue::new", "Queue::push", "Queue::pop", "Queue::retain", "Queue::is_empty"],
+  "roots": ["Queue::new", "Queue::push", "Queue::push_cloned", "Queue::pop", "Queue::retain", "Queue::is_empty"],
   "proofs": "Proofs.lean",
   "obligations": [
     { "theorem": "Example.Proofs.push_len", "function": "Queue::push" },
     { "theorem": "Example.Proofs.new_empty", "function": "Queue::new" },
-    { "theorem": "Example.Proofs.pushed_len", "function": "Queue::push" }
+    { "theorem": "Example.Proofs.pushed_len", "function": "Queue::push" },
+    { "theorem": "Example.Proofs.full_skips_clone", "function": "Queue::push_cloned" },
+    { "theorem": "Example.Proofs.push_cloned_len", "function": "Queue::push_cloned" }
   ],
   "differential": {
     "source": "differential.rs",

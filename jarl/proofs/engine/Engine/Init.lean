@@ -5,27 +5,33 @@ import Engine.Invariant
 namespace Jarl.Engine
 open Jarl
 
-variable {V S : Type} {N CAP : Nat}
+variable {V S : Type} {N CAP : Nat} [Rust.Clone V] [Rust.Clone S]
 
 /-- The empty history. -/
 def Ghost.empty : Ghost V N := ⟨fun _ => none, fun _ => none, [], []⟩
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem new_ret : ret (State.new : State V S CAP) = [] := by
   simp [ret, State.new]
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem new_layout : Layout (State.new : State V S CAP) := by
   refine ⟨by simp [State.new], ?_⟩
   rw [new_ret]
   apply List.ext_getElem <;> simp [State.new, Rust.Slice.from_fn]
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem new_contig : Contig (State.new : State V S CAP) := by
   intro k hk; simp [new_ret] at hk
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem new_base : (State.new : State V S CAP).base = LogId.default := rfl
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem new_fullLog (G : Ghost V N) : fullLog G (State.new : State V S CAP) = [] := by
   simp [fullLog, new_base, LogId.default, new_ret]
 
+omit [Rust.Clone V] [Rust.Clone S] in
 theorem new_stateOk (G : Ghost V N) : StateOk G (State.new : State V S CAP) where
   layout := new_layout
   contig := new_contig
@@ -36,6 +42,7 @@ theorem new_stateOk (G : Ghost V N) : StateOk G (State.new : State V S CAP) wher
   commit_le := by simp [State.new, HardState.default]
   unvoted := by simp [State.new, HardState.default]
 
+omit [Rust.Clone V] in
 theorem wf_empty : Wf (Ghost.empty : Ghost V N) where
   leader := by intro t L h; simp [Ghost.empty] at h
   elect := by intro T c eL h; simp [Ghost.empty] at h

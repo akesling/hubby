@@ -26,6 +26,9 @@ pub struct Ctx<'a> {
     pub pure_fns: &'a BTreeSet<String>,
     pub overflow_checks: bool,
     pub debug_assertions: bool,
+    /// For a function returning a struct that borrows its `&mut` receiver:
+    /// the fields of the receiver the struct borrows (empty: the receiver).
+    pub lent_fields: &'a BTreeMap<String, Vec<String>>,
 }
 
 #[derive(Clone, Debug)]
@@ -108,7 +111,7 @@ pub struct Body<'a> {
     used: BTreeSet<String>,
     source_idents: BTreeSet<String>,
     pub out: Lines,
-    indent: usize,
+    pub(super) indent: usize,
     pub impure: bool,
     /// Locals returned alongside the result: the function's `&mut` parameters.
     pub outputs: Vec<usize>,
@@ -319,7 +322,11 @@ impl<'a> Body<'a> {
         false
     }
 
-    fn push_scope(&mut self, kind: ScopeKind) {
+    pub(super) fn drop_scope(&mut self) {
+        self.scopes.pop();
+    }
+
+    pub(super) fn push_scope(&mut self, kind: ScopeKind) {
         self.scopes.push(Scope {
             kind,
             names: vec![],
@@ -468,7 +475,7 @@ impl<'a> Body<'a> {
         Ok(())
     }
 
-    fn field_ty(&self, ty: &Ty, field: &str) -> R<(String, Ty)> {
+    pub(super) fn field_ty(&self, ty: &Ty, field: &str) -> R<(String, Ty)> {
         match self.resolve(ty).peel() {
             Ty::Adt(p, tys, lens) => {
                 let s = self
@@ -2635,12 +2642,18 @@ impl<'a> Body<'a> {
             return Ok(V::of("()", Ty::Unit));
         }
         let (src, item) = self.iterable(&f.expr)?;
-        let (lean_pat, binds) = self.pattern(&f.pat, &item, false)?;
+        let (lean_pat, mut binds) = self.pattern(&f.pat, &item, false)?;
         self.emit(format!("for {lean_pat} in {} do", paren(&src)));
         self.indent += 2;
         self.push_scope(ScopeKind::Loop);
-        for b in &binds {
-            if b.mutable {
+        for b in &mut binds {
+            // A deferred item is produced when the loop pulls it.
+            if let Ty::Lazy(t) = self.resolve(&b.ty) {
+                self.impure = true;
+                let m = if b.mutable { "mut " } else { "" };
+                self.emit(format!("let {m}{} ← {}", b.lean, b.lean));
+                b.ty = *t;
+            } else if b.mutable {
                 self.emit(format!("let mut {} := {}", b.lean, b.lean));
             }
         }
@@ -2860,6 +2873,12 @@ impl<'a> Body<'a> {
                 .ok_or_else(|| format!("no field {n} in {}", names.join("::")))?;
             if matches!(&f.expr, Expr::Reference(r) if r.mutability.is_some()) {
                 return Err("struct literals holding &mut borrows must be bound by let".into());
+            }
+            // A function-typed field holds the monadic form of its closure.
+            if let Ty::Fn(a, r) = self.resolve(&fty).peel().clone() {
+                let fa = self.fn_arg(&f.expr, &a, Some(*r))?;
+                terms.push((n, paren(&fa.monadic())));
+                continue;
             }
             let (t, vt) = self.value(&f.expr, Some(&fty))?;
             self.unify(&fty, &vt);
@@ -3081,7 +3100,7 @@ enum Fields {
 }
 
 /// Whether a block contains `break`, `continue`, `return` or `?` (outside closures).
-fn has_jump(b: &syn::Block) -> bool {
+pub(super) fn has_jump(b: &syn::Block) -> bool {
     struct J(bool);
     impl<'ast> syn::visit::Visit<'ast> for J {
         fn visit_expr_break(&mut self, _: &'ast syn::ExprBreak) {

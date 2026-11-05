@@ -47,11 +47,29 @@ differential scenario ──► native run (Cargo) ══ Lean #eval ──► m
    | `&[T]` | `Array T` |
    | `Option`, `Result` | `Option`, `Rust.Result` |
    | iterators | `List` of the items they yield |
+   | `impl Iterator<Item = T>` parameter, `T` mentioning a type parameter | `List (Rust.M T)`: each item is produced when the callee pulls it |
    | closures, `fn` pointers, `impl Fn` | `A → Rust.M B` (pure closures stay pure) |
    | `&T`, `&mut T` | `T` (see borrows) |
 
-   Derived `PartialEq` becomes `DecidableEq`; derived `Default` a `default`
-   definition.
+   Type aliases are expanded. Derived `PartialEq` becomes `DecidableEq`, and a
+   generic type also gets a low-priority field-wise `BEq` for arguments that
+   only have Rust's `==`. A hand-written `PartialEq::eq` is translated (it must
+   be pure) and is the type's `BEq`; types deriving `PartialEq` around it
+   derive `BEq`, so `==` is Rust's equality everywhere. Derived `Default`
+   becomes a `default` definition.
+
+   `Clone` on a type that mentions no type parameter is the identity: its
+   `Clone` is derived or `Copy` all the way down (a hand-written `clone` is
+   translated like any method). A type parameter's `Clone` is the consumer's:
+   `Rust.Clone α` is an arbitrary `α → Rust.M α` that may panic or diverge,
+   bounds `T: Clone` become `[Rust.Clone T]`, and a derived `Clone` on a
+   generic type gets an instance that clones each field reaching a parameter,
+   plus a `Rust.LawfulClone` instance when the parameters' are lawful.
+   Theorems that need a faithful clone assume `Rust.LawfulClone` (a clone that
+   returns, returns an equal value). Clones the source makes lazily stay lazy:
+   an iterator handed to another function (`once_with(|| x.clone())`,
+   `xs.iter().cloned().map(f)`) is passed as deferred items, so a clone runs
+   only if, and when, the callee's loop pulls it.
 3. **Functions.** A function that cannot panic or diverge is a pure `def`.
    Otherwise it returns `Rust.M α := ExceptT Rust.Panic Option α`: a panic
    is `throw`, divergence is `none`. Purity is computed as a fixed point over
@@ -68,8 +86,11 @@ differential scenario ──► native run (Cargo) ══ Lean #eval ──► m
    while the borrow lives, so eager write-through is exact. `Drop`
    implementations run at scope exits, early returns and `drop(x)`.
    A function returning a struct that borrows its `&mut` receiver (such as
-   `Node::ready`) leaves the receiver to the struct, whose binding writes
-   through. Functions returning `&mut T` are rejected.
+   `Node::ready`), or a field of it (`Cluster::ready` borrows `self.node`),
+   leaves that place to the struct, whose binding writes through. Functions
+   returning `&mut T` are rejected. A closure passed to `array::from_fn` that
+   mutates captured state runs as the body of a loop over the indices, as
+   `from_fn` calls it; other closures may not mutate captured state.
 5. **Core library.** `provium/lean/Provium/Rust.lean` defines every
    operation the translation uses: checked and wrapping arithmetic under the
    build's overflow-check setting, slices and arrays, `Option`/`Result`
@@ -100,8 +121,8 @@ differential scenario ──► native run (Cargo) ══ Lean #eval ──► m
   source correspondence.
 - **Trusted.** The `syn` front end's name resolution and type inference, the
   interpretation of each core-library operation in `Rust.lean`, and these
-  modelling assumptions: application `Clone` returns an equal value without
-  panicking; a panic ends the execution (no unwinding observed); a failed
+  modelling assumptions: a panic ends the execution (no unwinding observed,
+  so `Drop` during unwinding is not modelled); a failed
   `const` assertion, which rustc would reject at compile time, is a panic.
 
 ## Alternatives considered

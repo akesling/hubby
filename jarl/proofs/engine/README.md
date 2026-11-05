@@ -63,11 +63,17 @@ the node crashing and restarting.
   the `syn` front end's name resolution and type inference, and the
   interpretation of each `Rust.lean` operation. The differential scenario
   (`differential.rs`) compares the translation with native Jarl.
-- Application `Clone` returns an equal value without panicking, and a panic
-  ends the node's execution (see above).
+- The application's `Clone` for `V` and `S` is arbitrary (it may panic or
+  diverge, which is no transition), but the theorems assume it is lawful:
+  when a clone returns, it returns an equal value (`Rust.LawfulClone`).
+  Without that, a follower could append a different entry than the leader
+  sent. A panic ends the node's execution (see above).
 - Persistence writes the whole state at once (`Cluster.persist`); a host
   writing only the `Write` delta is covered by the storage-view contracts, not
   here.
 - Snapshot application values are not tracked: snapshot safety is about the
   boundary identity, not the snapshot's application state.
-- Only the fixed engine; the dynamic `Cluster` engine (M4) is out of scope.
+- Only the fixed engine. The dynamic `Cluster` engine (M4) is translated
+  (it is in the project's roots and the differential scenario drives it through
+  learner addition, joint consensus and finalization), but its safety is not
+  yet proved.
