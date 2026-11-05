@@ -41,7 +41,7 @@ differential scenario ──► native run (Cargo) ══ Lean #eval ──► m
    | --- | --- |
    | `struct` | `structure`, fields in order (tuple fields `f0`, `f1`, ...) |
    | `enum` | `inductive`, one constructor per variant |
-   | `u8` ... `u64`, `usize` | `Rust.u8` ... (`Fin (2 ^ bits)`); 64-bit targets only |
+   | `u8` ... `u64`, `usize` | `Rust.u8` ... (`Fin (2 ^ bits)`); `usize` has the build's pointer width, `Rust.usizeBits` (32 or 64) |
    | `i8` ... `i64` | `Rust.IntN bits` |
    | `[T; N]` | `Vector T N`; const generics are `Nat` parameters |
    | `&[T]` | `Array T` |
@@ -139,7 +139,8 @@ differential scenario ──► native run (Cargo) ══ Lean #eval ──► m
 
 ## Status
 
-Implemented: everything above. Jarl's fixed `Node` engine (`node.rs`,
-`state.rs`, `membership.rs`, `ready.rs`) translates completely, and
-`jarl/proofs/engine` proves election, state-machine and snapshot safety for
-every reachable cluster of it.
+Implemented: everything above. Jarl (`node.rs`, `state.rs`, `membership.rs`,
+`ready.rs` and the dynamic engine in `cluster.rs`) translates completely, and
+every Jarl correspondence claim is a typed project: `jarl/proofs/engine`
+proves the fixed engine's Raft safety and the component contracts on host and
+wasm32 builds, with source-mutation negative controls.
