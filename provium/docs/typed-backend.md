@@ -25,6 +25,7 @@ Cargo build (captured) ──► cfg, overflow checks, debug assertions
 crate sources (syn) ──► name resolution ──► typed translation ──► Generated.lean
                                                                     ▲
 consumer proofs, proof modules ─────────────────────────────────────┘
+captured rustc ──► --emit=mir ══ translation's calls and local types ──► must agree
 differential scenario ──► native run (Cargo) ══ Lean #eval ──► must agree
 ```
 
@@ -119,8 +120,17 @@ differential scenario ──► native run (Cargo) ══ Lean #eval ──► m
   Jarl's scenario; a wrong `saturating_sub` is not, because the scenario never
   reaches it. Differential tests support, but do not replace, a proof of
   source correspondence.
-- **Trusted.** The `syn` front end's name resolution and type inference, the
-  interpretation of each core-library operation in `Rust.lean`, and these
+- **rustc cross-check.** With a captured Cargo build, Provium re-runs the root
+  `rustc` invocation with `--emit=mir` and compares, for every translated
+  function, the crate functions it calls (both directions) and the type of
+  every source-named local (parameters, `let` and pattern bindings) with
+  rustc's MIR. A disagreement fails verification. Locals whose translated type
+  has no rustc counterpart (iterators, closures, deferred items, types left to
+  Lean's elaborator) are counted and reported, not compared.
+- **Trusted.** The front end beyond what the cross-check compares (the types of
+  intermediate expressions, which operation an expression becomes, and calls
+  into `core`), the interpretation of each core-library operation in
+  `Rust.lean`, and these
   modelling assumptions: a panic ends the execution (no unwinding observed,
   so `Drop` during unwinding is not modelled); a failed
   `const` assertion, which rustc would reject at compile time, is a panic.

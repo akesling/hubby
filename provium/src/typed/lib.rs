@@ -586,6 +586,18 @@ impl Body<'_> {
         if let Some(t) = &inst {
             self.instantiate(&g, t, &mut sub_t, &mut sub_l);
         }
+        // Impl generics nothing fixes yet are inference variables, never the
+        // callee's own parameter names.
+        for t in &g.types {
+            if !sub_t.iter().any(|(n, _)| n == t) {
+                sub_t.push((t.clone(), Ty::Param(format!("?{t}"))));
+            }
+        }
+        for c in &g.consts {
+            if !sub_l.iter().any(|(n, _)| n == c) {
+                sub_l.push((c.clone(), Len::Param(format!("?{c}"))));
+            }
+        }
         let mut all = vec![];
         let mut arg_exprs: Vec<&Expr> = vec![];
         if let Some(r) = recv {
@@ -781,6 +793,13 @@ impl Body<'_> {
         sub_l: &mut Vec<(String, Len)>,
     ) {
         if let Ty::Adt(_, tys, lens) = self.resolve(actual).peel() {
+            // Known arguments replace inference placeholders for the same names.
+            sub_t.retain(|(n, t)| {
+                !(g.types.contains(n) && matches!(t, Ty::Param(p) if p.starts_with('?')))
+            });
+            sub_l.retain(|(n, l)| {
+                !(g.consts.contains(n) && matches!(l, Len::Param(p) if p.starts_with('?')))
+            });
             sub_t.extend(g.types.iter().cloned().zip(tys.iter().cloned()));
             sub_l.extend(g.consts.iter().cloned().zip(lens.iter().cloned()));
         }

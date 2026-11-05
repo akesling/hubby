@@ -7,6 +7,67 @@ use std::{collections::BTreeMap, fs, path::Path, process::Command};
 
 const RUST: &str = include_str!("../../lean/Provium/Rust.lean");
 
+/// A fresh directory for rustc's MIR output.
+fn out_dir_for_mir(out: &Path) -> Result<std::path::PathBuf, String> {
+    let dir = out.join("mir");
+    if dir.exists() {
+        fs::remove_dir_all(&dir).map_err(|e| e.to_string())?;
+    }
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir)
+}
+
+/// Re-run the captured root compilation, emitting only MIR.
+fn emit_mir(inv: &crate::cargo_capture::Invocation, dir: &Path) -> Result<String, String> {
+    let file = dir.join("crate.mir");
+    let mut args: Vec<String> = vec![];
+    let mut skip = false;
+    for a in &inv.arguments {
+        if skip {
+            skip = false;
+            continue;
+        }
+        if a == "--emit" || a == "--out-dir" || a == "-o" {
+            skip = true;
+            continue;
+        }
+        if a.starts_with("--emit=") || a.starts_with("--out-dir=") {
+            continue;
+        }
+        args.push(a.clone());
+    }
+    // `-C incremental=DIR` comes as two arguments; drop the pair.
+    let mut cleaned: Vec<String> = vec![];
+    let mut i = 0;
+    while i < args.len() {
+        if args[i] == "-C"
+            && args
+                .get(i + 1)
+                .is_some_and(|v| v.starts_with("incremental="))
+        {
+            i += 2;
+            continue;
+        }
+        cleaned.push(args[i].clone());
+        i += 1;
+    }
+    let output = Command::new(&inv.executable)
+        .current_dir(&inv.working_directory)
+        .args(&cleaned)
+        .arg(format!("--emit=mir={}", file.display()))
+        .arg("--out-dir")
+        .arg(dir)
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !output.status.success() {
+        return Err(format!(
+            "rustc --emit=mir failed:\n{}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    fs::read_to_string(&file).map_err(|e| e.to_string())
+}
+
 /// The runtime library for a target's pointer width.
 fn runtime_for(width: u32) -> String {
     if width == 64 {
@@ -187,6 +248,42 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
             debug_assertions,
         },
     )?;
+    // The front end's name resolution and type inference, checked against
+    // rustc's MIR for the same build.
+    let mut report = String::new();
+    if let Some(b) = &build {
+        let inv = &b.capture.invocations[b.capture.configured_root_invocation];
+        let mir = emit_mir(inv, &out_dir_for_mir(out)?)?;
+        let facts: BTreeMap<String, super::gen::Facts> = generated
+            .facts
+            .iter()
+            .filter(|(p, _)| !p.starts_with(&format!("{MOUNT}::")))
+            .map(|(p, f)| (p.clone(), f.clone()))
+            .collect();
+        let cwd = inv
+            .working_directory
+            .canonicalize()
+            .map_err(|e| e.to_string())?;
+        let outcome = super::mircheck::check(
+            &krate,
+            &facts,
+            &super::mircheck::parse(&mir),
+            &cwd.to_string_lossy(),
+        );
+        if !outcome.problems.is_empty() {
+            return Err(format!(
+                "the translation disagrees with rustc:\n{}",
+                outcome.problems.join("\n")
+            ));
+        }
+        report.push_str(&format!(
+            "rustc cross-check: {} functions agree with MIR ({} crate calls, {} local types; {} locals have no rustc counterpart).\n",
+            facts.len(),
+            outcome.calls,
+            outcome.locals,
+            outcome.unchecked
+        ));
+    }
     let mut audit = "import Provium.Audit\nimport Proofs\n".to_string();
     for o in &project.obligations {
         let lean = generated.functions.get(&o.function).ok_or_else(|| {
@@ -232,7 +329,6 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
         fs::write(path, text).map_err(|e| e.to_string())?;
         workspace.write(file, text)?;
     }
-    let mut report = String::new();
     for (file, object) in [
         ("Provium/Rust.lean", "Provium/Rust.olean"),
         ("Provium/Audit.lean", "Provium/Audit.olean"),

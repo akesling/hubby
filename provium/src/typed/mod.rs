@@ -4,6 +4,7 @@ pub mod gen;
 pub mod lean;
 pub mod lib;
 pub mod load;
+pub mod mircheck;
 pub mod types;
 pub mod verify;
 
@@ -15,6 +16,16 @@ pub fn generate_host(
     roots: &[String],
     namespace: &str,
 ) -> Result<String, String> {
+    Ok(translate_host(crate_root, roots, namespace)?.1.lean)
+}
+
+/// The loaded crate and its translation for the host, with the facts the
+/// rustc cross-check compares.
+pub fn translate_host(
+    crate_root: &Path,
+    roots: &[String],
+    namespace: &str,
+) -> Result<(load::Krate, gen::Generated), String> {
     let cfg = std::process::Command::new("rustc")
         .args([
             "--print",
@@ -28,9 +39,11 @@ pub fn generate_host(
         .map_err(|e| e.to_string())?;
     let cfg_text = String::from_utf8(cfg.stdout).map_err(|e| e.to_string())?;
     let configuration = crate::cfg::Configuration::parse(&cfg_text)?;
-    if configuration.pointer_width() != Some(64) {
-        return Err("the typed backend supports 64-bit targets only".into());
-    }
+    let width = match configuration.pointer_width() {
+        Some(w @ (32 | 64)) => w,
+        _ => return Err("the typed backend supports 32- and 64-bit targets only".into()),
+    };
+    types::set_pointer_width(width);
     let k = load::Krate::load(crate_root, Some(configuration))?;
     let g = gen::generate(
         &k,
@@ -41,5 +54,5 @@ pub fn generate_host(
             debug_assertions: true,
         },
     )?;
-    Ok(g.lean)
+    Ok((k, g))
 }

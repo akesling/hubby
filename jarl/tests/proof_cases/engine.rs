@@ -22,6 +22,7 @@ fn fixed_engine_safety_is_kernel_checked() {
         );
     }
     assert!(report.contains("Differential: 40 scenarios"), "{report}");
+    assert!(report.contains("rustc cross-check:"), "{report}");
 }
 
 /// The same proofs, checked against the translation of a 32-bit build
@@ -61,4 +62,5 @@ fn fixed_engine_safety_holds_on_32_bit() {
             "{report}"
         );
     }
+    assert!(report.contains("rustc cross-check:"), "{report}");
 }

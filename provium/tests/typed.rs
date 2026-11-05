@@ -145,6 +145,126 @@ pub fn upto(a: &[u64; 4], n: usize) -> usize { a[..=n].len() }
     assert!(lean.contains("Rust.add n 1"), "{lean}");
 }
 
+/// rustc's MIR for the work crate, emitted the way the cross-check does.
+fn crate_mir(w: &Work) -> String {
+    let out = std::process::Command::new("rustc")
+        .current_dir(&w.0)
+        .args([
+            "--crate-type",
+            "lib",
+            "--edition",
+            "2021",
+            "-C",
+            "opt-level=0",
+        ])
+        .arg("--emit=mir=crate.mir")
+        .arg("lib.rs")
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    fs::read_to_string(w.0.join("crate.mir")).unwrap()
+}
+
+#[test]
+fn rustc_cross_check_catches_misresolved_calls_and_mistyped_locals() {
+    let w = Work::new(
+        r#"
+pub struct A { n: u64 }
+pub struct B { n: u32 }
+impl A {
+    pub fn get(&self) -> u64 { self.n }
+    pub fn twice(&self) -> u64 { let v = self.get(); v.wrapping_mul(2) }
+}
+impl B {
+    pub fn get(&self) -> u32 { self.n }
+}
+pub fn use_b(b: &B) -> u32 { let x = b.get(); x }
+"#,
+    );
+    let roots: Vec<String> = ["A::twice", "use_b"]
+        .iter()
+        .map(|r| r.to_string())
+        .collect();
+    let (krate, generated) =
+        provium::typed::translate_host(&w.0.join("lib.rs"), &roots, "T").unwrap();
+    let mir = provium::typed::mircheck::parse(&crate_mir(&w));
+    let dir = w.0.canonicalize().unwrap();
+    let dir = dir.to_str().unwrap();
+    let ok = provium::typed::mircheck::check(&krate, &generated.facts, &mir, dir);
+    assert!(ok.problems.is_empty(), "{:?}", ok.problems);
+    assert!(ok.locals >= 4 && ok.calls >= 2, "{ok:?}");
+
+    // A call resolved to the wrong type's method.
+    let mut facts = generated.facts.clone();
+    let calls = &mut facts.get_mut("use_b").unwrap().calls;
+    assert!(calls.remove("B::get"));
+    calls.insert("A::get".into());
+    let bad = provium::typed::mircheck::check(&krate, &facts, &mir, dir);
+    assert!(
+        bad.problems
+            .iter()
+            .any(|p| p.contains("rustc calls B::get")),
+        "{:?}",
+        bad.problems
+    );
+    assert!(
+        bad.problems
+            .iter()
+            .any(|p| p.contains("the translation calls A::get")),
+        "{:?}",
+        bad.problems
+    );
+
+    // A local inferred at the wrong width.
+    let mut facts = generated.facts.clone();
+    for (name, ty) in &mut facts.get_mut("A::twice").unwrap().locals {
+        if name == "v" {
+            *ty = provium::typed::types::Ty::Uint(32, "u32");
+        }
+    }
+    let bad = provium::typed::mircheck::check(&krate, &facts, &mir, dir);
+    assert!(
+        bad.problems
+            .iter()
+            .any(|p| p.contains("local `v` is u32 in the translation")),
+        "{:?}",
+        bad.problems
+    );
+}
+
+#[test]
+fn mir_parsing_handles_function_types_and_promoted_constants() {
+    let mir = r#"
+fn m::<impl at a.rs:3:1: 3:9>::f(_1: &mut S<V>, _2: impl FnOnce() -> V) -> Result<(), E> {
+    debug self => _1;
+    debug make => _2;
+    let mut _3: core::option::Option<&'a mut Entry<V>>;
+    scope 1 {
+        debug slot => _3;
+    }
+    bb0: {
+        _4 = S::<V>::g::<Map<Cloned<core::slice::Iter<'_, V>>, fn(V) -> R<V> {R::<V>::C}>>(move _1) -> [return: bb1, unwind continue];
+        _5 = const m::S::<V>::f::<impl FnOnce() -> V>::promoted[0];
+        _6 = <impl FnOnce() -> V as FnOnce<()>>::call_once(move _2, const ()) -> [return: bb2, unwind continue];
+    }
+}
+"#;
+    let parsed = provium::typed::mircheck::parse(mir);
+    let f = &parsed[&("a.rs".to_owned(), 3, "f".to_owned())];
+    assert_eq!(
+        f.locals["slot"].iter().collect::<Vec<_>>(),
+        ["Option<Entry<V>>"]
+    );
+    assert_eq!(f.locals["self"].iter().collect::<Vec<_>>(), ["S<V>"]);
+    // The promoted constant is not a call; the two calls are.
+    assert_eq!(f.callees.len(), 2, "{:?}", f.callees);
+    assert!(f.callees.iter().all(|c| !c.contains("promoted")));
+}
+
 #[test]
 fn unsupported_constructs_are_rejected_with_their_function() {
     for (source, root, message) in [
@@ -189,6 +309,7 @@ fn example_verifies() {
         "{report}"
     );
     assert!(report.contains("Differential: 16 scenarios"), "{report}");
+    assert!(report.contains("rustc cross-check:"), "{report}");
 }
 
 /// A theorem reaches a generated function through a consumer relation whose
@@ -208,6 +329,7 @@ fn obligations_must_reach_their_function() {
             .unwrap();
     project["crate_root"] = "lib.rs".into();
     project.as_object_mut().unwrap().remove("differential");
+    project.as_object_mut().unwrap().remove("cargo_build");
     project["obligations"] = serde_json::json!([
         { "theorem": "Example.Proofs.pushed_len", "function": "Queue::pop" }
     ]);

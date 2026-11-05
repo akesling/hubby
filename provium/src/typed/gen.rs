@@ -12,6 +12,8 @@ pub struct Options {
 }
 
 pub struct Generated {
+    /// Per translated function, the facts the rustc cross-check compares.
+    pub facts: BTreeMap<String, Facts>,
     pub lean: String,
     /// Crate function path to Lean name, for every translated function.
     pub functions: BTreeMap<String, String>,
@@ -23,6 +25,16 @@ struct Emitted {
     calls: BTreeSet<String>,
     impure: bool,
     lent: Option<Vec<String>>,
+    facts: Facts,
+}
+
+/// What the translation decided about a function, for checking against rustc.
+#[derive(Clone, Debug, Default)]
+pub struct Facts {
+    /// Crate functions it calls.
+    pub calls: BTreeSet<String>,
+    /// Source-named locals (parameters, bindings, patterns) and their types.
+    pub locals: Vec<(String, Ty)>,
 }
 
 fn generic_binders(g: &Generics, bounds: &[(String, String)]) -> String {
@@ -662,6 +674,20 @@ fn emit_function(cx: &Ctx, f: &Function) -> R<Emitted> {
             .filter(|s| s.starts_with('t') || s.starts_with('r') || s.starts_with('m'))
             .cloned(),
     );
+    let mut names = idents.clone();
+    for input in &f.sig.inputs {
+        match input {
+            syn::FnArg::Receiver(_) => {
+                names.insert("self".to_owned());
+            }
+            syn::FnArg::Typed(t) => {
+                if let syn::Pat::Ident(pi) = &*t.pat {
+                    names.insert(pi.ident.to_string());
+                }
+            }
+        }
+    }
+    body.set_source_names(names);
     let mut params = vec![];
     let mut lent_param = None;
     let mut prologue = vec![];
@@ -788,11 +814,20 @@ fn emit_function(cx: &Ctx, f: &Function) -> R<Emitted> {
         }
     }
     text.push('\n');
+    let facts = Facts {
+        calls: body.calls.clone(),
+        locals: body
+            .declared
+            .iter()
+            .map(|(n, id)| (n.clone(), body.resolve(&body.locals[*id].ty)))
+            .collect(),
+    };
     Ok(Emitted {
         text,
         calls: body.calls.clone(),
         impure,
         lent,
+        facts,
     })
 }
 
@@ -981,6 +1016,10 @@ pub fn generate(k: &Krate, roots: &[String], opts: &Options) -> R<Generated> {
     }
     out.push_str(&format!("end {}\n", opts.namespace));
     Ok(Generated {
+        facts: emitted
+            .iter()
+            .map(|(p, e)| (p.clone(), e.facts.clone()))
+            .collect(),
         lean: out,
         functions: order
             .iter()

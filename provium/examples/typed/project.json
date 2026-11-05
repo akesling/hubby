@@ -1,5 +1,6 @@
 {
   "kind": "typed",
+  "cargo_build": "build.json",
   "crate_root": "src/lib.rs",
   "namespace": "Example",
   "roots": ["Queue::new", "Queue::push", "Queue::push_cloned", "Queue::pop", "Queue::retain", "Queue::is_empty"],

@@ -61,6 +61,9 @@ pub struct Function {
     pub sig: syn::Signature,
     pub block: syn::Block,
     pub file: PathBuf,
+    /// The line of the enclosing `impl` keyword, which rustc's MIR names
+    /// associated functions by.
+    pub impl_line: Option<usize>,
 }
 
 #[derive(Clone, Debug)]
@@ -307,6 +310,7 @@ impl Krate {
             .trait_
             .as_ref()
             .map(|(_, p, _)| p.segments.last().unwrap().ident.to_string());
+        let impl_line = i.impl_token.span.start().line;
         for item in i.items {
             match item {
                 syn::ImplItem::Fn(f) => {
@@ -330,6 +334,7 @@ impl Krate {
                             sig: f.sig,
                             block: f.block,
                             file: file.to_owned(),
+                            impl_line: Some(impl_line),
                         },
                     );
                 }
@@ -460,6 +465,7 @@ impl Krate {
                             sig: f.sig,
                             block: *f.block,
                             file: file.to_owned(),
+                            impl_line: None,
                         },
                     );
                 }

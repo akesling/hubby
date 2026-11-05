@@ -110,6 +110,10 @@ pub struct Body<'a> {
     scopes: Vec<Scope>,
     used: BTreeSet<String>,
     source_idents: BTreeSet<String>,
+    /// Every identifier of the source body, to tell its locals from temporaries.
+    source_names: BTreeSet<String>,
+    /// Source-named locals as declared, for the rustc cross-check.
+    pub declared: Vec<(String, usize)>,
     pub out: Lines,
     pub(super) indent: usize,
     pub impure: bool,
@@ -184,6 +188,8 @@ impl<'a> Body<'a> {
             }],
             used: BTreeSet::new(),
             source_idents: BTreeSet::new(),
+            source_names: BTreeSet::new(),
+            declared: Vec::new(),
             out: vec![],
             indent: 0,
             impure: false,
@@ -272,10 +278,18 @@ impl<'a> Body<'a> {
         self.source_idents.extend(names);
     }
 
+    /// The identifiers the source body uses.
+    pub fn set_source_names(&mut self, names: BTreeSet<String>) {
+        self.source_names = names;
+    }
+
     pub fn declare(&mut self, rust: &str, local: Local) -> usize {
         let id = self.locals.len();
         if local.drop.is_some() {
             self.scopes.last_mut().unwrap().drops.push(id);
+        }
+        if self.source_names.contains(rust) {
+            self.declared.push((rust.to_owned(), id));
         }
         self.locals.push(local);
         self.scopes
@@ -1709,7 +1723,9 @@ impl<'a> Body<'a> {
             if n == "None" {
                 return Ok(V::of(
                     "none",
-                    expect.cloned().unwrap_or(Ty::Option(Box::new(Ty::Unit))),
+                    expect
+                        .cloned()
+                        .unwrap_or_else(|| Ty::Option(Box::new(Ty::Param("?None".into())))),
                 ));
             }
             if self.generics.consts.contains(n) {
@@ -2647,6 +2663,8 @@ impl<'a> Body<'a> {
             return Ok(V::of("()", Ty::Unit));
         }
         let (src, item) = self.iterable(&f.expr)?;
+        // Literal items are typed by their uses in the body, as for `let`.
+        let item = self.fresh_lits(&item);
         let (lean_pat, mut binds) = self.pattern(&f.pat, &item, false)?;
         self.emit(format!("for {lean_pat} in {} do", paren(&src)));
         self.indent += 2;
