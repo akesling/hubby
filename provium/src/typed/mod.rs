@@ -1,4 +1,5 @@
 //! Typed backend: Rust items compiled to ordinary Lean definitions.
+pub mod diffcov;
 pub mod emit;
 pub mod gen;
 pub mod lean;

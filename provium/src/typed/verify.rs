@@ -129,6 +129,11 @@ pub struct Differential {
     pub crate_name: String,
     pub function: String,
     pub seeds: u64,
+    /// Translated functions the scenario does not execute, each with the
+    /// reason. Any other unexecuted function fails verification, and so does
+    /// a listed function the scenario does execute.
+    #[serde(default)]
+    pub unexercised: BTreeMap<String, String>,
 }
 
 use super::lean::MOUNT;
@@ -346,8 +351,11 @@ pub fn verify(config: &Path, out: &Path) -> Result<String, String> {
             base,
             &out,
             &workspace,
-            &generated,
-            &project.namespace,
+            &Subject {
+                generated: &generated,
+                krate: &krate,
+                namespace: &project.namespace,
+            },
             profile.overflow_checked,
         )?);
     }
@@ -426,10 +434,14 @@ fn differential(
     base: &Path,
     out: &Path,
     workspace: &proof_modules::Workspace,
-    generated: &super::gen::Generated,
-    namespace: &str,
+    subject: &Subject,
     overflow_checks: bool,
 ) -> Result<String, String> {
+    let Subject {
+        generated,
+        krate,
+        namespace,
+    } = *subject;
     let source = base
         .join(&d.source)
         .canonicalize()
@@ -515,10 +527,76 @@ fn differential(
         return Err(format!("differential mismatch for {path}: {first}"));
     }
     fs::write(out.join("differential.txt"), &native_out).map_err(|e| e.to_string())?;
+    let coverage = coverage_report(d, &native, generated, krate)?;
     Ok(format!(
-        "Differential: {} scenarios of {path} agree natively and in Lean.\n",
+        "Differential: {} scenarios of {path} agree natively and in Lean.\n{coverage}",
         native_lines.len()
     ))
+}
+
+/// A crate and its translation, as the differential needs them.
+#[derive(Clone, Copy)]
+struct Subject<'a> {
+    generated: &'a super::gen::Generated,
+    krate: &'a super::load::Krate,
+    namespace: &'a str,
+}
+
+/// Which translated functions the scenario executes. An unexecuted function
+/// fails verification unless the project names it in `unexercised` with a
+/// reason; a named function that does run fails too, so the list stays exact.
+fn coverage_report(
+    d: &Differential,
+    native: &Path,
+    generated: &super::gen::Generated,
+    krate: &super::load::Krate,
+) -> Result<String, String> {
+    let export = super::diffcov::run_instrumented(native, &[])?;
+    let translated: std::collections::BTreeSet<String> = generated
+        .functions
+        .keys()
+        .filter(|p| !p.starts_with(&format!("{MOUNT}::")))
+        .cloned()
+        .collect();
+    let cov = super::diffcov::attribute(krate, &translated, &export)?;
+    let mut problems = vec![];
+    for (f, c) in &cov {
+        match (c.executed, d.unexercised.get(f)) {
+            (false, None) => problems.push(format!("{f} is never executed by the scenario")),
+            (true, Some(_)) => problems.push(format!(
+                "{f} is listed as unexercised but the scenario executes it"
+            )),
+            _ => {}
+        }
+    }
+    for f in d.unexercised.keys() {
+        if !cov.contains_key(f) {
+            problems.push(format!(
+                "{f} is listed as unexercised but is not translated"
+            ));
+        }
+    }
+    if !problems.is_empty() {
+        return Err(format!("differential coverage:\n{}", problems.join("\n")));
+    }
+    let executed = cov.values().filter(|c| c.executed).count();
+    let (covered, regions) = cov
+        .values()
+        .fold((0, 0), |(a, b), c| (a + c.covered, b + c.regions));
+    let mut lines = format!(
+        "Differential coverage: {executed} of {} translated functions executed, {covered} of {regions} code regions.\n",
+        cov.len()
+    );
+    // The least-covered executed functions, as a guide for new scenarios.
+    let mut partial: Vec<(&String, &super::diffcov::FnCoverage)> = cov
+        .iter()
+        .filter(|(_, c)| c.executed && c.covered < c.regions)
+        .collect();
+    partial.sort_by(|a, b| (a.1.covered * b.1.regions).cmp(&(b.1.covered * a.1.regions)));
+    for (f, c) in partial.iter().take(10) {
+        lines.push_str(&format!("  {f}: {} of {} regions\n", c.covered, c.regions));
+    }
+    Ok(lines)
 }
 
 /// The `[package]` name of a Cargo manifest.

@@ -566,7 +566,16 @@ impl Body<'_> {
                 syn::FnArg::Receiver(r) => {
                     let mutable = r.reference.is_some() && r.mutability.is_some();
                     receiver = Some(mutable);
-                    params.push((mutable, impl_self.clone().unwrap()));
+                    let st = impl_self.clone().unwrap();
+                    let shared = r.reference.is_some() && r.mutability.is_none();
+                    params.push((
+                        mutable,
+                        if shared {
+                            Ty::Ref(false, Box::new(st))
+                        } else {
+                            st
+                        },
+                    ));
                 }
                 syn::FnArg::Typed(t) => {
                     let ty = scope.ty(&t.ty)?.param_iter();
@@ -611,8 +620,12 @@ impl Body<'_> {
         let mut write_backs: Vec<Place> = vec![];
         for (i, ((mutable, pty), arg)) in params.iter().zip(arg_exprs.iter()).enumerate() {
             let pty_s = pty.subst(&sub_t, &sub_l);
-            let holds =
-                pty_s.peel().holds_mut_borrow(self.cx.k) && !matches!(pty_s.peel(), Ty::Fn(..));
+            // A struct holding a `&mut` borrow is written back when passed by
+            // value or `&mut`, as the callee returns it; through `&` it is
+            // only read, matching the callee's signature.
+            let holds = pty_s.peel().holds_mut_borrow(self.cx.k)
+                && !matches!(pty_s.peel(), Ty::Fn(..))
+                && !matches!(pty_s, Ty::Ref(false, _));
             let is_fn = matches!(pty_s.peel(), Ty::Fn(..));
             if is_fn {
                 let Ty::Fn(a, r) = pty_s.peel().clone() else {

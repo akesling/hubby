@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - run: rustup component add clippy rustfmt --toolchain stable
+      - run: rustup component add clippy rustfmt llvm-tools --toolchain stable
       - run: rustup target add wasm32-unknown-unknown thumbv7em-none-eabi --toolchain stable
       - name: Install Provium's supported Lean toolchain
         shell: bash

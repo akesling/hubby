@@ -22,6 +22,10 @@ fn fixed_engine_safety_is_kernel_checked() {
         );
     }
     assert!(report.contains("Differential: 40 scenarios"), "{report}");
+    assert!(
+        report.contains("Differential coverage: 95 of 95 translated functions executed"),
+        "{report}"
+    );
     assert!(report.contains("rustc cross-check:"), "{report}");
 }
 

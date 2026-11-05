@@ -116,10 +116,16 @@ differential scenario ──► native run (Cargo) ══ Lean #eval ──► m
   `pub fn run(seed: u64) -> u64`. Provium translates it with the crate, runs
   it natively through Cargo with the same overflow-check setting and in Lean
   with `#eval`, and requires identical results (or identical panics) for every
-  seed. A deliberately wrong `wrapping_mul` in `Rust.lean` is caught by
-  Jarl's scenario; a wrong `saturating_sub` is not, because the scenario never
-  reaches it. Differential tests support, but do not replace, a proof of
-  source correspondence.
+  seed. With a captured build, the native run is repeated with
+  `-C instrument-coverage` (`rustup component add llvm-tools`): every
+  translated function must execute, unless the project lists it under
+  `differential.unexercised` with a reason, and a listed function that does
+  execute fails verification too, so the list stays exact. The report gives
+  the covered share of code regions and the least-covered functions.
+  Coverage is per Rust function and region; which `Rust.lean` operations a
+  scenario exercises is not measured. A deliberately wrong `wrapping_mul` in
+  `Rust.lean` is caught by Jarl's scenario. Differential tests support, but do
+  not replace, a proof of source correspondence.
 - **rustc cross-check.** With a captured Cargo build, Provium re-runs the root
   `rustc` invocation with `--emit=mir` and compares, for every translated
   function, the crate functions it calls (both directions) and the type of

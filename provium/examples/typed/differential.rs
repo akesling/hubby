@@ -25,7 +25,8 @@ pub fn run(seed: u64) -> u64 {
             2 => u64::from(queue.push_cloned(&(r >> 16)).is_ok()) + 4,
             _ => queue.retain(|item| item % 3 != r % 3) as u64,
         };
-        digest = (digest ^ value ^ queue.len() as u64).wrapping_mul(0x100000001b3);
+        digest = (digest ^ value ^ queue.len() as u64 ^ u64::from(queue.is_empty()))
+            .wrapping_mul(0x100000001b3);
         step += 1;
     }
     digest

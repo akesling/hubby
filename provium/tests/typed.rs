@@ -310,6 +310,32 @@ fn example_verifies() {
     );
     assert!(report.contains("Differential: 16 scenarios"), "{report}");
     assert!(report.contains("rustc cross-check:"), "{report}");
+    assert!(
+        report.contains("Differential coverage: 8 of 8 translated functions executed"),
+        "{report}"
+    );
+}
+
+/// The differential must execute every translated function or name it, with a
+/// reason, as unexercised; a stale entry fails too.
+#[test]
+#[ignore = "requires the pinned Lean toolchain, Cargo and llvm-tools"]
+fn differential_coverage_must_be_exact() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("examples/typed");
+    let out = Path::new(env!("CARGO_MANIFEST_DIR")).join("artifacts/typed-coverage");
+    let mut project: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join("project.json")).unwrap()).unwrap();
+    project["differential"]["unexercised"] =
+        serde_json::json!({ "Queue::pop": "claimed unexercised, but the scenario pops" });
+    let config = root.join("project-coverage-test.json");
+    fs::write(&config, project.to_string()).unwrap();
+    let result = provium::typed::verify::verify(&config, &out);
+    fs::remove_file(&config).unwrap();
+    let error = result.unwrap_err();
+    assert!(
+        error.contains("Queue::pop is listed as unexercised but the scenario executes it"),
+        "{error}"
+    );
 }
 
 /// A theorem reaches a generated function through a consumer relation whose
