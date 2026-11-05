@@ -552,6 +552,8 @@ fn coverage_report(
     krate: &super::load::Krate,
 ) -> Result<String, String> {
     let export = super::diffcov::run_instrumented(native, &[])?;
+    // Kept for inspecting which regions a scenario misses.
+    fs::write(native.join("coverage.json"), &export).map_err(|e| e.to_string())?;
     let translated: std::collections::BTreeSet<String> = generated
         .functions
         .keys()

@@ -379,7 +379,11 @@ impl<'a> Body<'a> {
 
     pub fn resolve(&self, t: &Ty) -> Ty {
         match t {
-            Ty::IntVar(v) => self.int_vars.get(v).cloned().unwrap_or(Ty::IntVar(*v)),
+            // Follow the whole chain of unified literal variables.
+            Ty::IntVar(v) => match self.int_vars.get(v) {
+                Some(t) => self.resolve(t),
+                None => Ty::IntVar(*v),
+            },
             Ty::Ref(m, t) => Ty::Ref(*m, Box::new(self.resolve(t))),
             Ty::Tuple(v) => Ty::Tuple(v.iter().map(|t| self.resolve(t)).collect()),
             Ty::Option(t) => Ty::Option(Box::new(self.resolve(t))),

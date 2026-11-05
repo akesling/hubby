@@ -396,6 +396,16 @@ impl Body<'_> {
                     ty: Ty::Iter(Box::new(f.ret)),
                 });
             }
+            "core::iter::empty" | "iter::empty" => {
+                let item = match expect.map(|t| self.resolve(t)) {
+                    Some(Ty::Iter(i)) => *i,
+                    _ => Ty::Param("?Item".into()),
+                };
+                return Ok(V {
+                    term: Some("[]".into()),
+                    ty: Ty::Iter(Box::new(item)),
+                });
+            }
             "core::iter::once" | "iter::once" => {
                 let (t, ty) = self.value(&c.args[0], None)?;
                 return Ok(V {
@@ -458,8 +468,31 @@ impl Body<'_> {
             let f = f.clone();
             let turbofish = fp.path.segments.last().unwrap().arguments.clone();
             let args: Vec<Expr> = c.args.iter().cloned().collect();
+            let n = fp.path.segments.len();
             let inst = if names[0] == "Self" {
                 self.self_ty.clone()
+            } else if n >= 2
+                && matches!(
+                    fp.path.segments[n - 2].arguments,
+                    syn::PathArguments::AngleBracketed(_)
+                )
+            {
+                // `Type::<A, N>::f`: the type's arguments instantiate the impl.
+                let mut ty_path = fp.path.clone();
+                ty_path.segments.pop();
+                let ty_path = syn::Path {
+                    leading_colon: ty_path.leading_colon,
+                    segments: ty_path
+                        .segments
+                        .into_pairs()
+                        .map(|p| p.into_value())
+                        .collect(),
+                };
+                let t = syn::Type::Path(syn::TypePath {
+                    qself: None,
+                    path: ty_path,
+                });
+                Some(self.tys().ty(&t)?)
             } else {
                 None
             };
@@ -707,15 +740,17 @@ impl Body<'_> {
             .iter()
             .map(|(_, t)| format!("{t:?}"))
             .collect::<String>();
+        // Arguments the source spells out (`Type::<A>::f`) are passed too.
+        let explicit = inst.is_some();
         for (n, t) in &sub_t {
-            if !mentioned.contains(&format!("Param(\"{n}\")"))
+            if (explicit || !mentioned.contains(&format!("Param(\"{n}\")")))
                 && !matches!(t, Ty::Param(x) if x.starts_with('?'))
             {
                 call.push_str(&format!(" ({} := {})", ident(n), self.lean_ty(t)));
             }
         }
         for (n, l) in &sub_l {
-            if !mentioned.contains(&format!("Param(\"{n}\")"))
+            if (explicit || !mentioned.contains(&format!("Param(\"{n}\")")))
                 && !matches!(l, Len::Param(x) if x.starts_with('?'))
             {
                 call.push_str(&format!(" ({} := {})", ident(n), self.cx.names.len(l)));
