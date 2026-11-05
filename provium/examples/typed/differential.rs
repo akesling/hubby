@@ -1,5 +1,23 @@
 //! Seeded operations on a queue, digested; compared natively and in Lean.
-use typed_example::{Error, Queue};
+use typed_example::{Error, Queue, Sink};
+
+/// Accepts items until it holds three, then refuses.
+struct Bounded {
+    held: u64,
+    total: u64,
+}
+
+impl Sink<u64> for Bounded {
+    type Error = ();
+    fn put(&mut self, item: u64) -> Result<(), ()> {
+        if self.held == 3 {
+            return Err(());
+        }
+        self.held += 1;
+        self.total = self.total.wrapping_add(item);
+        Ok(())
+    }
+}
 
 fn mix(state: &mut u64) -> u64 {
     *state = state.wrapping_add(0x9e3779b97f4a7c15);
@@ -23,6 +41,13 @@ pub fn run(seed: u64) -> u64 {
             },
             1 => queue.pop().unwrap_or(7),
             2 => u64::from(queue.push_cloned(&(r >> 16)).is_ok()) + 4,
+            3 if r % 7 == 0 => {
+                let mut sink = Bounded { held: 0, total: 0 };
+                match queue.drain_into(&mut sink) {
+                    Ok(n) => n as u64 + sink.total,
+                    Err(()) => 100 + sink.total,
+                }
+            }
             _ => queue.retain(|item| item % 3 != r % 3) as u64,
         };
         digest = (digest ^ value ^ queue.len() as u64 ^ u64::from(queue.is_empty()))

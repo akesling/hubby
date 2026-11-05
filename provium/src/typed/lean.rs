@@ -99,6 +99,8 @@ pub struct Names {
     pub functions: BTreeMap<String, String>,
     /// Crate const path to Lean name.
     pub consts: BTreeMap<String, String>,
+    /// Consumer trait path to its Lean class name.
+    pub traits: BTreeMap<String, String>,
 }
 
 /// The module path a differential scenario is mounted at.
@@ -176,10 +178,21 @@ impl Names {
             taken.insert(lean.clone());
             functions.insert(path.clone(), lean);
         }
+        let traits = k
+            .traits
+            .keys()
+            .map(|p| {
+                (
+                    p.clone(),
+                    scoped(p, p.rsplit("::").next().unwrap().to_owned()),
+                )
+            })
+            .collect();
         Names {
             types,
             functions,
             consts,
+            traits,
         }
     }
 
@@ -240,6 +253,19 @@ impl Names {
                 s
             }
             Ty::TryFromIntError => "Rust.TryFromIntError".into(),
+            Ty::Formatter => "Rust.Formatter".into(),
+            Ty::Assoc(param, tr, args, name) => {
+                let mut s = format!("({}.{name}", self.traits[tr]);
+                for (n, t) in args {
+                    s.push_str(&format!(" ({} := {})", ident(n), self.ty(t)));
+                }
+                s.push_str(&format!(" (Self := {}))", ident(param)));
+                s
+            }
+            Ty::Future(t) => format!("(Rust.M {})", self.ty(t)),
+            Ty::Budget => "Nat".into(),
+            Ty::Run(t) => format!("(Rust.Run {})", self.ty(t)),
+            Ty::FmtError => "Rust.FmtError".into(),
         }
     }
 }

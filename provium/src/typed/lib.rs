@@ -571,6 +571,21 @@ impl Body<'_> {
         expect: Option<&Ty>,
         inst: Option<Ty>,
     ) -> R<V> {
+        // Only this call is awaited, not calls inside its arguments.
+        let awaited = std::mem::replace(&mut self.awaiting, false);
+        let is_async = f.sig.asyncness.is_some();
+        if is_async && !awaited {
+            return Err(format!(
+                "{}: calling an async fn without .await is unsupported",
+                f.path
+            ));
+        }
+        if awaited && !is_async {
+            return Err(format!(
+                "{}: .await of a function that is not async",
+                f.path
+            ));
+        }
         let generics = function_generics(f)?;
         let impl_self = match &f.self_ty {
             Some(t) => {
@@ -651,6 +666,8 @@ impl Body<'_> {
         }
         // Receiver first: its type fixes the impl generics.
         let mut write_backs: Vec<Place> = vec![];
+        // Type parameters that arguments fix by their position (`storage: &mut B`).
+        let mut by_arg: Vec<(String, Ty)> = vec![];
         for (i, ((mutable, pty), arg)) in params.iter().zip(arg_exprs.iter()).enumerate() {
             let pty_s = pty.subst(&sub_t, &sub_l);
             // A struct holding a `&mut` borrow is written back when passed by
@@ -680,6 +697,9 @@ impl Body<'_> {
                 if i == 0 && receiver.is_some() {
                     self.instantiate(&g, &place.ty, &mut sub_t, &mut sub_l);
                 }
+                if let Ty::Param(n) = pty.peel() {
+                    by_arg.push((n.clone(), self.resolve(&place.ty).peel().clone()));
+                }
                 all.push(p(&cur));
                 write_backs.push(place);
                 continue;
@@ -702,9 +722,51 @@ impl Body<'_> {
             if i == 0 && receiver.is_some() {
                 self.instantiate(&g, &at, &mut sub_t, &mut sub_l);
             }
+            if let Ty::Param(n) = pty.peel() {
+                by_arg.push((n.clone(), self.resolve(&at).peel().clone()));
+            }
             self.unify(&pty_s, &at);
             all.push(p(&t));
         }
+        // A type argument bounded by a crate trait needs that type's
+        // implementation: its methods are translated (and ordered) first.
+        for (param, path) in &generics.bounds {
+            let Some(tp) = super::gen::consumer_trait(self.cx.k, &f.module, path) else {
+                continue;
+            };
+            let Some((_, actual)) = sub_t
+                .iter()
+                .find(|(n, t)| n == param && !matches!(t, Ty::Param(x) if x.starts_with('?')))
+                .or_else(|| by_arg.iter().find(|(n, _)| n == param))
+            else {
+                continue;
+            };
+            if let Ty::Adt(owner, ..) = self.resolve(actual) {
+                for ti in &self.cx.k.trait_impls {
+                    if ti.trait_path == tp && ti.owner == owner {
+                        self.instance_deps
+                            .extend(ti.methods.iter().map(|(_, p)| p.clone()));
+                    }
+                }
+            }
+        }
+        // An awaited `async fn` takes the caller's await budget as its final
+        // `&mut` argument and yields a `Rust.Run`.
+        let ret = if is_async {
+            let id = self
+                .lookup(super::gen::BUDGET)
+                .ok_or(".await outside an async fn")?;
+            let place = Place {
+                root: id,
+                projs: vec![],
+                ty: Ty::Budget,
+            };
+            all.push(self.read_place(&place)?);
+            write_backs.push(place);
+            Ty::Run(Box::new(ret))
+        } else {
+            ret
+        };
         // A result that borrows a `&mut` argument (`fn ready(&mut self) ->
         // Option<Ready<'_>>`): the argument is not returned; the result's
         // binding writes through to it instead.
@@ -894,12 +956,21 @@ impl Body<'_> {
                 return self.crate_call(&f, Some(&m.receiver), &args, &turbofish, expect);
             }
         }
+        if let Ty::Param(param) = &base {
+            if let Some(v) = self.trait_call(param, &name, place.clone(), value.clone(), &args)? {
+                return Ok(v);
+            }
+        }
         let recv = match value {
             Some(v) => v,
             None => self.read_place(place.as_ref().unwrap())?,
         };
         let r = p(&recv);
         let ty = |t: Ty| t;
+        if matches!(base, Ty::Formatter) && name == "write_str" && args.len() == 1 {
+            let (s, _) = self.value(&args[0], Some(&Ty::Str))?;
+            return self.write_formatter(&m.receiver, s);
+        }
         // Methods every type shares.
         match name.as_str() {
             "clone" | "cloned" | "copied" | "as_ref" | "as_slice" | "into_iter" | "by_ref"
@@ -1562,6 +1633,28 @@ impl Body<'_> {
                     ty: Ty::Unit,
                 })
             }
+            "write" | "writeln" => {
+                let args = mac
+                    .parse_body_with(
+                        syn::punctuated::Punctuated::<Expr, syn::Token![,]>::parse_terminated,
+                    )
+                    .map_err(|e| e.to_string())?;
+                let mut args = args.into_iter();
+                let target = args.next().ok_or("write! needs a destination")?;
+                let Some(Expr::Lit(syn::ExprLit {
+                    lit: syn::Lit::Str(fmt),
+                    ..
+                })) = args.next()
+                else {
+                    return Err("write! needs a literal format string".into());
+                };
+                let rest: Vec<Expr> = args.collect();
+                let mut text = self.format_text(&fmt.value(), &rest)?;
+                if name == "writeln" {
+                    text = format!("{text} ++ \"\\n\"");
+                }
+                self.write_formatter(&target, text)
+            }
             "matches" => {
                 let (e, pat, guard) = mac
                     .parse_body_with(|input: syn::parse::ParseStream| {
@@ -1587,6 +1680,246 @@ impl Body<'_> {
             }
             _ => Err(format!("unsupported macro {name}!")),
         }
+    }
+}
+
+impl Body<'_> {
+    /// A call of a consumer trait's method on a value of a type parameter it
+    /// bounds: the class method. An awaited async method first checks the
+    /// await budget: when it is spent the future is dropped, applying the
+    /// method's `_dropped` effect.
+    fn trait_call(
+        &mut self,
+        param: &str,
+        name: &str,
+        place: Option<Place>,
+        value: Option<String>,
+        args: &[Expr],
+    ) -> R<Option<V>> {
+        let found = self.generics.bounds.iter().find_map(|(p, path)| {
+            if p != param {
+                return None;
+            }
+            let tp = super::gen::consumer_trait(self.cx.k, &self.module, path)?;
+            let m = self.cx.k.traits[&tp]
+                .methods
+                .iter()
+                .find(|m| m.sig.ident == name)?
+                .clone();
+            Some((tp, path.clone(), m))
+        });
+        let Some((tp, path, method)) = found else {
+            return Ok(None);
+        };
+        let awaited = std::mem::replace(&mut self.awaiting, false);
+        let bound = self.tys().trait_args(&tp, path.segments.last().unwrap())?;
+        let g = super::gen::trait_generics(self.cx.k, &tp)?;
+        let module = self.cx.k.traits[&tp].module.clone();
+        let self_ty = Ty::Param("Self".into());
+        let scope = TyScope {
+            krate: self.cx.k,
+            module: &module,
+            generics: &g,
+            self_ty: Some(&self_ty),
+        };
+        let mut sub = bound;
+        sub.push(("Self".into(), Ty::Param(param.to_owned())));
+        let mut mut_self = false;
+        let mut tys = vec![];
+        for input in &method.sig.inputs {
+            match input {
+                syn::FnArg::Receiver(r) => {
+                    mut_self = r.reference.is_some() && r.mutability.is_some();
+                }
+                syn::FnArg::Typed(t) => tys.push(scope.ty(&t.ty)?.subst(&sub, &[])),
+            }
+        }
+        let ret = match &method.sig.output {
+            syn::ReturnType::Default => Ty::Unit,
+            syn::ReturnType::Type(_, t) => scope.ty(t)?.subst(&sub, &[]),
+        };
+        let (out, future) = match ret {
+            Ty::Future(t) => (*t, true),
+            t => (t, method.sig.asyncness.is_some()),
+        };
+        if future && !awaited {
+            return Err(format!(
+                "{name}: a consumer future must be awaited directly"
+            ));
+        }
+        if awaited && !future {
+            return Err(format!("{name}: .await of a method that is not async"));
+        }
+        if mut_self && place.is_none() {
+            return Err(format!("{name}: &mut self call on a temporary"));
+        }
+        let recv = match (&place, value) {
+            (Some(pl), _) => self.read_place(pl)?,
+            (None, Some(v)) => v,
+            (None, None) => return Err("receiver without a value".into()),
+        };
+        let mut terms = vec![];
+        for (a, t) in args.iter().zip(&tys) {
+            let (x, xt) = self.value(a, Some(t))?;
+            self.unify(t, &xt);
+            terms.push(p(&x));
+        }
+        let cls = self.cx.names.traits[&tp].clone();
+        let call_args = format!("{} {}", p(&recv), terms.join(" "));
+        self.impure = true;
+        if future {
+            let budget = self.budget()?;
+            self.emit(format!("if {budget} = 0 then"));
+            self.indent += 2;
+            if let (true, Some(pl)) = (mut_self, &place) {
+                let dropped = format!("{cls}.{} {call_args}", ident(&format!("{name}_dropped")));
+                self.write_place(pl, dropped)?;
+            }
+            self.return_dropped()?;
+            self.indent -= 2;
+            self.emit(format!("{budget} := {budget} - 1"));
+        }
+        let call = format!("{cls}.{} {call_args}", ident(name));
+        if let (true, Some(pl)) = (mut_self, &place) {
+            let r = self.synthetic("r");
+            let m = self.synthetic("m");
+            self.emit(format!("let ({r}, {m}) ← {call}"));
+            self.write_place(pl, m)?;
+            return Ok(Some(V {
+                term: Some(r),
+                ty: out,
+            }));
+        }
+        let t = self.bind(call);
+        Ok(Some(V {
+            term: Some(t),
+            ty: out,
+        }))
+    }
+
+    /// The local holding the enclosing `async fn`'s await budget.
+    fn budget(&self) -> R<String> {
+        let id = self
+            .lookup(super::gen::BUDGET)
+            .ok_or(".await outside an async fn")?;
+        Ok(self.locals[id].lean.clone())
+    }
+
+    /// `e.await`: an awaited call yields its value, or, if the future is
+    /// dropped meanwhile, drops this one too, keeping every effect so far.
+    pub fn await_(&mut self, a: &syn::ExprAwait, expect: Option<&Ty>) -> R<V> {
+        if !self.async_fn {
+            return Err(".await outside an async fn".into());
+        }
+        let saved = std::mem::replace(&mut self.awaiting, true);
+        let v = self.value_v(&a.base, expect);
+        self.awaiting = saved;
+        let v = v?;
+        if let Ty::Run(t) = self.resolve(&v.ty) {
+            let term = v.term.ok_or("diverging awaited call")?;
+            let x = self.synthetic("v");
+            let dropped = self.dropped_return()?;
+            self.emit(format!(
+                "let Rust.Run.ready {x} := {term} | return {}",
+                p(&dropped)
+            ));
+            return Ok(V {
+                term: Some(x),
+                ty: *t,
+            });
+        }
+        Ok(v)
+    }
+
+    /// The packed result of a dropped future; destructors that would run on
+    /// the drop are unsupported.
+    fn dropped_return(&mut self) -> R<String> {
+        if !self.pending_drops().is_empty() {
+            return Err("dropping a future with live destructors is unsupported".into());
+        }
+        Ok(self.pack(Some("Rust.Run.dropped")))
+    }
+
+    fn return_dropped(&mut self) -> R<()> {
+        let packed = self.dropped_return()?;
+        self.emit(format!("return {}", p(&packed)));
+        Ok(())
+    }
+
+    /// The text of `format_args!(fmt, args..)`: literal pieces and the `Display`
+    /// of each `{}` argument. Other format specifications are unsupported.
+    fn format_text(&mut self, fmt: &str, args: &[Expr]) -> R<String> {
+        let mut parts: Vec<String> = vec![];
+        let mut lit = String::new();
+        let mut next = args.iter();
+        let mut chars = fmt.chars().peekable();
+        while let Some(c) = chars.next() {
+            match c {
+                '{' if chars.peek() == Some(&'{') => {
+                    chars.next();
+                    lit.push('{');
+                }
+                '}' if chars.peek() == Some(&'}') => {
+                    chars.next();
+                    lit.push('}');
+                }
+                '{' => {
+                    if chars.next() != Some('}') {
+                        return Err(format!("unsupported format specification in {fmt:?}"));
+                    }
+                    if !lit.is_empty() {
+                        parts.push(format!("{lit:?}"));
+                        lit.clear();
+                    }
+                    let arg = next.next().ok_or("too few format arguments")?;
+                    let (t, ty) = self.value(arg, None)?;
+                    let rt = self.resolve(&ty).peel().clone();
+                    let typed = format!("({t} : {})", self.lean_ty(&rt));
+                    parts.push(match rt {
+                        Ty::Uint(..) => format!("Rust.displayUint {typed}"),
+                        Ty::Int(..) | Ty::IntVar(_) | Ty::IntLit => {
+                            format!("Rust.displayInt {typed}")
+                        }
+                        Ty::Bool => format!("Rust.displayBool {}", p(&t)),
+                        Ty::Str => t,
+                        other => return Err(format!("unsupported Display argument {other:?}")),
+                    });
+                }
+                '}' => return Err(format!("unmatched }} in {fmt:?}")),
+                c => lit.push(c),
+            }
+        }
+        if next.next().is_some() {
+            return Err("too many format arguments".into());
+        }
+        if !lit.is_empty() || parts.is_empty() {
+            parts.push(format!("{lit:?}"));
+        }
+        Ok(parts
+            .into_iter()
+            .map(|p| format!("({p})"))
+            .collect::<Vec<_>>()
+            .join(" ++ "))
+    }
+
+    /// Append `text` to a `Formatter` place, returning the `fmt::Result`.
+    fn write_formatter(&mut self, target: &Expr, text: String) -> R<V> {
+        let place = self.place(target)?.ok_or("a formatter must be a place")?;
+        if !matches!(self.resolve(&place.ty).peel(), Ty::Formatter) {
+            return Err("write! to something other than a core::fmt::Formatter".into());
+        }
+        let cur = self.read_place(&place)?;
+        let r = self.synthetic("r");
+        let m = self.synthetic("m");
+        self.emit(format!(
+            "let ({r}, {m}) := Rust.Formatter.write_str {} ({text})",
+            p(&cur)
+        ));
+        self.write_place(&place, m)?;
+        Ok(V {
+            term: Some(r),
+            ty: Ty::Result(Box::new(Ty::Unit), Box::new(Ty::FmtError)),
+        })
     }
 }
 

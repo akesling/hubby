@@ -161,6 +161,9 @@ abbrev i32 := IntN 32
 abbrev i64 := IntN 64
 abbrev isize := IntN 64
 
+/-- `Display` of a signed integer. -/
+def displayInt {n : Nat} (x : IntN n) : String := toString x.val
+
 namespace IntN
 variable {n : Nat}
 instance : LT (IntN n) := ⟨fun a b => a.val < b.val⟩
@@ -252,6 +255,43 @@ Fixed arrays `[T; N]` are `Vector T N`; slices are `Array T`; iterators are the
 fused into explicit loops by the code generator, so eager list evaluation here
 never runs a closure that the lazy Rust iterator would not.
 -/
+
+/-! ## Futures
+
+An `async fn` takes an await budget: how many of its `.await`s complete before
+its owner drops it. It returns `Run.ready v` if it finishes, or `Run.dropped`
+if it is dropped first; either way with every effect made so far.
+-/
+
+/-- How an `async fn` ended. -/
+inductive Run (α : Type) where
+  | ready (a : α)
+  | dropped
+  deriving Repr, DecidableEq
+
+/-! ## Formatting
+
+`core::fmt::Formatter` is the text written so far. Writing appends and never
+fails: the formatter's sink is assumed infallible. `Display` of integers and
+`bool` is their decimal or `true`/`false` text, as in Rust.
+-/
+
+/-- `core::fmt::Error`. -/
+structure FmtError where
+  deriving Repr, DecidableEq, Inhabited
+
+/-- `core::fmt::Formatter`: the text written so far. -/
+abbrev Formatter := String
+
+/-- `Formatter::write_str`. -/
+def Formatter.write_str (f : Formatter) (s : String) : Result Unit FmtError × Formatter :=
+  (.Ok (), f ++ s)
+
+/-- `Display` of an unsigned integer. -/
+def displayUint {n : Nat} (x : Fin (2 ^ n)) : String := toString x.val
+
+/-- `Display` of `bool`. -/
+def displayBool (b : Bool) : String := if b then "true" else "false"
 
 namespace Slice
 variable {α : Type}

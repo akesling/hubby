@@ -314,9 +314,18 @@ pub fn rust_form(k: &Krate, t: &Ty) -> Option<String> {
         Ty::Result(a, b) => format!("Result<{},{}>", rust_form(k, a)?, rust_form(k, b)?),
         Ty::Param(p) if !p.starts_with('?') => p.clone(),
         Ty::TryFromIntError => "TryFromIntError".into(),
+        Ty::Formatter => "Formatter".into(),
+        Ty::FmtError => "Error".into(),
         // Unresolved literals default to i32, as in Rust.
         Ty::IntLit | Ty::IntVar(_) => "i32".into(),
-        Ty::Param(_) | Ty::Iter(_) | Ty::Fn(..) | Ty::Lazy(_) => return None,
+        Ty::Param(_)
+        | Ty::Iter(_)
+        | Ty::Fn(..)
+        | Ty::Lazy(_)
+        | Ty::Assoc(..)
+        | Ty::Future(_)
+        | Ty::Budget
+        | Ty::Run(_) => return None,
     })
 }
 
@@ -445,7 +454,12 @@ pub fn check(
             problems.push(format!("{path}: no MIR key"));
             continue;
         };
-        let Some(m) = mir.get(&key) else {
+        // rustc prints a free function by its bare name when that is unique.
+        let bare = (String::new(), 0, key.2.clone());
+        let found = mir
+            .get(&key)
+            .or_else(|| (f.impl_line.is_none()).then(|| mir.get(&bare)).flatten());
+        let Some(m) = found else {
             problems.push(format!("{path}: no MIR body for {key:?}"));
             continue;
         };

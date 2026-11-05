@@ -10,6 +10,31 @@ pub enum Error {
     Empty,
 }
 
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Error::Full => f.write_str("queue full"),
+            Error::Empty => write!(f, "queue empty ({} items)", 0u8),
+        }
+    }
+}
+
+/// A consumer's destination for drained items.
+pub trait Sink<T> {
+    /// Why the sink refused an item.
+    type Error;
+    /// Accept one item.
+    fn put(&mut self, item: T) -> Result<(), Self::Error>;
+}
+
+/// An asynchronous destination; dropping a `put` future leaves the item unsent.
+pub trait AsyncSink<T> {
+    /// Why the sink refused an item.
+    type Error;
+    /// Accept one item.
+    fn put(&mut self, item: T) -> impl core::future::Future<Output = Result<(), Self::Error>>;
+}
+
 /// At most `N` items in insertion order, stored in a ring.
 #[derive(Clone, Debug)]
 pub struct Queue<T, const N: usize> {
@@ -67,6 +92,33 @@ impl<T: Clone, const N: usize> Queue<T, N> {
             self.push(item)?;
         }
         Ok(())
+    }
+
+    /// Move every item into `sink`, oldest first, stopping at its first refusal.
+    pub fn drain_into<K: Sink<T>>(&mut self, sink: &mut K) -> Result<usize, K::Error> {
+        let mut moved = 0;
+        while self.len > 0 {
+            let item = self.pop();
+            if let Ok(item) = item {
+                sink.put(item)?;
+                moved += 1;
+            }
+        }
+        Ok(moved)
+    }
+
+    /// Send the oldest item to `sink` without removing it.
+    pub async fn send_front<K: AsyncSink<T>>(&self, sink: &mut K) -> Result<bool, K::Error> {
+        if self.len == 0 {
+            return Ok(false);
+        }
+        match self.slots[self.head].clone() {
+            Some(item) => {
+                sink.put(item).await?;
+                Ok(true)
+            }
+            None => Ok(false),
+        }
     }
 
     /// Remove the oldest item.

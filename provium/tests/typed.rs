@@ -309,9 +309,20 @@ fn example_verifies() {
         "{report}"
     );
     assert!(report.contains("Differential: 16 scenarios"), "{report}");
+    for theorem in [
+        "display_text",
+        "send_front_dropped",
+        "send_front_sent",
+        "drain_empty",
+    ] {
+        assert!(
+            report.contains(&format!("PROVIUM_VERIFIED Example.Proofs.{theorem}")),
+            "{report}"
+        );
+    }
     assert!(report.contains("rustc cross-check:"), "{report}");
     assert!(
-        report.contains("Differential coverage: 8 of 8 translated functions executed"),
+        report.contains("Differential coverage: 9 of 11 translated functions executed"),
         "{report}"
     );
 }

@@ -114,6 +114,13 @@ pub struct Body<'a> {
     source_names: BTreeSet<String>,
     /// Source-named locals as declared, for the rustc cross-check.
     pub declared: Vec<(String, usize)>,
+    /// Trait implementations a call needs, by their methods: translated and
+    /// ordered first, but not calls rustc would show.
+    pub instance_deps: BTreeSet<String>,
+    /// Whether this is an `async fn`: results are `Rust.Run.ready`.
+    pub async_fn: bool,
+    /// Whether the expression being translated is the operand of `.await`.
+    pub awaiting: bool,
     pub out: Lines,
     pub(super) indent: usize,
     pub impure: bool,
@@ -190,6 +197,9 @@ impl<'a> Body<'a> {
             source_idents: BTreeSet::new(),
             source_names: BTreeSet::new(),
             declared: Vec::new(),
+            instance_deps: BTreeSet::new(),
+            async_fn: false,
+            awaiting: false,
             out: vec![],
             indent: 0,
             impure: false,
@@ -361,6 +371,14 @@ impl<'a> Body<'a> {
     }
 
     /// Run destructors of every scope exited by a jump to the nearest scope of `kind`.
+    /// Locals whose destructors would run on leaving the function now.
+    pub(super) fn pending_drops(&self) -> Vec<usize> {
+        self.scopes
+            .iter()
+            .flat_map(|s| s.drops.iter().copied())
+            .collect()
+    }
+
     fn unwind_to(&mut self, kinds: &[ScopeKind]) -> R<()> {
         let mut ids = vec![];
         for s in self.scopes.iter().rev() {
@@ -814,6 +832,14 @@ impl<'a> Body<'a> {
     }
 
     fn ret_term(&self, term: &str) -> String {
+        if self.closure_rets.is_empty() && self.async_fn {
+            let v = if self.resolve(&self.ret_ty).is_unit() {
+                "()"
+            } else {
+                term
+            };
+            return self.pack(Some(&format!("Rust.Run.ready {}", paren(v))));
+        }
         if self.closure_rets.is_empty() {
             if self.resolve(&self.ret_ty).is_unit() {
                 self.pack(None)
@@ -1498,7 +1524,7 @@ impl<'a> Body<'a> {
         }
     }
 
-    fn value_v(&mut self, e: &Expr, expect: Option<&Ty>) -> R<V> {
+    pub(super) fn value_v(&mut self, e: &Expr, expect: Option<&Ty>) -> R<V> {
         let v = self.expr(e, expect)?;
         if let (Some(x), Some(_)) = (expect, &v.term) {
             self.unify(x, &v.ty);
@@ -1661,6 +1687,7 @@ impl<'a> Body<'a> {
             Expr::Cast(c) => self.cast(c),
             Expr::Closure(c) => self.closure(c, expect),
             Expr::Macro(m) => self.macro_(&m.mac, expect),
+            Expr::Await(a) => self.await_(a, expect),
             Expr::ForLoop(f) => self.for_(f),
             Expr::While(w) => self.while_(w),
             Expr::Loop(l) => self.loop_(l),

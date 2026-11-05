@@ -51,6 +51,9 @@ differential scenario ──► native run (Cargo) ══ Lean #eval ──► m
    | `impl Iterator<Item = T>` parameter, `T` mentioning a type parameter | `List (Rust.M T)`: each item is produced when the callee pulls it |
    | closures, `fn` pointers, `impl Fn` | `A → Rust.M B` (pure closures stay pure) |
    | `&T`, `&mut T` | `T` (see borrows) |
+   | a crate trait (`trait Storage<V, S> { type Error; fn save(..); }`) | a class over its parameters and `Self`; associated types are fields |
+   | `async fn f(..) -> T` | `f (..) (budget : Nat) : Rust.M (Rust.Run T × ..)` (see futures) |
+   | `core::fmt::Formatter`, `core::fmt::Result` | `Rust.Formatter` (the text written), `Rust.Result Unit Rust.FmtError` |
 
    Type aliases are expanded. Derived `PartialEq` becomes `DecidableEq`, and a
    generic type also gets a low-priority field-wise `BEq` for arguments that
@@ -78,7 +81,27 @@ differential scenario ──► native run (Cargo) ══ Lean #eval ──► m
    statement by statement: `let mut`, `for`, `while` (via Lean's `MonadTail`
    loops, so no fuel appears), `return`, `break`, `continue`, `?`, `match`
    with guards and or-patterns, and `if let`/`while let`/`let ... else`.
-4. **Borrows.** A function returns the final values of its `&mut`
+4. **Traits.** A trait the crate declares becomes a class whose methods are
+   arbitrary operations (`Rust.M`, so they may panic or diverge); a bound
+   `B: Storage<V, S>` becomes `[Storage V S B]`, `B::Error` the class's field,
+   and a method call on a `B` value the class method (a `&mut self` method
+   returns the new receiver). A crate type's `impl` of such a trait becomes an
+   instance of its translated methods, and a call that instantiates a bound
+   type parameter with that type depends on them. Default method bodies,
+   generic trait methods and implementing an async trait method are
+   rejected.
+5. **Futures.** An `async fn` takes an await budget: how many of its
+   `.await`s complete before its owner drops it. It returns `Rust.Run.ready v`
+   when it finishes and `Rust.Run.dropped` when it is dropped first, either
+   way with every `&mut` effect made so far. Awaiting a crate `async fn`
+   passes the budget on; awaiting a consumer trait's async method (returning
+   `impl Future`) completes with its class method `m`, or, with no budget
+   left, applies `m_dropped` (the consumer's effect of dropping that future)
+   and drops. Futures must be awaited where they are created.
+6. **Formatting.** `write!`/`writeln!` and `Formatter::write_str` append to
+   the formatter's text; `{}` displays integers, `bool` and string slices as
+   Rust does, and other format specifications are rejected.
+7. **Borrows.** A function returns the final values of its `&mut`
    parameters alongside its result. A local `&mut` borrow (`let x = &mut p`,
    `for x in &mut a`, `if let Some(x) = slot` on a `&mut` scrutinee,
    `get_or_insert`, struct literals holding `&mut` fields) is a local copy
@@ -92,7 +115,7 @@ differential scenario ──► native run (Cargo) ══ Lean #eval ──► m
    returning `&mut T` are rejected. A closure passed to `array::from_fn` that
    mutates captured state runs as the body of a loop over the indices, as
    `from_fn` calls it; other closures may not mutate captured state.
-5. **Core library.** `provium/lean/Provium/Rust.lean` defines every
+8. **Core library.** `provium/lean/Provium/Rust.lean` defines every
    operation the translation uses: checked and wrapping arithmetic under the
    build's overflow-check setting, slices and arrays, `Option`/`Result`
    combinators, and iterator adaptors. An iterator pipeline may contain at
@@ -138,7 +161,9 @@ differential scenario ──► native run (Cargo) ══ Lean #eval ──► m
   into `core`), the interpretation of each core-library operation in
   `Rust.lean`, and these
   modelling assumptions: a panic ends the execution (no unwinding observed,
-  so `Drop` during unwinding is not modelled); a failed
+  so `Drop` during unwinding is not modelled); a formatter's sink never
+  fails; a dropped future runs no destructors of its live locals (translation
+  rejects such drops); a failed
   `const` assertion, which rustc would reject at compile time, is a panic.
 
 ## Alternatives considered

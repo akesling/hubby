@@ -3,19 +3,64 @@
   "cargo_build": "build.json",
   "crate_root": "src/lib.rs",
   "namespace": "Example",
-  "roots": ["Queue::new", "Queue::push", "Queue::push_cloned", "Queue::pop", "Queue::retain", "Queue::is_empty"],
+  "roots": [
+    "Queue::new",
+    "Queue::push",
+    "Queue::push_cloned",
+    "Queue::pop",
+    "Queue::retain",
+    "Queue::is_empty",
+    "Queue::drain_into",
+    "Queue::send_front",
+    "Error::fmt"
+  ],
   "proofs": "Proofs.lean",
   "obligations": [
-    { "theorem": "Example.Proofs.push_len", "function": "Queue::push" },
-    { "theorem": "Example.Proofs.new_empty", "function": "Queue::new" },
-    { "theorem": "Example.Proofs.pushed_len", "function": "Queue::push" },
-    { "theorem": "Example.Proofs.full_skips_clone", "function": "Queue::push_cloned" },
-    { "theorem": "Example.Proofs.push_cloned_len", "function": "Queue::push_cloned" }
+    {
+      "theorem": "Example.Proofs.push_len",
+      "function": "Queue::push"
+    },
+    {
+      "theorem": "Example.Proofs.new_empty",
+      "function": "Queue::new"
+    },
+    {
+      "theorem": "Example.Proofs.pushed_len",
+      "function": "Queue::push"
+    },
+    {
+      "theorem": "Example.Proofs.full_skips_clone",
+      "function": "Queue::push_cloned"
+    },
+    {
+      "theorem": "Example.Proofs.push_cloned_len",
+      "function": "Queue::push_cloned"
+    },
+    {
+      "theorem": "Example.Proofs.display_text",
+      "function": "Error::fmt"
+    },
+    {
+      "theorem": "Example.Proofs.send_front_dropped",
+      "function": "Queue::send_front"
+    },
+    {
+      "theorem": "Example.Proofs.send_front_sent",
+      "function": "Queue::send_front"
+    },
+    {
+      "theorem": "Example.Proofs.drain_empty",
+      "function": "Queue::drain_into"
+    }
   ],
   "differential": {
     "source": "differential.rs",
     "crate_name": "typed_example",
     "function": "run",
-    "seeds": 16
+    "seeds": 16,
+    "unexercised": {
+      "Queue::send_front": "Driving a future needs an executor, outside the translated subset; Proofs.lean states its cancellation behaviour.",
+      "Error::fmt": "Display output is reachable only through core::fmt machinery the scenario cannot call directly."
+    }
   }
 }

@@ -58,6 +58,20 @@ pub enum Ty {
     /// consumer pulls it: a `Rust.M` computation.
     Lazy(Box<Ty>),
     TryFromIntError,
+    /// `core::fmt::Formatter`: the text written so far.
+    Formatter,
+    /// An associated type of a consumer trait at a type parameter:
+    /// `P::Name` where `P: Trait<args>` (parameter, trait path, the trait's
+    /// named arguments, associated type).
+    Assoc(String, String, Vec<(String, Ty)>, String),
+    /// `impl Future<Output = T>`, returned by an async trait method.
+    Future(Box<Ty>),
+    /// An `async fn`'s await budget.
+    Budget,
+    /// The outcome of an awaited `async fn`: its value, or dropped.
+    Run(Box<Ty>),
+    /// `core::fmt::Error`.
+    FmtError,
 }
 
 impl Ty {
@@ -144,6 +158,20 @@ impl Ty {
             Ty::Result(a, b) => Ty::Result(Box::new(s(a)), Box::new(s(b))),
             Ty::Iter(t) => Ty::Iter(Box::new(s(t))),
             Ty::Lazy(t) => Ty::Lazy(Box::new(s(t))),
+            Ty::Future(t) => Ty::Future(Box::new(s(t))),
+            Ty::Run(t) => Ty::Run(Box::new(s(t))),
+            Ty::Assoc(p, tr, args, name) => {
+                let param = match tys.iter().find(|(n, _)| n == p) {
+                    Some((_, Ty::Param(q))) => q.clone(),
+                    _ => p.clone(),
+                };
+                Ty::Assoc(
+                    param,
+                    tr.clone(),
+                    args.iter().map(|(n, t)| (n.clone(), s(t))).collect(),
+                    name.clone(),
+                )
+            }
             Ty::Fn(a, r) => Ty::Fn(a.iter().map(s).collect(), Box::new(s(r))),
             t => t.clone(),
         }
@@ -155,13 +183,22 @@ impl Ty {
 pub struct Generics {
     pub types: Vec<String>,
     pub consts: Vec<String>,
+    /// Trait bounds on type parameters, as written (`B: Storage<V, S>`).
+    pub bounds: Vec<(String, syn::Path)>,
 }
 
 impl Generics {
     pub fn extend(&mut self, g: &syn::Generics) -> Result<(), String> {
         for p in &g.params {
             match p {
-                syn::GenericParam::Type(t) => self.types.push(t.ident.to_string()),
+                syn::GenericParam::Type(t) => {
+                    self.types.push(t.ident.to_string());
+                    for b in &t.bounds {
+                        if let syn::TypeParamBound::Trait(tb) = b {
+                            self.bounds.push((t.ident.to_string(), tb.path.clone()));
+                        }
+                    }
+                }
                 syn::GenericParam::Const(c) => {
                     if tokens(&c.ty) != "usize" {
                         return Err(format!("const generic {} must be usize", c.ident));
@@ -169,6 +206,21 @@ impl Generics {
                     self.consts.push(c.ident.to_string())
                 }
                 syn::GenericParam::Lifetime(_) => {}
+            }
+        }
+        if let Some(w) = &g.where_clause {
+            for pred in &w.predicates {
+                if let syn::WherePredicate::Type(pt) = pred {
+                    if let syn::Type::Path(tp) = &pt.bounded_ty {
+                        if let Some(id) = tp.path.get_ident() {
+                            for b in &pt.bounds {
+                                if let syn::TypeParamBound::Trait(tb) = b {
+                                    self.bounds.push((id.to_string(), tb.path.clone()));
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
         Ok(())
@@ -242,6 +294,44 @@ impl Scope<'_> {
         }
     }
 
+    /// The associated type `name` of the consumer trait bounding `param`.
+    pub fn assoc(&self, param: &str, name: &str) -> Result<Ty, String> {
+        for (p, path) in &self.generics.bounds {
+            if p != param {
+                continue;
+            }
+            let segs: Vec<String> = path.segments.iter().map(|s| s.ident.to_string()).collect();
+            let Some(tp) = self.krate.resolve(self.module, &segs) else {
+                continue;
+            };
+            let Some(tr) = self.krate.traits.get(&tp) else {
+                continue;
+            };
+            if !tr.assoc.iter().any(|a| a == name) {
+                continue;
+            }
+            let args = self.trait_args(&tp, path.segments.last().unwrap())?;
+            return Ok(Ty::Assoc(param.to_owned(), tp, args, name.to_owned()));
+        }
+        Err(format!("unresolved type {param}::{name}"))
+    }
+
+    /// A consumer trait's parameters paired with the arguments of a bound.
+    pub fn trait_args(
+        &self,
+        trait_path: &str,
+        seg: &syn::PathSegment,
+    ) -> Result<Vec<(String, Ty)>, String> {
+        let tr = &self.krate.traits[trait_path];
+        let mut g = Generics::default();
+        g.extend(&tr.generics)?;
+        let (tys, lens) = self.args(seg)?;
+        if tys.len() != g.types.len() || !lens.is_empty() || !g.consts.is_empty() {
+            return Err(format!("unsupported arguments for trait {trait_path}"));
+        }
+        Ok(g.types.into_iter().zip(tys).collect())
+    }
+
     fn bounds(
         &self,
         bounds: &syn::punctuated::Punctuated<syn::TypeParamBound, syn::Token![+]>,
@@ -262,6 +352,15 @@ impl Scope<'_> {
                         if let syn::GenericArgument::AssocType(at) = arg {
                             if at.ident == "Item" {
                                 return Ok(Ty::Iter(Box::new(self.ty(&at.ty)?)));
+                            }
+                        }
+                    }
+                }
+                ("Future", syn::PathArguments::AngleBracketed(a)) => {
+                    for arg in &a.args {
+                        if let syn::GenericArgument::AssocType(at) = arg {
+                            if at.ident == "Output" {
+                                return Ok(Ty::Future(Box::new(self.ty(&at.ty)?)));
                             }
                         }
                     }
@@ -348,6 +447,21 @@ impl Scope<'_> {
                         .self_ty
                         .cloned()
                         .ok_or_else(|| "Self outside an impl".to_owned());
+                }
+                _ => {}
+            }
+        }
+        // `P::Name`: an associated type of a consumer trait bounding `P`.
+        if names.len() == 2 && self.generics.types.contains(&names[0]) {
+            return self.assoc(&names[0], &names[1]);
+        }
+        // `core::fmt` types, by their path's last two segments.
+        if names.len() >= 2 && names[names.len() - 2] == "fmt" {
+            match names[names.len() - 1].as_str() {
+                "Formatter" => return Ok(Ty::Formatter),
+                "Error" => return Ok(Ty::FmtError),
+                "Result" => {
+                    return Ok(Ty::Result(Box::new(Ty::Unit), Box::new(Ty::FmtError)));
                 }
                 _ => {}
             }

@@ -21,6 +21,8 @@ pub struct Generated {
 }
 
 struct Emitted {
+    /// Consumer traits its bounds name.
+    traits: BTreeSet<String>,
     text: String,
     calls: BTreeSet<String>,
     impure: bool,
@@ -453,6 +455,219 @@ fn emit_types(
     Ok((out, consts))
 }
 
+/// The local name of an `async fn`'s await budget (not a Rust identifier).
+pub const BUDGET: &str = "#budget";
+
+/// The consumer trait a bound names, if it is one of the crate's traits.
+pub fn consumer_trait(k: &Krate, module: &str, path: &syn::Path) -> Option<String> {
+    let segs: Vec<String> = path.segments.iter().map(|s| s.ident.to_string()).collect();
+    k.resolve(module, &segs)
+        .filter(|p| k.traits.contains_key(p))
+}
+
+/// The scope of a consumer trait's own items: its parameters and `Self`,
+/// bounded by the trait itself so `Self::Assoc` resolves.
+pub fn trait_generics(k: &Krate, tp: &str) -> R<Generics> {
+    let tr = &k.traits[tp];
+    let mut g = Generics::default();
+    g.extend(&tr.generics)?;
+    if !g.consts.is_empty() {
+        return Err(format!("trait {tp}: const parameters are unsupported"));
+    }
+    let name = tp.rsplit("::").next().unwrap();
+    let bound = if g.types.is_empty() {
+        name.to_owned()
+    } else {
+        format!("{name}<{}>", g.types.join(", "))
+    };
+    let bound: syn::Path = syn::parse_str(&bound).map_err(|e| e.to_string())?;
+    g.types.push("Self".into());
+    g.bounds.push(("Self".into(), bound));
+    Ok(g)
+}
+
+/// A consumer trait as a Lean class: associated types are fields, and each
+/// method is an arbitrary operation (it may panic or diverge). An async
+/// method (returning `impl Future`) has its completion `m` and the effect of
+/// dropping it unfinished, `m_dropped`.
+fn trait_class(k: &Krate, names: &Names, tp: &str) -> R<String> {
+    let tr = &k.traits[tp];
+    let g = trait_generics(k, tp)?;
+    let self_ty = Ty::Param("Self".into());
+    let scope = TyScope {
+        krate: k,
+        module: &tr.module,
+        generics: &g,
+        self_ty: Some(&self_ty),
+    };
+    let lean = &names.traits[tp];
+    let params: Vec<&String> = g.types.iter().filter(|t| *t != "Self").collect();
+    let own = |name: &str| {
+        let mut s = format!("({lean}.{name}");
+        for p in &params {
+            s.push_str(&format!(" ({} := {})", ident(p), ident(p)));
+        }
+        s.push_str(" (Self := Self))");
+        s
+    };
+    let render = |t: &Ty| {
+        let mut s = names.ty(t);
+        for a in &tr.assoc {
+            s = s.replace(&own(a), &ident(a));
+        }
+        s
+    };
+    let mut out = format!(
+        "/-- Rust trait `{tp}`, implemented by the consumer: every method is an arbitrary operation. -/\nclass {lean}"
+    );
+    if !params.is_empty() {
+        out.push_str(&format!(
+            " ({} : Type)",
+            params
+                .iter()
+                .map(|p| ident(p))
+                .collect::<Vec<_>>()
+                .join(" ")
+        ));
+    }
+    out.push_str(" (Self : Type) where\n");
+    for a in &tr.assoc {
+        out.push_str(&format!("  {} : Type\n", ident(a)));
+    }
+    for m in &tr.methods {
+        let name = m.sig.ident.to_string();
+        if m.default.is_some() {
+            return Err(format!(
+                "{tp}::{name}: default method bodies are unsupported"
+            ));
+        }
+        if !m.sig.generics.params.is_empty() {
+            return Err(format!(
+                "{tp}::{name}: generic trait methods are unsupported"
+            ));
+        }
+        let mut args = vec![];
+        let mut returns_self = false;
+        for input in &m.sig.inputs {
+            match input {
+                syn::FnArg::Receiver(r) => {
+                    returns_self = r.reference.is_some() && r.mutability.is_some();
+                    args.push("Self".to_owned());
+                }
+                syn::FnArg::Typed(t) => {
+                    let ty = scope.ty(&t.ty)?;
+                    if ty.mut_ref() {
+                        return Err(format!(
+                            "{tp}::{name}: &mut parameters other than self are unsupported"
+                        ));
+                    }
+                    args.push(render(&ty));
+                }
+            }
+        }
+        let ret = match &m.sig.output {
+            syn::ReturnType::Default => Ty::Unit,
+            syn::ReturnType::Type(_, t) => scope.ty(t)?,
+        };
+        let (value, future) = match ret {
+            Ty::Future(t) => (*t, true),
+            t => (t, m.sig.asyncness.is_some()),
+        };
+        let value = if returns_self {
+            format!("({} × Self)", render(&value))
+        } else {
+            render(&value)
+        };
+        let arrows = args.iter().map(|a| format!("{a} → ")).collect::<String>();
+        out.push_str(&format!(
+            "  {} : {arrows}Rust.M {}\n",
+            ident(&name),
+            paren_ty(&value)
+        ));
+        if future && returns_self {
+            out.push_str(&format!(
+                "  {} : {arrows}Self\n",
+                ident(&format!("{name}_dropped"))
+            ));
+        }
+    }
+    out.push('\n');
+    Ok(out)
+}
+
+/// A crate type's implementation of a crate trait as an instance of its class.
+fn trait_instance(
+    k: &Krate,
+    names: &Names,
+    ti: &super::load::TraitImpl,
+    pure: &BTreeSet<String>,
+) -> R<String> {
+    let tr = &k.traits[&ti.trait_path];
+    let mut g = Generics::default();
+    g.extend(&ti.generics)?;
+    let scope = TyScope {
+        krate: k,
+        module: &ti.module,
+        generics: &g,
+        self_ty: None,
+    };
+    let self_ty = scope.ty(&ti.self_ty)?;
+    let scope = TyScope {
+        krate: k,
+        module: &ti.module,
+        generics: &g,
+        self_ty: Some(&self_ty),
+    };
+    let args = scope.trait_args(&ti.trait_path, ti.trait_ref.segments.last().unwrap())?;
+    let mut head = names.traits[&ti.trait_path].clone();
+    for (_, t) in &args {
+        head.push(' ');
+        head.push_str(&names.ty(t));
+    }
+    head.push(' ');
+    head.push_str(&names.ty(&self_ty));
+    let mut out = format!(
+        "/-- Rust `impl {} for {}`. -/\ninstance{} : {head} where\n",
+        ti.trait_path,
+        ti.owner,
+        generic_binders(&g, &bounds(&[&ti.generics]))
+    );
+    for (n, t) in &ti.assoc {
+        out.push_str(&format!("  {} := {}\n", ident(n), names.ty(&scope.ty(t)?)));
+    }
+    for m in &tr.methods {
+        let name = m.sig.ident.to_string();
+        let path = ti
+            .methods
+            .iter()
+            .find(|(n, _)| *n == name)
+            .map(|(_, p)| p)
+            .ok_or_else(|| format!("{}: missing method {name}", ti.owner))?;
+        let async_method = m.sig.asyncness.is_some()
+            || matches!(&m.sig.output, syn::ReturnType::Type(_, t) if tokens(t).contains("Future"));
+        if async_method {
+            return Err(format!(
+                "{path}: implementing an async trait method is unsupported"
+            ));
+        }
+        let f = &names.functions[path];
+        let arity = m.sig.inputs.len();
+        if pure.contains(path) {
+            let xs: Vec<String> = (0..arity).map(|i| format!("x{i}")).collect();
+            out.push_str(&format!(
+                "  {} := fun {} => pure ({f} {})\n",
+                ident(&name),
+                xs.join(" "),
+                xs.join(" ")
+            ));
+        } else {
+            out.push_str(&format!("  {} := {f}\n", ident(&name)));
+        }
+    }
+    out.push('\n');
+    Ok(out)
+}
+
 /// A low-priority field-wise `BEq`, as Rust derives `PartialEq`.
 fn structural_beq(k: &Krate, names: &Names, p: &str, g: &Generics, self_ty: &Ty) -> R<String> {
     let lean = &names.types[p];
@@ -742,8 +957,21 @@ fn emit_function(cx: &Ctx, f: &Function) -> R<Emitted> {
             out_tys.push(ty.peel().clone());
         }
     }
+    // An `async fn` threads its await budget as a final `&mut` parameter.
+    if f.sig.asyncness.is_some() {
+        let lean = body.fresh("budget");
+        params.push(format!("({lean} : Nat)"));
+        prologue.push(format!("let mut {lean} := {lean}"));
+        let id = body.declare(BUDGET, Body::local(lean, Ty::Budget, true));
+        body.outputs.push(id);
+        out_tys.push(Ty::Budget);
+        body.async_fn = true;
+        body.impure = true;
+    }
     let mut rets = vec![];
-    if !ret.is_unit() {
+    if f.sig.asyncness.is_some() {
+        rets.push(cx.names.ty(&Ty::Run(Box::new(ret.clone()))));
+    } else if !ret.is_unit() {
         rets.push(cx.names.ty(&ret));
     }
     rets.extend(out_tys.iter().map(|t| cx.names.ty(t)));
@@ -776,7 +1004,20 @@ fn emit_function(cx: &Ctx, f: &Function) -> R<Emitted> {
         _ => None,
     };
     let name = &cx.names.functions[&f.path];
-    let ib = bounds(&[&f.impl_generics, &f.sig.generics]);
+    let mut ib = bounds(&[&f.impl_generics, &f.sig.generics]);
+    let mut traits = BTreeSet::new();
+    for (param, path) in &generics.bounds {
+        if let Some(tp) = consumer_trait(cx.k, &f.module, path) {
+            let args = scope.trait_args(&tp, path.segments.last().unwrap())?;
+            let mut class = cx.names.traits[&tp].clone();
+            for (_, t) in &args {
+                class.push(' ');
+                class.push_str(&cx.names.ty(t));
+            }
+            ib.push((param.clone(), class));
+            traits.insert(tp);
+        }
+    }
     let sig = format!(
         "def {name}{} {} : {}",
         generic_binders(&generics, &ib),
@@ -823,8 +1064,9 @@ fn emit_function(cx: &Ctx, f: &Function) -> R<Emitted> {
             .collect(),
     };
     Ok(Emitted {
+        traits,
         text,
-        calls: body.calls.clone(),
+        calls: body.calls.union(&body.instance_deps).cloned().collect(),
         impure,
         lent,
         facts,
@@ -1011,8 +1253,36 @@ pub fn generate(k: &Krate, roots: &[String], opts: &Options) -> R<Generated> {
         }
     }
     out.push_str(&types);
+    let mut used: BTreeSet<String> = emitted
+        .values()
+        .flat_map(|e| e.traits.iter().cloned())
+        .collect();
+    // Implementations whose methods are translated become instances, placed
+    // after their last method.
+    let mut instances: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for ti in &k.trait_impls {
+        if ti.methods.is_empty() || !ti.methods.iter().all(|(_, p)| emitted.contains_key(p)) {
+            continue;
+        }
+        let last = order
+            .iter()
+            .rfind(|p| ti.methods.iter().any(|(_, m)| m == *p))
+            .unwrap()
+            .clone();
+        instances
+            .entry(last)
+            .or_default()
+            .push(trait_instance(k, &names, ti, &pure)?);
+        used.insert(ti.trait_path.clone());
+    }
+    for tp in &used {
+        out.push_str(&trait_class(k, &names, tp)?);
+    }
     for p in &order {
         out.push_str(&emitted[p].text);
+        for i in instances.get(p).into_iter().flatten() {
+            out.push_str(i);
+        }
     }
     out.push_str(&format!("end {}\n", opts.namespace));
     Ok(Generated {

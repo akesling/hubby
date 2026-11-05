@@ -74,6 +74,32 @@ pub struct Const {
     pub expr: syn::Expr,
 }
 
+/// A trait the consumer implements: its associated types and methods.
+#[derive(Clone, Debug)]
+pub struct Trait {
+    pub path: String,
+    pub module: String,
+    pub generics: syn::Generics,
+    pub assoc: Vec<String>,
+    pub methods: Vec<syn::TraitItemFn>,
+}
+
+/// A crate type's implementation of a crate trait.
+#[derive(Clone, Debug)]
+pub struct TraitImpl {
+    pub trait_path: String,
+    /// The trait as named in the impl, with its arguments.
+    pub trait_ref: syn::Path,
+    pub owner: String,
+    pub self_ty: Type,
+    pub generics: syn::Generics,
+    pub module: String,
+    /// Associated type bindings (`type Error = ();`).
+    pub assoc: Vec<(String, Type)>,
+    /// The implementing functions' paths, by method name.
+    pub methods: Vec<(String, String)>,
+}
+
 /// A type alias, expanded where it is named.
 #[derive(Clone, Debug)]
 pub struct Alias {
@@ -85,6 +111,8 @@ pub struct Alias {
 #[derive(Default)]
 pub struct Krate {
     pub aliases: BTreeMap<String, Alias>,
+    pub traits: BTreeMap<String, Trait>,
+    pub trait_impls: Vec<TraitImpl>,
     pub files: BTreeMap<PathBuf, String>,
     pub structs: BTreeMap<String, Struct>,
     pub enums: BTreeMap<String, Enum>,
@@ -311,6 +339,15 @@ impl Krate {
             .as_ref()
             .map(|(_, p, _)| p.segments.last().unwrap().ident.to_string());
         let impl_line = i.impl_token.span.start().line;
+        // An implementation of one of the crate's own traits.
+        let consumer = i.trait_.as_ref().and_then(|(_, p, _)| {
+            let segs: Vec<String> = p.segments.iter().map(|s| s.ident.to_string()).collect();
+            self.resolve(module, &segs)
+                .filter(|t| self.traits.contains_key(t))
+                .map(|t| (t, p.clone()))
+        });
+        let mut assoc = vec![];
+        let mut methods = vec![];
         for item in i.items {
             match item {
                 syn::ImplItem::Fn(f) => {
@@ -321,6 +358,7 @@ impl Krate {
                     if self.functions.contains_key(&path) {
                         path = format!("{owner}::{name}#{}", self.functions.len());
                     }
+                    methods.push((name.clone(), path.clone()));
                     self.functions.insert(
                         path.clone(),
                         Function {
@@ -338,6 +376,9 @@ impl Krate {
                         },
                     );
                 }
+                syn::ImplItem::Type(t) if consumer.is_some() => {
+                    assoc.push((t.ident.to_string(), t.ty));
+                }
                 syn::ImplItem::Type(_) | syn::ImplItem::Const(_) => {
                     return Err(format!(
                         "associated types and consts are unsupported in impl for {owner}"
@@ -345,6 +386,18 @@ impl Krate {
                 }
                 _ => {}
             }
+        }
+        if let Some((trait_path, trait_ref)) = consumer {
+            self.trait_impls.push(TraitImpl {
+                trait_path,
+                trait_ref,
+                owner: owner.clone(),
+                self_ty: (*i.self_ty).clone(),
+                generics: i.generics.clone(),
+                module: module.to_owned(),
+                assoc,
+                methods,
+            });
         }
         Ok(())
     }
@@ -499,9 +552,32 @@ impl Krate {
                         },
                     );
                 }
-                // Traits and macros are not translated; a use of one fails to
-                // resolve with a diagnostic naming it.
-                Item::Trait(_) | Item::Macro(_) | Item::ExternCrate(_) => {}
+                Item::Trait(t) => {
+                    let path = join(module, &t.ident.to_string());
+                    self.declare(module, &t.ident.to_string(), &path)?;
+                    let mut assoc = vec![];
+                    let mut methods = vec![];
+                    for item in &t.items {
+                        match item {
+                            syn::TraitItem::Type(ty) => assoc.push(ty.ident.to_string()),
+                            syn::TraitItem::Fn(f) => methods.push(f.clone()),
+                            _ => {}
+                        }
+                    }
+                    self.traits.insert(
+                        path.clone(),
+                        Trait {
+                            path,
+                            module: module.to_owned(),
+                            generics: t.generics.clone(),
+                            assoc,
+                            methods,
+                        },
+                    );
+                }
+                // Macros are not translated; a use of one fails to resolve
+                // with a diagnostic naming it.
+                Item::Macro(_) | Item::ExternCrate(_) => {}
                 other => {
                     return Err(format!(
                         "{}: unsupported item {}",
