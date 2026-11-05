@@ -1810,3 +1810,21 @@ project, [engine](engine/README.md); the deep-embedding projects are retired.
   reconfiguration) translates completely and is driven by the differential
   scenario through learner addition, joint consensus and finalization. Its
   safety proof (M4) is the next milestone.
+
+## Front-end assurance
+
+The typed front end is no longer only trusted:
+
+- **rustc cross-check.** Verification re-runs the captured `rustc` with
+  `--emit=mir` and requires every translated function's crate calls and the
+  types of its source-named locals to match rustc's (Jarl: 96 functions, 195
+  calls, 380 local types, on the host and on wasm32). It found three
+  inference imprecisions, fixed.
+- **Differential coverage.** The native differential run is repeated with
+  coverage instrumentation; every translated function must execute (Jarl: all
+  95, 1792 of 1850 code regions). Measuring it showed the old scenario barely
+  ran the protocol; the widened scenario partitions nodes (snapshot
+  installation, conflict truncation), restarts them from a host's durable
+  copy built from `Write` deltas, proposes batches, grows logs and feeds
+  invalid inputs to every validating path. Widening it found two more
+  front-end bugs, fixed.
