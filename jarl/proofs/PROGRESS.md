@@ -1776,3 +1776,37 @@ listed in the engine README: the typed translation's trusted front end and
 core library, `Clone` returning an equal value, panics as crashes,
 whole-state persistence, and snapshot application values not being tracked.
 The dynamic engine (M4) is not covered.
+
+## Migration to the typed backend
+
+Every Rust correspondence claim now runs on Provium's typed backend, in one
+project, [engine](engine/README.md); the deep-embedding projects are retired.
+
+- **Component contracts.** The capacity, initialization, input-gating,
+  log-boundary, message-dispatch, persistence, election, node-election,
+  message-validation, storage, storage-view, replication-contract, membership
+  and consensus obligations are restated over the typed translation in
+  `engine/Contracts/`, each at least as strong as before. The consensus
+  "source slices" are now properties of the functions that contain them
+  (`quorum`, `quorum_index`, `joint`, `Node::append`, `commit_to`,
+  `advance_commit`). `coverage.json` binds the same items to the replacement
+  theorems. Together with the engine's safety theorems: 537 obligations.
+- **Clone.** An application type's `Clone` is the consumer's: it may panic or
+  diverge, and clones the source makes lazily stay lazy across calls. The
+  engine theorems assume a lawful `Clone` (one that, when it returns, returns
+  an equal value). The old backend modelled `Clone` as an oracle, the typed
+  backend at first as the identity.
+- **32-bit targets.** Every module is checked against a wasm32 build as well as
+  the host, from one source, as the old projects were. `usize`-width bounds are
+  stated with `Rust.usizeBits`. Where 32-bit Rust behaves differently
+  (`usize::try_from` of large log offsets, the `as usize` cast in
+  `State::install`) the specs account for it, and none is false on 32-bit.
+- **Negative controls.** Every source mutation of the old projects' tests is
+  ported and must be rejected by the contract module that replaced its
+  project; 21 seeded Raft bugs must be rejected by an engine module. Porting
+  them found a front-end bug: `a[..=n]` was translated as `a[..n]`, now
+  fixed.
+- **Dynamic engine.** The `Cluster` engine (learners, joint consensus,
+  reconfiguration) translates completely and is driven by the differential
+  scenario through learner addition, joint consensus and finalization. Its
+  safety proof (M4) is the next milestone.

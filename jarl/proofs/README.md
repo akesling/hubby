@@ -11,18 +11,11 @@ See [M0.md](M0.md) for the completed claim/inventory audit and
 [PROGRESS.md](PROGRESS.md) for implemented evidence and the remaining dependency frontier.
 
 `coverage.json` records a reviewed syntactic inventory of every item in the
-production module tree. Ordinary tests reject source changes until that review is
-updated. Calls remain unresolved in this inventory; it is not a closure proof.
-`jarl/scripts/verify-complete.sh` deliberately fails while source correspondence
-and composed safety/progress certificates are unavailable. The existing
-`verify.sh` checks the supported component contracts.
-
-```rust
-#[test]
-fn invariants() {
-    provium::assert_proofs!("proofs");
-}
-```
+production module tree, and binds items with component evidence to obligations
+of the proof project below. Ordinary tests reject source changes until that
+review is updated. `jarl/scripts/verify-complete.sh` deliberately fails while
+source correspondence and composed safety/progress certificates are
+unavailable.
 
 From the repository root:
 
@@ -32,211 +25,66 @@ jarl/scripts/verify.sh
 jarl/scripts/verify-m0.sh
 ```
 
-The first command asserts the checked contracts and runs native comparisons.
-The script additionally runs slow source-mutation and 32-bit checks. Missing Lean
-fails verification; install elan and the version required by Provium first.
-CI runs ordinary tests, the component proof gate and the M0 scope/witness gate.
-The M0 gate checks reviewed source/build accounting, model consistency and
-concrete host witnesses. It does not establish source-level protocol correctness.
+The first command verifies every project below (`provium::assert_proofs!`). The
+script additionally runs the slow checks: the proof project against a 32-bit
+(wasm32) build and the source-mutation negative controls. Missing Lean fails
+verification; install elan and the version required by Provium first. Set
+`PROVIUM_LEAN_MEMORY_MB=8192` as CI does.
+
+## Projects
 
 | Project | Contracts and scope |
 | --- | --- |
-| [engine](engine/README.md) | M3 fixed-engine safety over Provium's typed translation of `Node` (`node.rs`, `state.rs`, `membership.rs`, `ready.rs`): election, state-machine and snapshot safety for every reachable cluster under arbitrary message loss, duplication and reordering, crashes and restarts; differential scenario against native Jarl. Trusts the typed front end and `Rust.lean` interpretations |
-| [specification](specification/Model.lean) | M0 handwritten specification only: genesis, host transaction/crash/cancellation, network provenance and external scheduling witnesses; no Rust correspondence claim |
-| [election-safety](election-safety/Model.lean) | M2 handwritten model of elections in both engines over a fixed voter set (fixed-engine campaign, dynamic-engine pre-vote probes sharing the `votes` array, `Vote`/`Voted` handling, persistence-gated publication, input gating, crash/restart from the durable checkpoint) under an honest network that drops, duplicates and reorders: historical at-most-one-leader-per-term by induction from initialization, plus three-voter witnesses for direct and pre-vote elections; no Rust correspondence claim |
-| [consensus](consensus/Proofs.lean) | Source-expression slices: strict majority, a majority-intersection lemma over abstract counts (its connection to the generated `Membership::quorum` is `Quorum.quorums_intersect` in the membership project), stable/joint boundary overlap, quorum-position bounds, joint/follower minima, commit-prefix monotonicity, and current-term checks |
-| [message-dispatch](message-dispatch/Proofs.lean) | Complete `Message::term`: all eight variants read the durable/proposed term field specified by Rust; PreVoted reads term rather than campaign; explicit variant/field coverage |
-| [persistence](persistence/Proofs.lean) | Complete `Ready::persisted` field effects: clear flags, preserve other leaves, algebraic idempotence |
-| [election](election/Proofs.lean) | Complete `Node::reset_election` successful-state projections: exact wrapping seed advance, zero elapsed time, and deadline in `[ticks, 2*ticks)` |
-| [node-election](node-election/Proofs.lean) | Complete `Node::reset_election` and `Node::follow` bodies (with `reset_election` inlined) through Provium's imperative backend: the exact resulting receiver record for every leader argument, so every field the theorem does not name is unchanged; holds for any fuel above the body depth, target width and overflow profile, given a positive election timeout of at most 2^63. The receiver is a record value whose correspondence to `Node`'s Rust layout is trusted |
-| [membership](membership/Proofs.lean) | Complete `Membership::finalized`, `is_joint`, `voters`, `old_voters`, `learners`, `contains`, and `is_voter`: arbitrary capacity, exact ordered projections, correct retention/removal, cleared old flags, surviving identities/fields preserved; finalization preserves voter/learner sequences and removes all old voters; identity queries agree with voter sequences; complete `include` preserves capacity and other slots, returns the input identity, preserves identity uniqueness, and has exact flag/initialization/full-error effects; `new`/`restore` preserve capacity, establish unique identities, establish exact output sets and identity union, accept iff inputs are valid and their distinct union fits capacity, and otherwise return Config; stable construction has no old voters and is not joint; `peers` preserves every slot position and returns exactly the stored identities; `with_learners` preserves voters, replaces learners, clears old voters, and has exact capacity/validation acceptance and Config rejection contracts; `joint` preserves target voter/learner sets, adds source voters as old voters, and has guarded union-capacity acceptance and precise Reconfiguring/Full errors; complete `quorum` and `quorum_index` lower to the callback interaction protocol with contracts for current/old projections, strict-majority thresholds, short circuit, empty-current cleanup, numeric-fold execution and response budgets; under any normally returning, handle-preserving callback, `quorum` reports exactly a strict majority of current (and, when joint, old) voters, any two quorums share a current voter (and an old voter when joint), `quorum_index` returns exactly the greatest position acknowledged by such majorities, and it completes without panicking whenever the current voter set is nonempty |
-| [input-gating](input-gating/Proofs.lean) | Complete `Node::available` and `idle`: exact Result, dirty-state/reply/outbox rejection, and clean/drained admission over arbitrary outbox lengths |
-| [capacity](capacity/Proofs.lean) | Complete `State::full`: exact equality against the original const-generic capacity; non-full implies room under the separate `len ≤ CAP` representation invariant |
-| [log-boundary](log-boundary/Proofs.lean) | Complete `State::base`, `get`, `id_at`, `entries` and `last`: snapshot boundary, checked borrowed lookup, ordered prefix iteration, and exact boundary/final-entry records |
-| [storage](storage/Proofs.lean) | Complete `State::push`, `new`, `grow`, `truncate`, `install` and `restore`: no-drop append/growth, occupied-prefix/capacity and metadata preservation, explicit destruction boundaries, induction over histories with changing capacity, and restore soundness and completeness (valid checkpoints are accepted with exactly their entries) |
-| [storage-view](storage-view/Proofs.lean) | Complete `State::write` and `Write::entries`: exact view, rebased borrowed locations and payload suffix; conditional atomic checkpoint equivalence and retry idempotence from explicit log/snapshot/index premises; caller preservation, source/heap refinement and storage-adapter correctness remain open |
-| [initialization](initialization/Proofs.lean) | Complete `State::new`: initial hard-state fields, absent snapshot, all slots empty for arbitrary capacity, and initial `len ≤ CAP` |
+| [engine](engine/README.md) | Provium's typed translation of Jarl (`Node`, `State`, `Membership`, `Ready`, and the dynamic `Cluster` engine) with Raft safety for the fixed engine (election, state-machine and snapshot safety for every reachable cluster under message loss, duplication and reordering, crashes and restarts) and every component contract below; 537 obligations, checked on the host and on wasm32, plus a differential scenario against native Jarl |
+| [specification](specification/Model.lean) | M0 handwritten specification: genesis, host transaction/crash/cancellation, network provenance and external scheduling witnesses; no Rust correspondence claim |
+| [election-safety](election-safety/Model.lean) | M2 handwritten model of elections in both engines over a fixed voter set, with historical at-most-one-leader-per-term by induction; no Rust correspondence claim |
 
-Each Rust project's `project.json` binds production Rust to explicit theorem
-obligations. The separately labelled specification project checks the handwritten
-model and records `source_correspondence_proved=false`. Generated Lean, snapshots, hashes, and certificates are written to
-`jarl/artifacts/provium/proofs/<project>/`. Proof-specific regression tests live in
-`jarl/tests/proof_cases/`; Provium's tests use independent compiler fixtures.
+### Component contracts (`engine/Contracts/`)
 
-These are component contracts, **not a full Raft correctness proof**. The scalar
-consensus slices exclude surrounding method effects. Their count/list assumptions
-must still be connected to reachable protocol state. The commit trace covers a
-guarded assignment prefix, not all of `commit_to` and `refresh_membership`.
+Each module restates, over the typed translation, the contracts of a former
+deep-embedding project, at least as strongly: interpreter-level projections
+became exact results, and fuel, loan and IR-path premises disappeared with the
+deep embedding.
 
-The timer contracts assume valid u64 inputs and `0 < ticks ≤ 2^63`; connecting
-that assumption to reachable configurations remains a separate obligation.
-Successful-state projections execute every statement, including late faults, but
-do not describe partially mutated stores after a panic. The persistence contract
-does not authorize acknowledging an undurable save or reusing a consumed token.
-Membership finalization contracts do not establish that finalization was
-protocol-authorized or its log entry committed.
+| Module | Rust | Contracts |
+| --- | --- | --- |
+| `Capacity` | `State::full` | Exact result; non-full implies room under `len ≤ CAP` |
+| `Initialization` | `State::new` | The exact initial record: zero hard state, no snapshot, every slot empty |
+| `InputGating` | `Node::available`, `idle`, `Ready::persisted` | Exact gate (dirty, pending reply, pending outbox); acknowledgment clears dirty state but not pending output |
+| `LogBoundary` | `State::base`, `get`, `id_at`, `entries`, `last` | Snapshot boundary, exact lookup for every offset (including offsets a 32-bit `usize` cannot address), ordered prefix iteration, exact final id |
+| `MessageDispatch` | `Message::term` | Every variant reads its durable term (`PreVoted` its term, not its campaign) |
+| `Persistence` | `Ready::persisted` | The exact resulting node; idempotence |
+| `NodeElection`, `Election` | `Node::reset_election`, `follow` | Exact resulting records: SplitMix64 seed advance, deadline in `[ticks, 2·ticks)`, zero elapsed time |
+| `MessageValidation` | `Node::valid` | `valid m = decide (Accepts m)` for every message: an exact per-variant acceptance condition, including ordered batches |
+| `Storage` | `State::push`, `truncate`, `install`, `restore`, `grow`, `hard`, `snapshot`, `new` | Exact effects, buffer shape, ordered-log representation, committed-prefix preservation, restore soundness and completeness, and a storage-history induction over every operation |
+| `StorageView` | `State::write`, `Write::entries` | The exact persistence view and payload suffix; checkpoint equivalence and retry idempotence of the host transaction |
+| `Replication` | `Node::valid`, `State::id_at`, `truncate`, `push` | Validated appends supply the storage successor condition; replacement preserves the ordered log and committed slots |
+| `Membership*` | `Membership::*` | Finalization, projections, identity queries, inclusion, restoration, stable/learner/joint construction, peers; `quorum` and `quorum_index` over arbitrary callbacks, with quorum intersection |
+| `Consensus` | `quorum`, `quorum_index`, `joint`, `Node::append`, `commit_to`, `advance_commit` | Strict majorities and their intersection (including across joint transitions), quorum positions, joint commit requiring both majorities, followers never overcommitting, commit monotonicity, current-term commitment |
 
-Input-gating contracts use typed query stores for bool, Option and optional-array
-fields. They prove the complete gate and its inlined wrapper, not that every
-protocol caller invokes the gate or that storage acknowledgment was truthful.
-Source-to-store representation and frontend preservation remain trusted.
-The project also composes the generated `Ready::persisted` effect with the gate:
-acknowledgment clears dirty state but does not bypass pending output. Its explicit
-view relation does not claim to prove Rust alias/layout correspondence. The full
-gate checks this project against both the host and installed 32-bit target.
+## Evidence and limits
 
-Initialization derives the initial length bound from the generated constructor.
-Storage composes it with restore, append, growth, truncation and installation
-for the buffer-shape invariant. This does not authorize resetting an existing voter. Builtin Default and array-construction
-semantics, source interpretation and Rust layout remain in the trusted boundary.
+- **Kernel checking.** Generated code and every proof module are checked by the
+  pinned Lean with `--trust=0`; each obligation's theorem must refer to its
+  generated function and use only `propext`, `Quot.sound` and
+  `Classical.choice`.
+- **Targets.** The project verifies against the host build and a wasm32 build
+  (`builds-wasm32.json`), where `usize` is 32 bits; statements use
+  `Rust.usizeBits` where the width matters.
+- **Negative controls.** `tests/proof_cases/engine_mutations.rs` applies source
+  mutations (every one ported from the former projects, plus seeded Raft bugs)
+  and requires each to be rejected by a named proof module, not by the front
+  end, Cargo or the generated code.
+- **Differential testing.** `engine/differential.rs` drives the fixed engine
+  and the dynamic engine (learner addition, joint consensus, finalization)
+  natively and in Lean and requires identical results.
+- **Trusted.** Provium's typed front end (name resolution and type inference
+  with `syn`) and the interpretation of each operation in its `Rust.lean`;
+  see [`provium/docs/typed-backend.md`](../../provium/docs/typed-backend.md).
+  Panics are terminal (unwinding is not modelled), and the application's
+  `Clone` is assumed lawful where the engine theorems need it.
+- **Open.** Dynamic-engine safety (M4), host and API refinement (M5), source
+  correspondence closure (M6), liveness (M7).
 
-Array proofs quantify over arbitrary lengths, including empty arrays. Native
-comparisons additionally cover every optional-record combination at capacities
-0–3. Source mutations must fail in the invariant proof, not just the parser or
-Rust compiler. Consensus and timer verification also exercise an installed
-32-bit no_std target.
-
-Provium's frontend, Rust subset semantics, field/borrow/layout refinement, and
-Lean implementation remain trusted. Axiom audits reject admits and custom axioms;
-they cannot establish specification adequacy. Global Raft safety/liveness,
-crash-recovery assumptions, and compiler correctness remain open proof work.
-
-The storage backend retains the entire bounded append body and its original
-capacity helper. A valid shape requires occupied slots below `len`, empty slots
-above it, and a capacity-sized array. Under that invariant and available room,
-Lean proves append returns without destruction or arithmetic/bounds failure,
-preserves earlier payloads, and advances length by one. An inductive theorem
-covers any finite sequence of successful appends from an empty buffer. That
-buffer is linked to the generated constructor only through the explicit
-`InitialRepresents` relation (`fresh_representation`), not by equality of stores.
-This does not cover all reachable Raft storage histories or prove log-ID ordering.
-
-Rejected owned inputs and overwritten payloads have explicit drop suspensions.
-Their continuations apply only if destruction returns normally. Destructor panic,
-unwinding and external side effects are not erased into a successful transition.
-The native compiler tests compare slots, length, destructor order and late panic
-states; source mutations and wasm32 checks exercise Jarl's actual method.
-
-Growth translates the original consuming `State::grow` body, including its const
-assertion, generic substitution, all metadata transfers, and indexed Option::take
-callback. The proof covers arbitrary nondecreasing capacities and preserves every
-live payload, length and metadata without invoking Drop. The storage-history
-induction allows repeated appends, growth, truncation and installation; it is not fixed to one capacity.
-Native tests cover copied and moved metadata and disposal of out-of-prefix
-payloads in malformed states. Partial-record ownership during a failed
-construction, panic hooks, and destructor unwinding are outside the current
-relocation model; the verified valid-state path encounters none of those effects.
-
-Snapshot-boundary selection includes its eager derived Default computation and
-complete shared Option projection. Its generated program retains both receiver
-and payload field paths; an independent provider mutation selecting another
-same-typed record must fail the proof. Storage contracts also bind their
-projected arrays, lengths and capacity parameters to the original source names.
-These bindings guard source drift; they are not Rust memory-layout proofs.
-
-Lookup translates all of `State::get` and its original `base` helper. Its result
-is a borrowed array place, retaining both the source field path and offset.
-The contracts cover every offset after a valid base, including usize conversion
-failure, out-of-bounds access and empty slots; indices at/before the boundary
-return None. Native tests compare pointer identity, and provider/Jarl mutations
-alter the offset or selected base field. The result's physical borrow validity
-and correspondence between each entry's LogId and its slot still need proof.
-
-`State::id_at` now composes both complete helpers with the original equality
-branch and entry-record projection. It returns the full base record at the
-boundary (including genesis), the selected entry's full `id` record on a hit,
-and None on an off-boundary miss. The proof does not assume that an arbitrary
-stored entry's id.index equals the requested index; contiguous log-ID invariants
-are checked for successful restore below; preservation through append callers,
-truncation and snapshot installation remains open.
-
-`State::entries` retains the complete prefix-slice check and builtin double-ended
-iterator construction. Its list is a denotation of borrowed locations, not a
-claim that Rust eagerly traverses or allocates. `State::last` includes the complete
-iterator and eager base helper: an empty retained prefix returns the base, and a
-final present retained slot returns that entry's id even with holes earlier in
-the prefix. Native tests alternate both iterator ends and check that entry
-Drop is never invoked during those reads. Invalid-prefix panic hooks/unwinding
-and Rust lifetime/layout correspondence remain outside the current model.
-
-Truncation translates the entire original loop and its complete last-record,
-iterator and snapshot-boundary helpers. The proof preserves shape and every
-retained payload, exposes each destructor after decrementing length, and proves
-the internal interpreter fuel cannot run out. Native tests compare sparse and
-malformed buffers, bounds-panic state, removal boundaries and destructor order.
-Following a drop continuation requires normal destructor return; metadata-view
-refinement, panic/unwinding and committed-prefix preservation remain open.
-
-Snapshot installation includes complete source lookup helpers and derived
-all-field record equality. Its contracts retain the exact matching suffix or
-clear the mismatching prefix, preserve capacity, advance commit monotonically,
-and install the exact input snapshot. The branch contracts require their explicit
-lookup/equality decisions; proving every reachable caller satisfies the required
-log invariants remains open. Destructors and pre-unwind ownership are explicit.
-
-The general installation shape theorem covers every successful branch from any
-shape-valid buffer. Storage histories compose this with append, growth and
-truncation and restoration. Protocol/metadata reachability remains outside that
-history theorem; it does not establish global Raft safety.
-
-Restoration translates all original validation and helper bodies. Iterator calls
-and destruction remain external interactions. Successful returns preserve buffer
-shape and the supplied metadata; the interpreter bound is sufficient for every
-response sequence. Successful recovery also establishes the concrete bounds
-`snapshot.index ≤ hard.commit ≤ last().index` using the translated final guard.
-Restoration now participates in the buffer-history theorem.
-Successful recovery also establishes an ordered chain for every returned entry:
-indices are consecutive from the snapshot boundary, terms are positive and
-nondecreasing, and all terms are bounded by the hard-state term. Exact-index
-contracts bind live slots and the original last() result to their offsets.
-Snapshot validity and the term-zero vote rule are checked from the initial guard.
-Restoration is also complete for valid checkpoints: `restoration_accepts` shows
-that every checkpoint meeting those conditions (nonzero snapshot id, snapshot
-term at most the hard term, no vote at term zero, an ordered chain that fits the
-capacity, and commit between the snapshot index and the last index) has a
-normally returning run that yields exactly its entries. A guard that rejects more
-than the source's validity conditions therefore fails the proof; the storage
-mutation test strengthens three guards to check this.
-Growth and truncation preserve this logical representation: growth retains the
-chain, and truncation retains an ordered prefix. Append preserves the chain under explicit successor/term preconditions.
-Truncation proves an exact retained length and protects committed entries when
-the boundary is above commit; append protects the existing committed prefix.
-Matching installation preserves the ordered suffix and its exact payloads using
-the actual lookup and index/term equality. Mismatching installation establishes
-an empty log and in-range commit when the snapshot covers the old commit.
-Discharging these conditions in every protocol caller and proving snapshot provenance,
-valid durable recovery, protocol safety and Rust memory refinement remain open.
-
-`message-validation` translates the complete original `node::Node::valid`,
-including its `Message::term` helper, captured `valid_id` closure and batch loop.
-Its 56 obligations characterize every variant for bounded scalar inputs. Accepted
-append entries have the successor index and a positive term between the
-predecessor's and message's terms. The complete batch theorem covers arbitrary
-finite typed slot lists shorter than the i32 counter bound: accepted batches are
-nonempty occupied prefixes with consecutive indices and positive, nondecreasing
-terms bounded by the message term. The converse is proved too: these conditions
-are sufficient for acceptance. A unified theorem proves Boolean termination
-without faults for all canonical typed validation views at fuel 256. This domain
-describes the fields inspected by validation; Rust memory refinement remains
-separate. Concrete cases also cover full 16-entry
-batches and overflow. Five 32-bit mutations reject removed hole, successor,
-snapshot-index and campaign guards and a broken batch counter.
-Source/borrow/layout refinement and composition with `append` / `step` remain
-outstanding; these are contracts of the generated structural semantics.
-
-`replication-contract` imports the original storage and validation proofs through
-Provium's `proof_modules` support. Both projects use the generated namespace
-`Jarl`. Accepted append validation supplies the storage successor/term condition.
-The replacement contract then composes actual generated `State::id_at`,
-`truncate` and `push`: it derives the retained predecessor and available space,
-preserves the ordered log and committed slots, and proves the resulting length.
-The capacity condition is both necessary and sufficient after truncation, even
-when the old log is full. These results are parameterized by capacity and word
-size. The normal destructor continuations remain explicit in `resumeTruncation`.
-
-The caller still must establish field correspondence, the advanced hard term,
-matching log identity, and the scalar admission/commit conditions. This is a
-composed storage contract, not a proof of the complete `Node::append` or
-`Node::step` bodies, their Clone/Drop behavior, membership effects, or global
-Raft safety and liveness. The project has 16 audited obligations; its 32-bit
-check rejects source mutations to the lookup offset and truncation boundary.
+`tests/proof_cases/quorum_callbacks.rs` keeps native regression tests of the
+original quorum callbacks' call order, short-circuiting and cleanup.

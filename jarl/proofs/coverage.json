@@ -2995,16 +2995,16 @@
       "root_apis": [],
       "contracts": [
         {
-          "project": "proofs/message-dispatch/project.json",
-          "theorem": "Messages.term_all_variants",
-          "function": "Message_term",
-          "evidence": "artifacts/provium/proofs/message-dispatch/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageDispatch.term_all_variants",
+          "function": "Message::term",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-dispatch/project.json",
-          "theorem": "Messages.projection_places",
-          "function": "Message_term",
-          "evidence": "artifacts/provium/proofs/message-dispatch/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageDispatch.projection_places",
+          "function": "Message::term",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -3998,16 +3998,16 @@
       ],
       "contracts": [
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "IdentityQuery.contains_exact",
-          "function": "membership_Membership_contains",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.IdentityQuery.contains_exact",
+          "function": "membership::Membership::contains",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "IdentityQuery.voter_participates",
-          "function": "membership_Membership_contains",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.IdentityQuery.voter_participates",
+          "function": "membership::Membership::contains",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -4023,34 +4023,34 @@
       "root_apis": [],
       "contracts": [
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Finalization.capacity_preserved",
-          "function": "membership_Membership_finalized",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Finalization.capacity_preserved",
+          "function": "membership::Membership::finalized",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Finalization.slot_effect",
-          "function": "membership_Membership_finalized",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Finalization.slot_effect",
+          "function": "membership::Membership::finalized",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Finalization.retained_fields",
-          "function": "membership_Membership_finalized",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Finalization.retained_fields",
+          "function": "membership::Membership::finalized",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Finalization.all_old_flags_cleared",
-          "function": "membership_Membership_finalized",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Finalization.all_old_flags_cleared",
+          "function": "membership::Membership::finalized",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Finalization.identity_origin",
-          "function": "membership_Membership_finalized",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Finalization.identity_origin",
+          "function": "membership::Membership::finalized",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -4066,82 +4066,82 @@
       "root_apis": [],
       "contracts": [
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Inclusion.capacity_preserved",
-          "function": "membership_Membership_include",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Inclusion.capacity_preserved",
+          "function": "membership::Membership::include",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Inclusion.selected_slot",
-          "function": "membership_Membership_include",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Inclusion.selected_slot",
+          "function": "membership::Membership::include",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Inclusion.full_error",
-          "function": "membership_Membership_include",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Inclusion.full_error",
+          "function": "membership::Membership::include",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Inclusion.full_exact",
-          "function": "membership_Membership_include",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Inclusion.full_exact",
+          "function": "membership::Membership::include",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Inclusion.other_slots_unchanged",
-          "function": "membership_Membership_include",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Inclusion.other_slots_unchanged",
+          "function": "membership::Membership::include",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Inclusion.selected_identity",
-          "function": "membership_Membership_include",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Inclusion.selected_identity",
+          "function": "membership::Membership::include",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Inclusion.selected_effect",
-          "function": "membership_Membership_include",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Inclusion.selected_effect",
+          "function": "membership::Membership::include",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Inclusion.full_unchanged",
-          "function": "membership_Membership_include",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Inclusion.full_unchanged",
+          "function": "membership::Membership::include",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Inclusion.preserves_unique",
-          "function": "membership_Membership_include",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Inclusion.preserves_unique",
+          "function": "membership::Membership::include",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "SetInterpretation.include_flag",
-          "function": "membership_Membership_include",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.SetInterpretation.include_flag",
+          "function": "membership::Membership::include",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "SetInterpretation.include_identity",
-          "function": "membership_Membership_include",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.SetInterpretation.include_identity",
+          "function": "membership::Membership::include",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "CapacityAcceptance.include_available",
-          "function": "membership_Membership_include",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.CapacityAcceptance.include_available",
+          "function": "membership::Membership::include",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "CapacityAcceptance.include_covered",
-          "function": "membership_Membership_include",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.CapacityAcceptance.include_covered",
+          "function": "membership::Membership::include",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -4159,16 +4159,16 @@
       ],
       "contracts": [
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Finalization.no_longer_joint",
-          "function": "membership_Membership_is_joint",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Finalization.no_longer_joint",
+          "function": "membership::Membership::is_joint",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "SetInterpretation.joint_iff_old_nonempty",
-          "function": "membership_Membership_is_joint",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.SetInterpretation.joint_iff_old_nonempty",
+          "function": "membership::Membership::is_joint",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -4186,10 +4186,10 @@
       ],
       "contracts": [
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "IdentityQuery.is_voter_exact",
-          "function": "membership_Membership_is_voter",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.IdentityQuery.is_voter_exact",
+          "function": "membership::Membership::is_voter",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -4205,100 +4205,100 @@
       "root_apis": [],
       "contracts": [
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "JointConstruction.success_shape",
-          "function": "membership_Membership_joint",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.JointConstruction.success_shape",
+          "function": "membership::Membership::joint",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "JointConstruction.capacity_preserved",
-          "function": "membership_Membership_joint",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.JointConstruction.capacity_preserved",
+          "function": "membership::Membership::joint",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "JointConstruction.unique_identities",
-          "function": "membership_Membership_joint",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.JointConstruction.unique_identities",
+          "function": "membership::Membership::joint",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "JointConstruction.flags",
-          "function": "membership_Membership_joint",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.JointConstruction.flags",
+          "function": "membership::Membership::joint",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "JointConstruction.voters_exact",
-          "function": "membership_Membership_joint",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.JointConstruction.voters_exact",
+          "function": "membership::Membership::joint",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "JointConstruction.learners_exact",
-          "function": "membership_Membership_joint",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.JointConstruction.learners_exact",
+          "function": "membership::Membership::joint",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "JointConstruction.old_voters_exact",
-          "function": "membership_Membership_joint",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.JointConstruction.old_voters_exact",
+          "function": "membership::Membership::joint",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "JointConstruction.identities",
-          "function": "membership_Membership_joint",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.JointConstruction.identities",
+          "function": "membership::Membership::joint",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "JointConstruction.accepts",
-          "function": "membership_Membership_joint",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.JointConstruction.accepts",
+          "function": "membership::Membership::joint",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "JointConstruction.accepts_iff",
-          "function": "membership_Membership_joint",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.JointConstruction.accepts_iff",
+          "function": "membership::Membership::joint",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "JointConstruction.accepts_by_count",
-          "function": "membership_Membership_joint",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.JointConstruction.accepts_by_count",
+          "function": "membership::Membership::joint",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "JointConstruction.guard_error_iff",
-          "function": "membership_Membership_joint",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.JointConstruction.guard_error_iff",
+          "function": "membership::Membership::joint",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "JointConstruction.error_codes",
-          "function": "membership_Membership_joint",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.JointConstruction.error_codes",
+          "function": "membership::Membership::joint",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "JointConstruction.full_iff",
-          "function": "membership_Membership_joint",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.JointConstruction.full_iff",
+          "function": "membership::Membership::joint",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "JointConstruction.full_by_count",
-          "function": "membership_Membership_joint",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.JointConstruction.full_by_count",
+          "function": "membership::Membership::joint",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "JointConstruction.joint_iff_source_voters",
-          "function": "membership_Membership_joint",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.JointConstruction.joint_iff_source_voters",
+          "function": "membership::Membership::joint",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -4316,22 +4316,22 @@
       ],
       "contracts": [
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "MembershipProjection.learners_exact",
-          "function": "membership_Membership_learners",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.JointConstruction.learners_exact",
+          "function": "membership::Membership::learners",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "MembershipProjection.learners_member",
-          "function": "membership_Membership_learners",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.MembershipProjection.learners_member",
+          "function": "membership::Membership::learners",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "MembershipProjection.finalization_preserves_learners",
-          "function": "membership_Membership_learners",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.MembershipProjection.finalization_preserves_learners",
+          "function": "membership::Membership::learners",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -4360,70 +4360,70 @@
       ],
       "contracts": [
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "StableConstruction.delegates_to_restore",
-          "function": "membership_Membership_new",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.StableConstruction.delegates_to_restore",
+          "function": "membership::Membership::new",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "StableConstruction.capacity_preserved",
-          "function": "membership_Membership_new",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.StableConstruction.capacity_preserved",
+          "function": "membership::Membership::new",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "StableConstruction.unique_identities",
-          "function": "membership_Membership_new",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.StableConstruction.unique_identities",
+          "function": "membership::Membership::new",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "StableConstruction.valid_inputs",
-          "function": "membership_Membership_new",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.StableConstruction.valid_inputs",
+          "function": "membership::Membership::new",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "SetInterpretation.stable_voters_exact",
-          "function": "membership_Membership_new",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.SetInterpretation.stable_voters_exact",
+          "function": "membership::Membership::new",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "SetInterpretation.stable_learners_exact",
-          "function": "membership_Membership_new",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.SetInterpretation.stable_learners_exact",
+          "function": "membership::Membership::new",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "SetInterpretation.stable_old_empty",
-          "function": "membership_Membership_new",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.SetInterpretation.stable_old_empty",
+          "function": "membership::Membership::new",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "SetInterpretation.stable_not_joint",
-          "function": "membership_Membership_new",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.SetInterpretation.stable_not_joint",
+          "function": "membership::Membership::new",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "CapacityAcceptance.stable_accepts_iff",
-          "function": "membership_Membership_new",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.CapacityAcceptance.stable_accepts_iff",
+          "function": "membership::Membership::new",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "CapacityAcceptance.stable_accepts_by_count",
-          "function": "membership_Membership_new",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.CapacityAcceptance.stable_accepts_by_count",
+          "function": "membership::Membership::new",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "CapacityAcceptance.stable_rejects_iff",
-          "function": "membership_Membership_new",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.CapacityAcceptance.stable_rejects_iff",
+          "function": "membership::Membership::new",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -4441,22 +4441,22 @@
       ],
       "contracts": [
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "MembershipProjection.old_voters_exact",
-          "function": "membership_Membership_old_voters",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.JointConstruction.old_voters_exact",
+          "function": "membership::Membership::old_voters",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "MembershipProjection.old_voters_member",
-          "function": "membership_Membership_old_voters",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.MembershipProjection.old_voters_member",
+          "function": "membership::Membership::old_voters",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "MembershipProjection.finalization_has_no_old_voters",
-          "function": "membership_Membership_old_voters",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.MembershipProjection.finalization_has_no_old_voters",
+          "function": "membership::Membership::old_voters",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -4472,34 +4472,34 @@
       "root_apis": [],
       "contracts": [
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Peers.capacity_preserved",
-          "function": "membership_Membership_peers",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Peers.capacity_preserved",
+          "function": "membership::Membership::peers",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Peers.slot_identity",
-          "function": "membership_Membership_peers",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Peers.slot_identity",
+          "function": "membership::Membership::peers",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Peers.member_iff",
-          "function": "membership_Membership_peers",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Peers.member_iff",
+          "function": "membership::Membership::peers",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Peers.restored_members",
-          "function": "membership_Membership_peers",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Peers.restored_members",
+          "function": "membership::Membership::peers",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Peers.stable_members",
-          "function": "membership_Membership_peers",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Peers.stable_members",
+          "function": "membership::Membership::peers",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -4515,70 +4515,70 @@
       "root_apis": [],
       "contracts": [
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Quorum.execution",
-          "function": "membership_Membership_quorum",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Quorum.execution",
+          "function": "membership::Membership::quorum",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Quorum.stable_execution",
-          "function": "membership_Membership_quorum",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Quorum.stable_execution",
+          "function": "membership::Membership::quorum",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Quorum.empty_current",
-          "function": "membership_Membership_quorum",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Quorum.empty_current",
+          "function": "membership::Membership::quorum",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Quorum.response_budget",
-          "function": "membership_Membership_quorum",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Quorum.response_budget",
+          "function": "membership::Membership::quorum",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Quorum.observation_complete",
-          "function": "membership_Membership_quorum",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Quorum.observation_complete",
+          "function": "membership::Membership::quorum",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/consensus/project.json",
-          "theorem": "JarlProofs.majority_strict",
-          "function": "majority",
-          "evidence": "artifacts/provium/proofs/consensus/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Consensus.majority_strict",
+          "function": "membership::Membership::quorum",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/consensus/project.json",
-          "theorem": "JarlProofs.majority_cardinality_overlap",
-          "function": "majority",
-          "evidence": "artifacts/provium/proofs/consensus/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Consensus.majority_cardinality_overlap",
+          "function": "membership::Membership::quorum",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/consensus/project.json",
-          "theorem": "JarlProofs.majority_intersection",
-          "function": "majority",
-          "evidence": "artifacts/provium/proofs/consensus/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Consensus.majority_intersection",
+          "function": "membership::Membership::quorum",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/consensus/project.json",
-          "theorem": "JarlProofs.joint_transition_intersection",
-          "function": "majority",
-          "evidence": "artifacts/provium/proofs/consensus/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Consensus.joint_transition_intersection",
+          "function": "membership::Membership::quorum",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Quorum.result",
-          "function": "membership_Membership_quorum",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Quorum.result",
+          "function": "membership::Membership::quorum",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Quorum.quorums_intersect",
-          "function": "membership_Membership_quorum",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Quorum.quorums_intersect",
+          "function": "membership::Membership::quorum",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -4594,82 +4594,82 @@
       "root_apis": [],
       "contracts": [
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "QuorumIndex.execution",
-          "function": "membership_Membership_quorum_index",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.QuorumIndex.execution",
+          "function": "membership::Membership::quorum_index",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "QuorumIndex.stable_execution",
-          "function": "membership_Membership_quorum_index",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.QuorumIndex.stable_execution",
+          "function": "membership::Membership::quorum_index",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "QuorumIndex.empty_current",
-          "function": "membership_Membership_quorum_index",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.QuorumIndex.empty_current",
+          "function": "membership::Membership::quorum_index",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "QuorumIndex.word_execution",
-          "function": "membership_Membership_quorum_index",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.QuorumIndex.exact",
+          "function": "membership::Membership::quorum_index",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "QuorumIndex.target_word_execution",
-          "function": "membership_Membership_quorum_index",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.QuorumIndex.exact",
+          "function": "membership::Membership::quorum_index",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "QuorumIndex.build_word_execution",
-          "function": "membership_Membership_quorum_index",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.QuorumIndex.exact",
+          "function": "membership::Membership::quorum_index",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "QuorumIndex.build_empty_current",
-          "function": "membership_Membership_quorum_index",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.QuorumIndex.empty_current",
+          "function": "membership::Membership::quorum_index",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "QuorumIndex.response_budget",
-          "function": "membership_Membership_quorum_index",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.QuorumIndex.response_budget",
+          "function": "membership::Membership::quorum_index",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "QuorumIndex.observation_complete",
-          "function": "membership_Membership_quorum_index",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.QuorumIndex.observation_complete",
+          "function": "membership::Membership::quorum_index",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/consensus/project.json",
-          "theorem": "JarlProofs.majority_position_in_bounds",
-          "function": "majority_position",
-          "evidence": "artifacts/provium/proofs/consensus/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Consensus.majority_position_in_bounds",
+          "function": "membership::Membership::quorum_index",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/consensus/project.json",
-          "theorem": "JarlProofs.joint_commit_requires_both",
-          "function": "joint_commit_index",
-          "evidence": "artifacts/provium/proofs/consensus/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Consensus.joint_commit_requires_both",
+          "function": "membership::Membership::quorum_index",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "QuorumIndex.result_majority",
-          "function": "membership_Membership_quorum_index",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.QuorumIndex.result_majority",
+          "function": "membership::Membership::quorum_index",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "QuorumIndex.completes",
-          "function": "membership_Membership_quorum_index",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.QuorumIndex.completes",
+          "function": "membership::Membership::quorum_index",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -4687,136 +4687,136 @@
       ],
       "contracts": [
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Restoration.capacity_preserved",
-          "function": "membership_Membership_restore",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Restoration.capacity_preserved",
+          "function": "membership::Membership::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Restoration.unique_identities",
-          "function": "membership_Membership_restore",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Restoration.unique_identities",
+          "function": "membership::Membership::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Restoration.empty_voters",
-          "function": "membership_Membership_restore",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Restoration.empty_voters",
+          "function": "membership::Membership::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Restoration.single_voter",
-          "function": "membership_Membership_restore",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Restoration.single_voter",
+          "function": "membership::Membership::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Restoration.duplicate_voter",
-          "function": "membership_Membership_restore",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Restoration.duplicate_voter",
+          "function": "membership::Membership::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Restoration.learner_overlap",
-          "function": "membership_Membership_restore",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Restoration.learner_overlap",
+          "function": "membership::Membership::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Restoration.nonempty_voters",
-          "function": "membership_Membership_restore",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Restoration.nonempty_voters",
+          "function": "membership::Membership::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Restoration.distinct_inputs",
-          "function": "membership_Membership_restore",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Restoration.distinct_inputs",
+          "function": "membership::Membership::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "Restoration.learners_disjoint",
-          "function": "membership_Membership_restore",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.Restoration.learners_disjoint",
+          "function": "membership::Membership::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "SetInterpretation.restore_flags",
-          "function": "membership_Membership_restore",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.SetInterpretation.restore_flags",
+          "function": "membership::Membership::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "SetInterpretation.voters_exact",
-          "function": "membership_Membership_restore",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.SetInterpretation.voters_exact",
+          "function": "membership::Membership::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "SetInterpretation.old_voters_exact",
-          "function": "membership_Membership_restore",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.SetInterpretation.old_voters_exact",
+          "function": "membership::Membership::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "SetInterpretation.learners_exact",
-          "function": "membership_Membership_restore",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.SetInterpretation.learners_exact",
+          "function": "membership::Membership::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "SetInterpretation.restore_identities",
-          "function": "membership_Membership_restore",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.SetInterpretation.restore_identities",
+          "function": "membership::Membership::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "SetInterpretation.restored_contains_exact",
-          "function": "membership_Membership_restore",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.SetInterpretation.restored_contains_exact",
+          "function": "membership::Membership::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "SetInterpretation.voter_count_bounds",
-          "function": "membership_Membership_restore",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.SetInterpretation.voter_count_bounds",
+          "function": "membership::Membership::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "CapacityAcceptance.restore_accepts",
-          "function": "membership_Membership_restore",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.CapacityAcceptance.restore_accepts",
+          "function": "membership::Membership::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "CapacityAcceptance.restore_accepts_iff",
-          "function": "membership_Membership_restore",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.CapacityAcceptance.restore_accepts_iff",
+          "function": "membership::Membership::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "CapacityAcceptance.restore_accepts_by_count",
-          "function": "membership_Membership_restore",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.CapacityAcceptance.restore_accepts_by_count",
+          "function": "membership::Membership::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "CapacityAcceptance.stored_identity_count",
-          "function": "membership_Membership_restore",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.CapacityAcceptance.stored_identity_count",
+          "function": "membership::Membership::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "CapacityAcceptance.restore_error_code",
-          "function": "membership_Membership_restore",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.CapacityAcceptance.restore_error_code",
+          "function": "membership::Membership::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "CapacityAcceptance.restore_rejects_iff",
-          "function": "membership_Membership_restore",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.CapacityAcceptance.restore_rejects_iff",
+          "function": "membership::Membership::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -4834,22 +4834,22 @@
       ],
       "contracts": [
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "MembershipProjection.voters_exact",
-          "function": "membership_Membership_voters",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.JointConstruction.voters_exact",
+          "function": "membership::Membership::voters",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "MembershipProjection.voters_member",
-          "function": "membership_Membership_voters",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.MembershipProjection.voters_member",
+          "function": "membership::Membership::voters",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "MembershipProjection.finalization_preserves_voters",
-          "function": "membership_Membership_voters",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.MembershipProjection.finalization_preserves_voters",
+          "function": "membership::Membership::voters",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -4865,88 +4865,88 @@
       "root_apis": [],
       "contracts": [
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "LearnerReplacement.capacity_preserved",
-          "function": "membership_Membership_with_learners",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.LearnerReplacement.capacity_preserved",
+          "function": "membership::Membership::with_learners",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "LearnerReplacement.unique_identities",
-          "function": "membership_Membership_with_learners",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.LearnerReplacement.unique_identities",
+          "function": "membership::Membership::with_learners",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "LearnerReplacement.flags",
-          "function": "membership_Membership_with_learners",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.LearnerReplacement.flags",
+          "function": "membership::Membership::with_learners",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "LearnerReplacement.voters_exact",
-          "function": "membership_Membership_with_learners",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.LearnerReplacement.voters_exact",
+          "function": "membership::Membership::with_learners",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "LearnerReplacement.learners_exact",
-          "function": "membership_Membership_with_learners",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.LearnerReplacement.learners_exact",
+          "function": "membership::Membership::with_learners",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "LearnerReplacement.old_empty",
-          "function": "membership_Membership_with_learners",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.LearnerReplacement.old_empty",
+          "function": "membership::Membership::with_learners",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "LearnerReplacement.valid_inputs",
-          "function": "membership_Membership_with_learners",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.LearnerReplacement.valid_inputs",
+          "function": "membership::Membership::with_learners",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "LearnerReplacement.identities",
-          "function": "membership_Membership_with_learners",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.LearnerReplacement.identities",
+          "function": "membership::Membership::with_learners",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "LearnerReplacement.accepts",
-          "function": "membership_Membership_with_learners",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.LearnerReplacement.accepts",
+          "function": "membership::Membership::with_learners",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "LearnerReplacement.accepts_iff",
-          "function": "membership_Membership_with_learners",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.LearnerReplacement.accepts_iff",
+          "function": "membership::Membership::with_learners",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "LearnerReplacement.accepts_by_count",
-          "function": "membership_Membership_with_learners",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.LearnerReplacement.accepts_by_count",
+          "function": "membership::Membership::with_learners",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "LearnerReplacement.error_code",
-          "function": "membership_Membership_with_learners",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.LearnerReplacement.error_code",
+          "function": "membership::Membership::with_learners",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "LearnerReplacement.rejects_iff",
-          "function": "membership_Membership_with_learners",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.LearnerReplacement.rejects_iff",
+          "function": "membership::Membership::with_learners",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/membership/project.json",
-          "theorem": "LearnerReplacement.not_joint",
-          "function": "membership_Membership_with_learners",
-          "evidence": "artifacts/provium/proofs/membership/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Membership.LearnerReplacement.not_joint",
+          "function": "membership::Membership::with_learners",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -5093,10 +5093,10 @@
       "root_apis": [],
       "contracts": [
         {
-          "project": "proofs/consensus/project.json",
-          "theorem": "JarlProofs.current_term_required",
-          "function": "can_commit_term",
-          "evidence": "artifacts/provium/proofs/consensus/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Consensus.current_term_required",
+          "function": "node::Node::advance_commit",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -5114,10 +5114,10 @@
       "root_apis": [],
       "contracts": [
         {
-          "project": "proofs/consensus/project.json",
-          "theorem": "JarlProofs.follower_never_overcommits",
-          "function": "follower_commit",
-          "evidence": "artifacts/provium/proofs/consensus/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Consensus.follower_never_overcommits",
+          "function": "node::Node::append",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -5133,40 +5133,40 @@
       "root_apis": [],
       "contracts": [
         {
-          "project": "proofs/input-gating/project.json",
-          "theorem": "JarlGateProofs.exact_result",
-          "function": "node_Node_available",
-          "evidence": "artifacts/provium/proofs/input-gating/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.InputGating.exact_result",
+          "function": "node::Node::available",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/input-gating/project.json",
-          "theorem": "JarlGateProofs.dirty_blocks",
-          "function": "node_Node_available",
-          "evidence": "artifacts/provium/proofs/input-gating/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.InputGating.dirty_blocks",
+          "function": "node::Node::available",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/input-gating/project.json",
-          "theorem": "JarlGateProofs.pending_reply_blocks",
-          "function": "node_Node_available",
-          "evidence": "artifacts/provium/proofs/input-gating/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.InputGating.pending_reply_blocks",
+          "function": "node::Node::available",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/input-gating/project.json",
-          "theorem": "JarlGateProofs.pending_outbox_blocks",
-          "function": "node_Node_available",
-          "evidence": "artifacts/provium/proofs/input-gating/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.InputGating.pending_outbox_blocks",
+          "function": "node::Node::available",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/input-gating/project.json",
-          "theorem": "JarlGateProofs.clean_allows",
-          "function": "node_Node_available",
-          "evidence": "artifacts/provium/proofs/input-gating/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.InputGating.clean_allows",
+          "function": "node::Node::available",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/input-gating/project.json",
-          "theorem": "JarlGateProofs.after_ack_exact",
-          "function": "node_Node_available",
-          "evidence": "artifacts/provium/proofs/input-gating/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.InputGating.after_ack_exact",
+          "function": "node::Node::available",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -5254,16 +5254,16 @@
       "root_apis": [],
       "contracts": [
         {
-          "project": "proofs/consensus/project.json",
-          "theorem": "JarlProofs.commit_never_regresses",
-          "function": "commit_index",
-          "evidence": "artifacts/provium/proofs/consensus/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Consensus.commit_never_regresses",
+          "function": "node::Node::commit_to",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/consensus/project.json",
-          "theorem": "JarlProofs.commit_sequence_monotone",
-          "function": "commit_index",
-          "evidence": "artifacts/provium/proofs/consensus/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Consensus.commit_sequence_monotone",
+          "function": "node::Node::commit_to",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -5341,10 +5341,10 @@
       "root_apis": [],
       "contracts": [
         {
-          "project": "proofs/node-election/project.json",
-          "theorem": "NodeElection.follow_exact",
-          "function": "node_Node_follow",
-          "evidence": "artifacts/provium/proofs/node-election/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.NodeElection.follow_exact",
+          "function": "node::Node::follow",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -5376,10 +5376,10 @@
       "root_apis": [],
       "contracts": [
         {
-          "project": "proofs/input-gating/project.json",
-          "theorem": "JarlGateProofs.idle_agrees",
-          "function": "node_Node_idle",
-          "evidence": "artifacts/provium/proofs/input-gating/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.InputGating.idle_agrees",
+          "function": "node::Node::idle",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -5607,34 +5607,34 @@
       "root_apis": [],
       "contracts": [
         {
-          "project": "proofs/election/project.json",
-          "theorem": "Election.elapsed_reset",
-          "function": "node_Node_reset_election_elapsed",
-          "evidence": "artifacts/provium/proofs/election/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Election.elapsed_reset",
+          "function": "node::Node::reset_election",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/election/project.json",
-          "theorem": "Election.deadline_range",
-          "function": "node_Node_reset_election_election_deadline",
-          "evidence": "artifacts/provium/proofs/election/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Election.deadline_range",
+          "function": "node::Node::reset_election",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/election/project.json",
-          "theorem": "Election.random_advanced",
-          "function": "node_Node_reset_election_random",
-          "evidence": "artifacts/provium/proofs/election/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Election.random_advanced",
+          "function": "node::Node::reset_election",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/election/project.json",
-          "theorem": "Election.deadline_exact",
-          "function": "node_Node_reset_election_election_deadline",
-          "evidence": "artifacts/provium/proofs/election/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Election.deadline_exact",
+          "function": "node::Node::reset_election",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/node-election/project.json",
-          "theorem": "NodeElection.reset_election_exact",
-          "function": "node_Node_reset_election",
-          "evidence": "artifacts/provium/proofs/node-election/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.NodeElection.reset_election_exact",
+          "function": "node::Node::reset_election",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -5762,352 +5762,352 @@
       "root_apis": [],
       "contracts": [
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.zero_campaign",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.zero_campaign",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.positive_campaign_ignores_term",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.positive_campaign_ignores_term",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.zero_campaign_ignores_term",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.zero_campaign_ignores_term",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.zero_term_prevote",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.zero_term_prevote",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.zero_term_vote",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.zero_term_vote",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.zero_term_voted",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.zero_term_voted",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.zero_term_append",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.zero_term_append",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.zero_term_appendbatch",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.zero_term_appendbatch",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.zero_term_install",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.zero_term_install",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.zero_term_replicated",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.zero_term_replicated",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.voted",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.voted",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.vote_empty",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.vote_empty",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.prevote_empty",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.prevote_empty",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.vote_zero_log_term",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.vote_zero_log_term",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.vote_future_log_term",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.vote_future_log_term",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.vote_nonzero_term_zero_index",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.vote_nonzero_term_zero_index",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.heartbeat",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.heartbeat",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.append_successor",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.append_successor",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.append_gap",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.append_gap",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.append_decreasing_term",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.append_decreasing_term",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.append_overflow",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.append_overflow",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.empty_batch",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.empty_batch",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.one_entry_batch",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.one_entry_batch",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.batch_hole",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.batch_hole",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.batch_gap",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.batch_gap",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.batch_decreasing_term",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.batch_decreasing_term",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.batch_future_term",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.batch_future_term",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.batch_invalid_previous",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.batch_invalid_previous",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.batch_overflow",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.batch_overflow",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.full_batch",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.full_batch",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.snapshot_valid",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.snapshot_valid",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.snapshot_empty",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.snapshot_empty",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.snapshot_zero_term",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.snapshot_zero_term",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.snapshot_future_term",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.snapshot_future_term",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.replicated_success",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.replicated_success",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.replicated_full",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.replicated_full",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.conflict_zero",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.conflict_zero",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.conflict_positive",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.conflict_positive",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.append_payload_unread",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.append_payload_unread",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.campaign_range",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.campaign_range",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.vote_range",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.vote_range",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.prevote_range",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.prevote_range",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.heartbeat_range",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.heartbeat_range",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.snapshot_range",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.snapshot_range",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.voted_range",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.voted_range",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.replicated_range",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.replicated_range",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.conflict_range",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.conflict_range",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.append_range",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.append_range",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.append_accepted",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Replication.append_accepted",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.empty_batch_any_length",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.empty_batch_any_length",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.leading_hole_rejected",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.leading_hole_rejected",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.batch_range",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.batch_range",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.batch_accepted",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.batch_accepted",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.validation_total",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.validation_total",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.validation_no_fault",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.validation_no_fault",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/message-validation/project.json",
-          "theorem": "Validation.batch_accepts_iff",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/message-validation/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.MessageValidation.batch_accepts_iff",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/replication-contract/project.json",
-          "theorem": "Replication.validation_supplies_successor",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/replication-contract/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Replication.validation_supplies_successor",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/replication-contract/project.json",
-          "theorem": "Replication.validated_append_preserves_log",
-          "function": "node_Node_valid",
-          "evidence": "artifacts/provium/proofs/replication-contract/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Replication.validated_append_preserves_log",
+          "function": "node::Node::valid",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -6275,46 +6275,46 @@
       ],
       "contracts": [
         {
-          "project": "proofs/input-gating/project.json",
-          "theorem": "JarlGateProofs.ack_preserves_pending_outputs",
-          "function": "ready_Ready_persisted",
-          "evidence": "artifacts/provium/proofs/input-gating/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.InputGating.ack_preserves_pending_outputs",
+          "function": "ready::Ready::persisted",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/persistence/project.json",
-          "theorem": "Persistence.flags_cleared",
-          "function": "ready_Ready_persisted",
-          "evidence": "artifacts/provium/proofs/persistence/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Persistence.flags_cleared",
+          "function": "ready::Ready::persisted",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/persistence/project.json",
-          "theorem": "Persistence.other_fields_unchanged",
-          "function": "ready_Ready_persisted",
-          "evidence": "artifacts/provium/proofs/persistence/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Persistence.other_fields_unchanged",
+          "function": "ready::Ready::persisted",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/persistence/project.json",
-          "theorem": "Persistence.idempotent",
-          "function": "ready_Ready_persisted",
-          "evidence": "artifacts/provium/proofs/persistence/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Persistence.idempotent",
+          "function": "ready::Ready::persisted",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/persistence/project.json",
-          "theorem": "Persistence.loan_checked_acknowledgment",
-          "function": "ready_Ready_persisted",
-          "evidence": "artifacts/provium/proofs/persistence/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Persistence.persisted_exact",
+          "function": "ready::Ready::persisted",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/persistence/project.json",
-          "theorem": "Persistence.loan_preserves_other_borrow",
-          "function": "ready_Ready_persisted",
-          "evidence": "artifacts/provium/proofs/persistence/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Persistence.other_fields_unchanged",
+          "function": "ready::Ready::persisted",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/persistence/project.json",
-          "theorem": "Persistence.source_checked_acknowledgment",
-          "function": "ready_Ready_persisted",
-          "evidence": "artifacts/provium/proofs/persistence/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Persistence.persisted_exact",
+          "function": "ready::Ready::persisted",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -6361,16 +6361,16 @@
       ],
       "contracts": [
         {
-          "project": "proofs/storage-view/project.json",
-          "theorem": "StorageView.entries_exact",
-          "function": "ready_Write_entries",
-          "evidence": "artifacts/provium/proofs/storage-view/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.StorageView.entries_exact",
+          "function": "ready::Write::entries",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage-view/project.json",
-          "theorem": "StorageView.returned_payloads",
-          "function": "ready_Write_entries",
-          "evidence": "artifacts/provium/proofs/storage-view/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.StorageView.returned_payloads",
+          "function": "ready::Write::entries",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -6477,16 +6477,16 @@
       "root_apis": [],
       "contracts": [
         {
-          "project": "proofs/log-boundary/project.json",
-          "theorem": "Boundary.without_snapshot",
-          "function": "state_State_base",
-          "evidence": "artifacts/provium/proofs/log-boundary/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.LogBoundary.without_snapshot",
+          "function": "state::State::base",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/log-boundary/project.json",
-          "theorem": "Boundary.snapshot_boundary",
-          "function": "state_State_base",
-          "evidence": "artifacts/provium/proofs/log-boundary/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.LogBoundary.snapshot_boundary",
+          "function": "state::State::base",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -6505,16 +6505,16 @@
       ],
       "contracts": [
         {
-          "project": "proofs/log-boundary/project.json",
-          "theorem": "Boundary.iterator_exact",
-          "function": "state_State_entries",
-          "evidence": "artifacts/provium/proofs/log-boundary/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.LogBoundary.iterator_exact",
+          "function": "state::State::entries",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/log-boundary/project.json",
-          "theorem": "Boundary.iterator_rejects_invalid_length",
-          "function": "state_State_entries",
-          "evidence": "artifacts/provium/proofs/log-boundary/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.LogBoundary.iterator_rejects_invalid_length",
+          "function": "state::State::entries",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -6529,16 +6529,16 @@
       "root_apis": [],
       "contracts": [
         {
-          "project": "proofs/capacity/project.json",
-          "theorem": "Capacity.full_exact",
-          "function": "state_State_full",
-          "evidence": "artifacts/provium/proofs/capacity/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Capacity.full_exact",
+          "function": "state::State::full",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/capacity/project.json",
-          "theorem": "Capacity.not_full_has_space",
-          "function": "state_State_full",
-          "evidence": "artifacts/provium/proofs/capacity/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Capacity.not_full_has_space",
+          "function": "state::State::full",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -6555,22 +6555,22 @@
       "root_apis": [],
       "contracts": [
         {
-          "project": "proofs/log-boundary/project.json",
-          "theorem": "Boundary.lookup_exact",
-          "function": "state_State_get",
-          "evidence": "artifacts/provium/proofs/log-boundary/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.LogBoundary.lookup_exact",
+          "function": "state::State::get",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/log-boundary/project.json",
-          "theorem": "Boundary.lookup_at_or_before_boundary",
-          "function": "state_State_get",
-          "evidence": "artifacts/provium/proofs/log-boundary/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.LogBoundary.lookup_at_or_before_boundary",
+          "function": "state::State::get",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/log-boundary/project.json",
-          "theorem": "Boundary.lookup_all_offsets",
-          "function": "state_State_get",
-          "evidence": "artifacts/provium/proofs/log-boundary/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.LogBoundary.lookup_all_offsets",
+          "function": "state::State::get",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -6587,40 +6587,40 @@
       "root_apis": [],
       "contracts": [
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.grow_exact",
-          "function": "state_State_grow",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.grow_exact",
+          "function": "state::State::grow",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.grow_preserves_shape",
-          "function": "state_State_grow",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.grow_preserves_shape",
+          "function": "state::State::grow",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.history_supports_growth",
-          "function": "state_State_grow",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.history_supports_growth",
+          "function": "state::State::grow",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.growth_representation",
-          "function": "state_State_grow",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.growth_representation",
+          "function": "state::State::grow",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.growth_preserves_log",
-          "function": "state_State_grow",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.growth_preserves_log",
+          "function": "state::State::grow",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.grow_initialized_moves",
-          "function": "state_State_grow",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.grow_initialized_moves",
+          "function": "state::State::grow",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -6639,28 +6639,28 @@
       ],
       "contracts": [
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.hard_copy",
-          "function": "state_State_hard",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.hard_copy",
+          "function": "state::State::hard",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.hard_source_read",
-          "function": "state_State_hard",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.hard_source_read",
+          "function": "state::State::hard",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.hard_loan_read",
-          "function": "state_State_hard",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.hard_loan_read",
+          "function": "state::State::hard",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage-view/project.json",
-          "theorem": "StorageView.hard_matches_write",
-          "function": "state_State_hard",
-          "evidence": "artifacts/provium/proofs/storage-view/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.StorageView.hard_matches_write",
+          "function": "state::State::hard",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -6677,40 +6677,40 @@
       "root_apis": [],
       "contracts": [
         {
-          "project": "proofs/log-boundary/project.json",
-          "theorem": "Boundary.record_at_snapshot",
-          "function": "state_State_id_at",
-          "evidence": "artifacts/provium/proofs/log-boundary/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.LogBoundary.record_at_snapshot",
+          "function": "state::State::id_at",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/log-boundary/project.json",
-          "theorem": "Boundary.record_at_entry",
-          "function": "state_State_id_at",
-          "evidence": "artifacts/provium/proofs/log-boundary/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.LogBoundary.record_at_entry",
+          "function": "state::State::id_at",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/log-boundary/project.json",
-          "theorem": "Boundary.record_at_absent",
-          "function": "state_State_id_at",
-          "evidence": "artifacts/provium/proofs/log-boundary/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.LogBoundary.record_at_absent",
+          "function": "state::State::id_at",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/replication-contract/project.json",
-          "theorem": "Replication.lookup_identifies_predecessor",
-          "function": "state_State_id_at",
-          "evidence": "artifacts/provium/proofs/replication-contract/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Replication.lookup_identifies_predecessor",
+          "function": "state::State::id_at",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/replication-contract/project.json",
-          "theorem": "Replication.lookup_retained_after_truncation",
-          "function": "state_State_id_at",
-          "evidence": "artifacts/provium/proofs/replication-contract/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Replication.lookup_retained_after_truncation",
+          "function": "state::State::id_at",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/replication-contract/project.json",
-          "theorem": "Replication.matched_replacement_preserves_log",
-          "function": "state_State_id_at",
-          "evidence": "artifacts/provium/proofs/replication-contract/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Replication.matched_replacement_preserves_log",
+          "function": "state::State::id_at",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -6727,58 +6727,58 @@
       "root_apis": [],
       "contracts": [
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.installation_preserves_capacity_and_commit",
-          "function": "state_State_install",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.installation_preserves_capacity_and_commit",
+          "function": "state::State::install",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.installation_matching_suffix",
-          "function": "state_State_install",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.installation_matching_suffix",
+          "function": "state::State::install",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.installation_mismatching_prefix",
-          "function": "state_State_install",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.installation_mismatching_prefix",
+          "function": "state::State::install",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.installation_places",
-          "function": "state_State_install",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.installation_places",
+          "function": "state::State::install",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.installation_preserves_shape",
-          "function": "state_State_install",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.installation_preserves_shape",
+          "function": "state::State::install",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.history_supports_installation",
-          "function": "state_State_install",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.history_supports_installation",
+          "function": "state::State::install",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.installation_matching_suffix_by_equality",
-          "function": "state_State_install",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.installation_matching_suffix_by_equality",
+          "function": "state::State::install",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.installation_matching_preserves_log",
-          "function": "state_State_install",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.installation_matching_preserves_log",
+          "function": "state::State::install",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.installation_mismatching_resets_log",
-          "function": "state_State_install",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.installation_mismatching_resets_log",
+          "function": "state::State::install",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -6797,28 +6797,28 @@
       ],
       "contracts": [
         {
-          "project": "proofs/log-boundary/project.json",
-          "theorem": "Boundary.last_empty",
-          "function": "state_State_last",
-          "evidence": "artifacts/provium/proofs/log-boundary/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.LogBoundary.last_empty",
+          "function": "state::State::last",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/log-boundary/project.json",
-          "theorem": "Boundary.last_final_slot",
-          "function": "state_State_last",
-          "evidence": "artifacts/provium/proofs/log-boundary/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.LogBoundary.last_final_slot",
+          "function": "state::State::last",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/log-boundary/project.json",
-          "theorem": "Boundary.last_without_present",
-          "function": "state_State_last",
-          "evidence": "artifacts/provium/proofs/log-boundary/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.LogBoundary.last_without_present",
+          "function": "state::State::last",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/log-boundary/project.json",
-          "theorem": "Boundary.last_skips_trailing_holes",
-          "function": "state_State_last",
-          "evidence": "artifacts/provium/proofs/log-boundary/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.LogBoundary.last_skips_trailing_holes",
+          "function": "state::State::last",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -6835,34 +6835,34 @@
       ],
       "contracts": [
         {
-          "project": "proofs/initialization/project.json",
-          "theorem": "Initialization.fresh_fields",
-          "function": "state_State_new",
-          "evidence": "artifacts/provium/proofs/initialization/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Initialization.fresh_fields",
+          "function": "state::State::new",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/initialization/project.json",
-          "theorem": "Initialization.initial_length_within_capacity",
-          "function": "state_State_new",
-          "evidence": "artifacts/provium/proofs/initialization/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Initialization.initial_length_within_capacity",
+          "function": "state::State::new",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/initialization/project.json",
-          "theorem": "Initialization.all_slots_empty",
-          "function": "state_State_new",
-          "evidence": "artifacts/provium/proofs/initialization/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Initialization.all_slots_empty",
+          "function": "state::State::new",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.fresh_representation",
-          "function": "state_State_new",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.fresh_representation",
+          "function": "state::State::new",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/initialization/project.json",
-          "theorem": "Initialization.source_fresh_fields",
-          "function": "state_State_new",
-          "evidence": "artifacts/provium/proofs/initialization/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Initialization.source_fresh_fields",
+          "function": "state::State::new",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -6879,76 +6879,76 @@
       "root_apis": [],
       "contracts": [
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.append_exact",
-          "function": "state_State_push",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.append_exact",
+          "function": "state::State::push",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.append_preserves_shape",
-          "function": "state_State_push",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.append_preserves_shape",
+          "function": "state::State::push",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.full_preserves_state_at_drop",
-          "function": "state_State_push",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.full_preserves_state_at_drop",
+          "function": "state::State::push",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.append_preserves_prefix",
-          "function": "state_State_push",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.append_preserves_prefix",
+          "function": "state::State::push",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.history_preserves_shape",
-          "function": "state_State_push",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.history_preserves_shape",
+          "function": "state::State::push",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.append_representation",
-          "function": "state_State_push",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.append_representation",
+          "function": "state::State::push",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.append_preserves_log",
-          "function": "state_State_push",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.append_preserves_log",
+          "function": "state::State::push",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.append_preserves_committed_prefix",
-          "function": "state_State_push",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.append_preserves_committed_prefix",
+          "function": "state::State::push",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/replication-contract/project.json",
-          "theorem": "Replication.validated_append_preserves_log",
-          "function": "state_State_push",
-          "evidence": "artifacts/provium/proofs/replication-contract/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Replication.validated_append_preserves_log",
+          "function": "state::State::push",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/replication-contract/project.json",
-          "theorem": "Replication.replacement_storage_succeeds",
-          "function": "state_State_push",
-          "evidence": "artifacts/provium/proofs/replication-contract/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Replication.replacement_storage_succeeds",
+          "function": "state::State::push",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/replication-contract/project.json",
-          "theorem": "Replication.replacement_append_preserves_log",
-          "function": "state_State_push",
-          "evidence": "artifacts/provium/proofs/replication-contract/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Replication.replacement_append_preserves_log",
+          "function": "state::State::push",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/replication-contract/project.json",
-          "theorem": "Replication.matched_replacement_preserves_log",
-          "function": "state_State_push",
-          "evidence": "artifacts/provium/proofs/replication-contract/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Replication.matched_replacement_preserves_log",
+          "function": "state::State::push",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -6967,82 +6967,82 @@
       ],
       "contracts": [
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.restoration_preserves_shape",
-          "function": "state_State_restore",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.restoration_preserves_shape",
+          "function": "state::State::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.restoration_fuel_sufficient",
-          "function": "state_State_restore",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.restoration_fuel_sufficient",
+          "function": "state::State::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.restoration_final_guard",
-          "function": "state_State_restore",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.restoration_final_guard",
+          "function": "state::State::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.restoration_places",
-          "function": "state_State_restore",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.restoration_places",
+          "function": "state::State::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.restoration_commit_bounds",
-          "function": "state_State_restore",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.restoration_commit_bounds",
+          "function": "state::State::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.restoration_initial_guard",
-          "function": "state_State_restore",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.restoration_initial_guard",
+          "function": "state::State::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.restoration_base_term_bound",
-          "function": "state_State_restore",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.restoration_base_term_bound",
+          "function": "state::State::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.restoration_zero_term_has_no_vote",
-          "function": "state_State_restore",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.restoration_zero_term_has_no_vote",
+          "function": "state::State::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.restoration_snapshot_nonzero",
-          "function": "state_State_restore",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.restoration_snapshot_nonzero",
+          "function": "state::State::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.restoration_orders_log",
-          "function": "state_State_restore",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.restoration_orders_log",
+          "function": "state::State::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.restoration_exact_indices",
-          "function": "state_State_restore",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.restoration_exact_indices",
+          "function": "state::State::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.restoration_log_representation",
-          "function": "state_State_restore",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.restoration_log_representation",
+          "function": "state::State::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.restoration_accepts",
-          "function": "state_State_restore",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.restoration_accepts",
+          "function": "state::State::restore",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -7072,34 +7072,34 @@
       ],
       "contracts": [
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.snapshot_none",
-          "function": "state_State_snapshot",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.snapshot_none",
+          "function": "state::State::snapshot",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.snapshot_some",
-          "function": "state_State_snapshot",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.snapshot_some",
+          "function": "state::State::snapshot",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.snapshot_borrowed_payload",
-          "function": "state_State_snapshot",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.snapshot_borrowed_payload",
+          "function": "state::State::snapshot",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.snapshot_excludes_writes",
-          "function": "state_State_snapshot",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.snapshot_excludes_writes",
+          "function": "state::State::snapshot",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.snapshot_result_is_live",
-          "function": "state_State_snapshot",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.snapshot_result_is_live",
+          "function": "state::State::snapshot",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -7116,100 +7116,100 @@
       "root_apis": [],
       "contracts": [
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.truncation_preserves_shape",
-          "function": "state_State_truncate",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.truncation_preserves_shape",
+          "function": "state::State::truncate",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.truncation_drop_order",
-          "function": "state_State_truncate",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.truncation_drop_order",
+          "function": "state::State::truncate",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.truncation_empty",
-          "function": "state_State_truncate",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.truncation_empty",
+          "function": "state::State::truncate",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.truncation_fuel_sufficient",
-          "function": "state_State_truncate",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.truncation_fuel_sufficient",
+          "function": "state::State::truncate",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.truncation_preserves_log",
-          "function": "state_State_truncate",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.truncation_preserves_log",
+          "function": "state::State::truncate",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.truncation_preserves_committed_prefix",
-          "function": "state_State_truncate",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.truncation_preserves_committed_prefix",
+          "function": "state::State::truncate",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.truncation_complete_result",
-          "function": "state_State_truncate",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.truncation_complete_result",
+          "function": "state::State::truncate",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.truncation_retains_predecessor",
-          "function": "state_State_truncate",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.truncation_retains_predecessor",
+          "function": "state::State::truncate",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage/project.json",
-          "theorem": "Storage.truncation_retains_base",
-          "function": "state_State_truncate",
-          "evidence": "artifacts/provium/proofs/storage/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Storage.truncation_retains_base",
+          "function": "state::State::truncate",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/replication-contract/project.json",
-          "theorem": "Replication.replacement_prepares_append",
-          "function": "state_State_truncate",
-          "evidence": "artifacts/provium/proofs/replication-contract/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Replication.replacement_prepares_append",
+          "function": "state::State::truncate",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/replication-contract/project.json",
-          "theorem": "Replication.replacement_storage_succeeds",
-          "function": "state_State_truncate",
-          "evidence": "artifacts/provium/proofs/replication-contract/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Replication.replacement_storage_succeeds",
+          "function": "state::State::truncate",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/replication-contract/project.json",
-          "theorem": "Replication.truncation_space_iff",
-          "function": "state_State_truncate",
-          "evidence": "artifacts/provium/proofs/replication-contract/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Replication.truncation_space_iff",
+          "function": "state::State::truncate",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/replication-contract/project.json",
-          "theorem": "Replication.replacement_append_preserves_log",
-          "function": "state_State_truncate",
-          "evidence": "artifacts/provium/proofs/replication-contract/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Replication.replacement_append_preserves_log",
+          "function": "state::State::truncate",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/replication-contract/project.json",
-          "theorem": "Replication.predecessor_after_truncation",
-          "function": "state_State_truncate",
-          "evidence": "artifacts/provium/proofs/replication-contract/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Replication.predecessor_after_truncation",
+          "function": "state::State::truncate",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/replication-contract/project.json",
-          "theorem": "Replication.lookup_retained_after_truncation",
-          "function": "state_State_truncate",
-          "evidence": "artifacts/provium/proofs/replication-contract/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Replication.lookup_retained_after_truncation",
+          "function": "state::State::truncate",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/replication-contract/project.json",
-          "theorem": "Replication.matched_replacement_preserves_log",
-          "function": "state_State_truncate",
-          "evidence": "artifacts/provium/proofs/replication-contract/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.Replication.matched_replacement_preserves_log",
+          "function": "state::State::truncate",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"
@@ -7228,64 +7228,64 @@
       ],
       "contracts": [
         {
-          "project": "proofs/storage-view/project.json",
-          "theorem": "StorageView.metadata_only",
-          "function": "state_State_write",
-          "evidence": "artifacts/provium/proofs/storage-view/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.StorageView.metadata_only",
+          "function": "state::State::write",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage-view/project.json",
-          "theorem": "StorageView.exact_view",
-          "function": "state_State_write",
-          "evidence": "artifacts/provium/proofs/storage-view/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.StorageView.exact_view",
+          "function": "state::State::write",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage-view/project.json",
-          "theorem": "StorageView.replacement_suffix",
-          "function": "state_State_write",
-          "evidence": "artifacts/provium/proofs/storage-view/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.StorageView.replacement_suffix",
+          "function": "state::State::write",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage-view/project.json",
-          "theorem": "StorageView.returned_entries",
-          "function": "state_State_write",
-          "evidence": "artifacts/provium/proofs/storage-view/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.StorageView.returned_entries",
+          "function": "state::State::write",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage-view/project.json",
-          "theorem": "StorageView.retained_prefix_plus_returned_payloads",
-          "function": "state_State_write",
-          "evidence": "artifacts/provium/proofs/storage-view/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.StorageView.retained_prefix_plus_returned_payloads",
+          "function": "state::State::write",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage-view/project.json",
-          "theorem": "StorageView.materialize_returned",
-          "function": "state_State_write",
-          "evidence": "artifacts/provium/proofs/storage-view/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.StorageView.materialize_returned",
+          "function": "state::State::write",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage-view/project.json",
-          "theorem": "StorageView.source_checkpoint",
-          "function": "state_State_write",
-          "evidence": "artifacts/provium/proofs/storage-view/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.StorageView.source_checkpoint",
+          "function": "state::State::write",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage-view/project.json",
-          "theorem": "StorageView.source_retry_some",
-          "function": "state_State_write",
-          "evidence": "artifacts/provium/proofs/storage-view/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.StorageView.source_retry_some",
+          "function": "state::State::write",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage-view/project.json",
-          "theorem": "StorageView.source_retry_none",
-          "function": "state_State_write",
-          "evidence": "artifacts/provium/proofs/storage-view/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.StorageView.source_retry_none",
+          "function": "state::State::write",
+          "evidence": "artifacts/provium/engine/verified.json"
         },
         {
-          "project": "proofs/storage-view/project.json",
-          "theorem": "StorageView.checkpoint_witness",
-          "function": "state_State_write",
-          "evidence": "artifacts/provium/proofs/storage-view/verified.json"
+          "project": "proofs/engine/project.json",
+          "theorem": "Jarl.Contracts.StorageView.checkpoint_witness",
+          "function": "state::State::write",
+          "evidence": "artifacts/provium/engine/verified.json"
         }
       ],
       "context": "production"

@@ -1,10 +1,16 @@
-# Fixed-engine safety (M3)
+# Typed proofs of Jarl
 
-Provium's typed backend translates the fixed-membership `Node` engine
-(`node.rs`, `state.rs`, `membership.rs`, `ready.rs`) to ordinary Lean
-definitions (`Generated.lean`, produced at verification time). The modules
-under `Engine/` prove Raft's safety properties about those definitions for
-every reachable cluster.
+Provium's typed backend translates Jarl's engines (`node.rs`, `state.rs`,
+`membership.rs`, `ready.rs`, `cluster.rs`) to ordinary Lean definitions
+(`Generated.lean`, produced at verification time). This project holds every
+Rust correspondence claim about Jarl:
+
+- `Engine/`: Raft safety of the fixed-membership `Node` engine (M3), below.
+- `Contracts/`: the component contracts (storage, membership, validation,
+  timers, gating and the rest), listed in [the proofs README](../README.md).
+
+Both are checked against the host build and a wasm32 build, and
+`differential.rs` compares the translation with native Jarl.
 
 ```text
 cargo test -p jarl --locked --test proofs engine -- --include-ignored
@@ -69,7 +75,7 @@ the node crashing and restarting.
   Without that, a follower could append a different entry than the leader
   sent. A panic ends the node's execution (see above).
 - Persistence writes the whole state at once (`Cluster.persist`); a host
-  writing only the `Write` delta is covered by the storage-view contracts, not
+  writing only the `Write` delta is covered by `Contracts/StorageView`, not
   here.
 - Snapshot application values are not tracked: snapshot safety is about the
   boundary identity, not the snapshot's application state.

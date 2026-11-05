@@ -118,38 +118,6 @@ fn cargo_subject_keeps_proof_tools_out_of_the_runtime_graph() {
         .any(|p| p.ends_with("Cargo.lock")));
 }
 
-#[path = "proof_cases/capacity.rs"]
-mod capacity;
-#[path = "proof_cases/lean.rs"]
-mod consensus;
-#[path = "proof_cases/scalar_methods.rs"]
-mod election;
-#[path = "proof_cases/initialization.rs"]
-mod initialization;
-#[path = "proof_cases/queries.rs"]
-mod input_gating;
-#[path = "proof_cases/arrays.rs"]
-mod membership;
-#[path = "proof_cases/node_election.rs"]
-mod node_election;
-#[path = "proof_cases/methods.rs"]
-mod persistence;
-
-#[path = "proof_cases/storage.rs"]
-mod storage;
-
-#[path = "proof_cases/boundary.rs"]
-mod boundary;
-
-#[path = "proof_cases/message_dispatch.rs"]
-mod message_dispatch;
-
-#[path = "proof_cases/message_validation.rs"]
-mod message_validation;
-
-#[path = "proof_cases/replication_contract.rs"]
-mod replication_contract;
-
 #[path = "proof_cases/engine.rs"]
 mod engine;
 #[path = "proof_cases/engine_mutations.rs"]
@@ -341,40 +309,6 @@ fn m1_actual_cargo_compilation_is_bound_to_original_sources() {
         .iter()
         .all(|item| !item.id.contains("::tests")));
 }
-
-#[test]
-fn m1_write_suffix_offset_is_inspected_from_original_rust() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let source = provium::methods::Crate::load(&root.join("src/lib.rs")).unwrap();
-    let offset = source.inspect_suffix_offset("state::State::write").unwrap();
-    assert_eq!(offset.length, ["len"]);
-    assert_eq!(offset.base_method, "state::State::base");
-    assert_eq!(offset.bias, 1);
-    let method = source.lower("state::State::write").unwrap();
-    let view = method.view.unwrap();
-    assert_eq!(
-        view.output_fields,
-        ["hard", "snapshot", "truncate_from", "entries"]
-    );
-    assert_eq!(view.slots, ["entries"]);
-    let entries = source
-        .lower("ready::Write::entries")
-        .unwrap()
-        .iteration
-        .unwrap();
-    assert!(entries.whole);
-    assert_eq!(entries.slots, ["entries"]);
-    // A truncating cast at 2^32 would incorrectly select a prefix here.
-    assert_eq!(
-        offset.evaluate(32, 7, 0, Some((1u64 << 32) + 1)).unwrap(),
-        7
-    );
-    assert_eq!(offset.evaluate(64, 7, 10, Some(9)).unwrap(), 0);
-    assert_eq!(offset.evaluate(64, 7, 10, None).unwrap(), 7);
-}
-
-#[path = "proof_cases/storage_view.rs"]
-mod storage_view;
 
 #[path = "proof_cases/quorum_callbacks.rs"]
 mod quorum_callbacks;
