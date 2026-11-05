@@ -211,6 +211,42 @@
     {
       "name": "Contracts.Replication",
       "path": "Contracts/Replication.lean"
+    },
+    {
+      "name": "Contracts.MembershipBase",
+      "path": "Contracts/MembershipBase.lean"
+    },
+    {
+      "name": "Contracts.MembershipInclude",
+      "path": "Contracts/MembershipInclude.lean"
+    },
+    {
+      "name": "Contracts.MembershipPass",
+      "path": "Contracts/MembershipPass.lean"
+    },
+    {
+      "name": "Contracts.MembershipSpec",
+      "path": "Contracts/MembershipSpec.lean"
+    },
+    {
+      "name": "Contracts.MembershipBuild",
+      "path": "Contracts/MembershipBuild.lean"
+    },
+    {
+      "name": "Contracts.MembershipReconfig",
+      "path": "Contracts/MembershipReconfig.lean"
+    },
+    {
+      "name": "Contracts.MembershipQuorum",
+      "path": "Contracts/MembershipQuorum.lean"
+    },
+    {
+      "name": "Contracts.Membership",
+      "path": "Contracts/Membership.lean"
+    },
+    {
+      "name": "Contracts.Consensus",
+      "path": "Contracts/Consensus.lean"
     }
   ],
   "obligations": [
@@ -1313,6 +1349,1054 @@
     {
       "theorem": "Jarl.Contracts.Storage.truncation_retains_predecessor",
       "function": "state::State::truncate"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.append_commit",
+      "function": "node::Node::append"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.commit_never_regresses",
+      "function": "node::Node::commit_to"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.commit_sequence_monotone",
+      "function": "node::Node::commit_to"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.commit_to_eq",
+      "function": "node::Node::commit_to"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.commit_to_noop",
+      "function": "node::Node::commit_to"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.commit_to_val",
+      "function": "node::Node::commit_to"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.current_term_required",
+      "function": "membership::Membership::quorum_index"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.current_term_required",
+      "function": "node::Node::advance_commit"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.current_term_required",
+      "function": "node::Node::commit_to"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.current_term_required",
+      "function": "node::Node::matched"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.current_term_required",
+      "function": "state::State::id_at"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.follow_state",
+      "function": "node::Node::follow"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.follower_never_overcommits",
+      "function": "node::Node::append"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.joint_commit_requires_both",
+      "function": "membership::Membership::is_joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.joint_commit_requires_both",
+      "function": "membership::Membership::old_voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.joint_commit_requires_both",
+      "function": "membership::Membership::quorum_index"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.joint_commit_requires_both",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.joint_transition_intersection",
+      "function": "membership::Membership::finalized"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.joint_transition_intersection",
+      "function": "membership::Membership::joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.joint_transition_intersection",
+      "function": "membership::Membership::quorum"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.joint_transition_intersection",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.majority_cardinality_overlap",
+      "function": "membership::Membership::is_joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.majority_cardinality_overlap",
+      "function": "membership::Membership::old_voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.majority_cardinality_overlap",
+      "function": "membership::Membership::quorum"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.majority_cardinality_overlap",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.majority_intersection",
+      "function": "membership::Membership::is_joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.majority_intersection",
+      "function": "membership::Membership::old_voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.majority_intersection",
+      "function": "membership::Membership::quorum"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.majority_intersection",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.majority_position_in_bounds",
+      "function": "membership::Membership::old_voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.majority_position_in_bounds",
+      "function": "membership::Membership::quorum_index"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.majority_position_in_bounds",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.majority_strict",
+      "function": "membership::Membership::is_joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.majority_strict",
+      "function": "membership::Membership::old_voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.majority_strict",
+      "function": "membership::Membership::quorum"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.majority_strict",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.old_voters_nodup",
+      "function": "membership::Membership::old_voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.push_hard",
+      "function": "state::State::push"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.refresh_state",
+      "function": "node::Node::refresh_membership"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.reset_election_state",
+      "function": "node::Node::reset_election"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.truncate_hard",
+      "function": "state::State::truncate"
+    },
+    {
+      "theorem": "Jarl.Contracts.Consensus.voters_nodup",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.CapacityAcceptance.include_available",
+      "function": "membership::Membership::include"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.CapacityAcceptance.include_covered",
+      "function": "membership::Membership::include"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.CapacityAcceptance.restore_accepts",
+      "function": "membership::Membership::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.CapacityAcceptance.restore_accepts_by_count",
+      "function": "membership::Membership::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.CapacityAcceptance.restore_accepts_iff",
+      "function": "membership::Membership::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.CapacityAcceptance.restore_error_code",
+      "function": "membership::Membership::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.CapacityAcceptance.restore_rejects_iff",
+      "function": "membership::Membership::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.CapacityAcceptance.stable_accepts_by_count",
+      "function": "membership::Membership::new"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.CapacityAcceptance.stable_accepts_iff",
+      "function": "membership::Membership::new"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.CapacityAcceptance.stable_rejects_iff",
+      "function": "membership::Membership::new"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.CapacityAcceptance.stored_identity_count",
+      "function": "membership::Membership::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Finalization.all_old_flags_cleared",
+      "function": "membership::Membership::finalized"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Finalization.capacity_preserved",
+      "function": "membership::Membership::finalized"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Finalization.finalized_members",
+      "function": "membership::Membership::finalized"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Finalization.identity_origin",
+      "function": "membership::Membership::finalized"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Finalization.no_longer_joint",
+      "function": "membership::Membership::finalized"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Finalization.no_longer_joint",
+      "function": "membership::Membership::is_joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Finalization.retained_fields",
+      "function": "membership::Membership::finalized"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Finalization.slot_effect",
+      "function": "membership::Membership::finalized"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.IdentityQuery.contains_exact",
+      "function": "membership::Membership::contains"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.IdentityQuery.contains_iff_has",
+      "function": "membership::Membership::contains"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.IdentityQuery.is_voter_exact",
+      "function": "membership::Membership::is_voter"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.IdentityQuery.is_voter_exact",
+      "function": "membership::Membership::old_voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.IdentityQuery.is_voter_exact",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.IdentityQuery.voter_participates",
+      "function": "membership::Membership::contains"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.IdentityQuery.voter_participates",
+      "function": "membership::Membership::is_voter"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Inclusion.capacity_preserved",
+      "function": "membership::Membership::include"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Inclusion.full_error",
+      "function": "membership::Membership::include"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Inclusion.full_exact",
+      "function": "membership::Membership::include"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Inclusion.full_unchanged",
+      "function": "membership::Membership::include"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Inclusion.other_slots_unchanged",
+      "function": "membership::Membership::include"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Inclusion.preserves_unique",
+      "function": "membership::Membership::include"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Inclusion.selected_effect",
+      "function": "membership::Membership::include"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Inclusion.selected_identity",
+      "function": "membership::Membership::include"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Inclusion.selected_slot",
+      "function": "membership::Membership::include"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.accepts",
+      "function": "membership::Membership::is_joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.accepts",
+      "function": "membership::Membership::joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.accepts_by_count",
+      "function": "membership::Membership::is_joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.accepts_by_count",
+      "function": "membership::Membership::joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.accepts_by_count",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.accepts_iff",
+      "function": "membership::Membership::is_joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.accepts_iff",
+      "function": "membership::Membership::joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.capacity_preserved",
+      "function": "membership::Membership::joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.error_codes",
+      "function": "membership::Membership::joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.fits_by_count",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.flags",
+      "function": "membership::Membership::joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.flags",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.full_by_count",
+      "function": "membership::Membership::is_joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.full_by_count",
+      "function": "membership::Membership::joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.full_by_count",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.full_iff",
+      "function": "membership::Membership::is_joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.full_iff",
+      "function": "membership::Membership::joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.guard_error_iff",
+      "function": "membership::Membership::is_joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.guard_error_iff",
+      "function": "membership::Membership::joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.identities",
+      "function": "membership::Membership::joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.identities",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.joint_iff_source_voters",
+      "function": "membership::Membership::is_joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.joint_iff_source_voters",
+      "function": "membership::Membership::joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.joint_iff_source_voters",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.learners_exact",
+      "function": "membership::Membership::joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.learners_exact",
+      "function": "membership::Membership::learners"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.old_voters_exact",
+      "function": "membership::Membership::joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.old_voters_exact",
+      "function": "membership::Membership::old_voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.old_voters_exact",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.success_shape",
+      "function": "membership::Membership::is_joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.success_shape",
+      "function": "membership::Membership::joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.success_shape",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.unique_identities",
+      "function": "membership::Membership::joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.voters_exact",
+      "function": "membership::Membership::joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.JointConstruction.voters_exact",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.LearnerReplacement.accepts",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.LearnerReplacement.accepts",
+      "function": "membership::Membership::with_learners"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.LearnerReplacement.accepts_by_count",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.LearnerReplacement.accepts_by_count",
+      "function": "membership::Membership::with_learners"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.LearnerReplacement.accepts_iff",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.LearnerReplacement.accepts_iff",
+      "function": "membership::Membership::with_learners"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.LearnerReplacement.capacity_preserved",
+      "function": "membership::Membership::with_learners"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.LearnerReplacement.error_code",
+      "function": "membership::Membership::with_learners"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.LearnerReplacement.flags",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.LearnerReplacement.flags",
+      "function": "membership::Membership::with_learners"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.LearnerReplacement.identities",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.LearnerReplacement.identities",
+      "function": "membership::Membership::with_learners"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.LearnerReplacement.learners_exact",
+      "function": "membership::Membership::learners"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.LearnerReplacement.learners_exact",
+      "function": "membership::Membership::with_learners"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.LearnerReplacement.not_joint",
+      "function": "membership::Membership::is_joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.LearnerReplacement.not_joint",
+      "function": "membership::Membership::with_learners"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.LearnerReplacement.old_empty",
+      "function": "membership::Membership::old_voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.LearnerReplacement.old_empty",
+      "function": "membership::Membership::with_learners"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.LearnerReplacement.rejects_iff",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.LearnerReplacement.rejects_iff",
+      "function": "membership::Membership::with_learners"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.LearnerReplacement.unique_identities",
+      "function": "membership::Membership::with_learners"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.LearnerReplacement.valid_inputs",
+      "function": "membership::Membership::is_voter"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.LearnerReplacement.valid_inputs",
+      "function": "membership::Membership::with_learners"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.LearnerReplacement.voters_exact",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.LearnerReplacement.voters_exact",
+      "function": "membership::Membership::with_learners"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.LearnerReplacement.with_learners_err",
+      "function": "membership::Membership::with_learners"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.LearnerReplacement.with_learners_ok",
+      "function": "membership::Membership::is_voter"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.LearnerReplacement.with_learners_ok",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.LearnerReplacement.with_learners_ok",
+      "function": "membership::Membership::with_learners"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.MembershipProjection.finalization_has_no_old_voters",
+      "function": "membership::Membership::finalized"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.MembershipProjection.finalization_has_no_old_voters",
+      "function": "membership::Membership::old_voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.MembershipProjection.finalization_preserves_learners",
+      "function": "membership::Membership::finalized"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.MembershipProjection.finalization_preserves_learners",
+      "function": "membership::Membership::learners"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.MembershipProjection.finalization_preserves_voters",
+      "function": "membership::Membership::finalized"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.MembershipProjection.finalization_preserves_voters",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.MembershipProjection.learners_exact",
+      "function": "membership::Membership::learners"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.MembershipProjection.learners_flag",
+      "function": "membership::Membership::learners"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.MembershipProjection.learners_member",
+      "function": "membership::Membership::learners"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.MembershipProjection.old_voters_exact",
+      "function": "membership::Membership::old_voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.MembershipProjection.old_voters_flag",
+      "function": "membership::Membership::old_voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.MembershipProjection.old_voters_member",
+      "function": "membership::Membership::old_voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.MembershipProjection.voters_exact",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.MembershipProjection.voters_flag",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.MembershipProjection.voters_member",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Peers.capacity_preserved",
+      "function": "membership::Membership::peers"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Peers.member_iff",
+      "function": "membership::Membership::peers"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Peers.restored_members",
+      "function": "membership::Membership::peers"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Peers.restored_members",
+      "function": "membership::Membership::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Peers.slot_identity",
+      "function": "membership::Membership::peers"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Peers.stable_members",
+      "function": "membership::Membership::new"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Peers.stable_members",
+      "function": "membership::Membership::peers"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Quorum.empty_current",
+      "function": "membership::Membership::quorum"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Quorum.empty_current",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Quorum.execution",
+      "function": "membership::Membership::is_joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Quorum.execution",
+      "function": "membership::Membership::quorum"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Quorum.observation_complete",
+      "function": "membership::Membership::quorum"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Quorum.old_voters_eq",
+      "function": "membership::Membership::old_voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Quorum.quorums_intersect",
+      "function": "membership::Membership::is_joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Quorum.quorums_intersect",
+      "function": "membership::Membership::old_voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Quorum.quorums_intersect",
+      "function": "membership::Membership::quorum"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Quorum.quorums_intersect",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Quorum.response_budget",
+      "function": "membership::Membership::old_voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Quorum.response_budget",
+      "function": "membership::Membership::quorum"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Quorum.response_budget",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Quorum.result",
+      "function": "membership::Membership::is_joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Quorum.result",
+      "function": "membership::Membership::old_voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Quorum.result",
+      "function": "membership::Membership::quorum"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Quorum.result",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Quorum.stable_execution",
+      "function": "membership::Membership::is_joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Quorum.stable_execution",
+      "function": "membership::Membership::quorum"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Quorum.voters_eq",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.QuorumIndex.completes",
+      "function": "membership::Membership::quorum_index"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.QuorumIndex.completes",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.QuorumIndex.empty_current",
+      "function": "membership::Membership::quorum_index"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.QuorumIndex.empty_current",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.QuorumIndex.exact",
+      "function": "membership::Membership::is_joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.QuorumIndex.exact",
+      "function": "membership::Membership::old_voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.QuorumIndex.exact",
+      "function": "membership::Membership::quorum_index"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.QuorumIndex.exact",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.QuorumIndex.execution",
+      "function": "membership::Membership::is_joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.QuorumIndex.execution",
+      "function": "membership::Membership::old_voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.QuorumIndex.execution",
+      "function": "membership::Membership::quorum_index"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.QuorumIndex.execution",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.QuorumIndex.observation_complete",
+      "function": "membership::Membership::quorum_index"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.QuorumIndex.observation_complete",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.QuorumIndex.response_budget",
+      "function": "membership::Membership::old_voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.QuorumIndex.response_budget",
+      "function": "membership::Membership::quorum_index"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.QuorumIndex.response_budget",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.QuorumIndex.result_majority",
+      "function": "membership::Membership::is_joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.QuorumIndex.result_majority",
+      "function": "membership::Membership::old_voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.QuorumIndex.result_majority",
+      "function": "membership::Membership::quorum_index"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.QuorumIndex.result_majority",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.QuorumIndex.stable_execution",
+      "function": "membership::Membership::is_joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.QuorumIndex.stable_execution",
+      "function": "membership::Membership::quorum_index"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.QuorumIndex.stable_execution",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Restoration.capacity_preserved",
+      "function": "membership::Membership::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Restoration.distinct_inputs",
+      "function": "membership::Membership::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Restoration.duplicate_voter",
+      "function": "membership::Membership::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Restoration.empty_voters",
+      "function": "membership::Membership::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Restoration.learner_overlap",
+      "function": "membership::Membership::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Restoration.learners_disjoint",
+      "function": "membership::Membership::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Restoration.nonempty_voters",
+      "function": "membership::Membership::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Restoration.single_voter",
+      "function": "membership::Membership::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Restoration.unique_identities",
+      "function": "membership::Membership::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.Restoration.valid",
+      "function": "membership::Membership::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.SetInterpretation.include_flag",
+      "function": "membership::Membership::include"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.SetInterpretation.include_identity",
+      "function": "membership::Membership::include"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.SetInterpretation.joint_iff_old_nonempty",
+      "function": "membership::Membership::is_joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.SetInterpretation.joint_iff_old_nonempty",
+      "function": "membership::Membership::old_voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.SetInterpretation.learners_exact",
+      "function": "membership::Membership::learners"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.SetInterpretation.learners_exact",
+      "function": "membership::Membership::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.SetInterpretation.old_voters_exact",
+      "function": "membership::Membership::old_voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.SetInterpretation.old_voters_exact",
+      "function": "membership::Membership::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.SetInterpretation.restore_flags",
+      "function": "membership::Membership::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.SetInterpretation.restore_identities",
+      "function": "membership::Membership::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.SetInterpretation.restored_contains_exact",
+      "function": "membership::Membership::contains"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.SetInterpretation.restored_contains_exact",
+      "function": "membership::Membership::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.SetInterpretation.stable_learners_exact",
+      "function": "membership::Membership::learners"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.SetInterpretation.stable_learners_exact",
+      "function": "membership::Membership::new"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.SetInterpretation.stable_not_joint",
+      "function": "membership::Membership::is_joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.SetInterpretation.stable_not_joint",
+      "function": "membership::Membership::new"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.SetInterpretation.stable_old_empty",
+      "function": "membership::Membership::new"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.SetInterpretation.stable_old_empty",
+      "function": "membership::Membership::old_voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.SetInterpretation.stable_voters_exact",
+      "function": "membership::Membership::new"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.SetInterpretation.stable_voters_exact",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.SetInterpretation.voter_count_bounds",
+      "function": "membership::Membership::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.SetInterpretation.voter_count_bounds",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.SetInterpretation.voters_exact",
+      "function": "membership::Membership::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.SetInterpretation.voters_exact",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.SetInterpretation.voters_length_le",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.StableConstruction.capacity_preserved",
+      "function": "membership::Membership::new"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.StableConstruction.delegates_to_restore",
+      "function": "membership::Membership::new"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.StableConstruction.delegates_to_restore",
+      "function": "membership::Membership::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.StableConstruction.unique_identities",
+      "function": "membership::Membership::new"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.StableConstruction.valid_inputs",
+      "function": "membership::Membership::new"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.include_eq",
+      "function": "membership::Membership::include"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.include_ok_spec",
+      "function": "membership::Membership::include"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.joint_eq",
+      "function": "membership::Membership::joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.new_eq",
+      "function": "membership::Membership::new"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.new_eq",
+      "function": "membership::Membership::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.quorum_execution",
+      "function": "membership::Membership::is_joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.quorum_execution",
+      "function": "membership::Membership::quorum"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.quorum_index_structure",
+      "function": "membership::Membership::is_joint"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.quorum_index_structure",
+      "function": "membership::Membership::old_voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.quorum_index_structure",
+      "function": "membership::Membership::quorum_index"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.quorum_index_structure",
+      "function": "membership::Membership::voters"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.restore_eq",
+      "function": "membership::Membership::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.restore_err",
+      "function": "membership::Membership::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.restore_ok",
+      "function": "membership::Membership::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Membership.with_learners_eq",
+      "function": "membership::Membership::with_learners"
     }
   ],
   "differential": {

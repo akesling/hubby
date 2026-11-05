@@ -10,6 +10,8 @@ import Contracts.Election
 import Contracts.MessageValidation
 import Contracts.StorageView
 import Contracts.Replication
+import Contracts.Membership
+import Contracts.Consensus
 
 namespace Jarl.Engine
 open Jarl
