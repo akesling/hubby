@@ -64,7 +64,10 @@
     "node::Node::reset_election",
     "node::Node::follow",
     "node::Node::available",
-    "node::Node::idle"
+    "node::Node::idle",
+    "host::persist",
+    "host::persist_async",
+    "Error::fmt"
   ],
   "proofs": "Proofs.lean",
   "proof_modules": [
@@ -247,6 +250,34 @@
     {
       "name": "Contracts.Consensus",
       "path": "Contracts/Consensus.lean"
+    },
+    {
+      "name": "Engine.App.Model",
+      "path": "Engine/App/Model.lean"
+    },
+    {
+      "name": "Engine.App.Preserve",
+      "path": "Engine/App/Preserve.lean"
+    },
+    {
+      "name": "Engine.App.Main",
+      "path": "Engine/App/Main.lean"
+    },
+    {
+      "name": "Engine.Host.Delta",
+      "path": "Engine/Host/Delta.lean"
+    },
+    {
+      "name": "Engine.Host.Ops",
+      "path": "Engine/Host/Ops.lean"
+    },
+    {
+      "name": "Engine.Host.Refine",
+      "path": "Engine/Host/Refine.lean"
+    },
+    {
+      "name": "Engine.Host.Main",
+      "path": "Engine/Host/Main.lean"
     }
   ],
   "obligations": [
@@ -2397,12 +2428,64 @@
     {
       "theorem": "Jarl.Contracts.Membership.with_learners_eq",
       "function": "membership::Membership::with_learners"
+    },
+    {
+      "theorem": "Jarl.Engine.App.raft_snapshot_application_safety",
+      "function": "node::Node::compact"
+    },
+    {
+      "theorem": "Jarl.Engine.App.raft_snapshot_application_safety",
+      "function": "node::Node::step"
+    },
+    {
+      "theorem": "Jarl.Engine.App.raft_snapshot_value_agreement",
+      "function": "node::Node::compact"
+    },
+    {
+      "theorem": "Jarl.Engine.App.raft_snapshot_value_agreement",
+      "function": "node::Node::step"
+    },
+    {
+      "theorem": "Jarl.Engine.Host.host_election_safety",
+      "function": "state::State::restore"
+    },
+    {
+      "theorem": "Jarl.Engine.Host.host_election_safety",
+      "function": "node::Node::step"
+    },
+    {
+      "theorem": "Jarl.Engine.Host.host_state_machine_safety",
+      "function": "state::State::write"
+    },
+    {
+      "theorem": "Jarl.Engine.Host.host_state_machine_safety",
+      "function": "state::State::restore"
+    },
+    {
+      "theorem": "Jarl.Engine.Host.host_snapshot_safety",
+      "function": "state::State::write"
+    },
+    {
+      "theorem": "Jarl.Engine.Host.host_snapshot_safety",
+      "function": "state::State::restore"
+    },
+    {
+      "theorem": "Jarl.Engine.Host.host_refinement",
+      "function": "state::State::write"
+    },
+    {
+      "theorem": "Jarl.Engine.Host.host_refinement",
+      "function": "state::State::restore"
     }
   ],
   "differential": {
     "source": "differential.rs",
     "crate_name": "jarl",
     "function": "run",
-    "seeds": 40
+    "seeds": 40,
+    "unexercised": {
+      "host::persist_async": "The scenario is synchronous: driving a future needs an executor, which is outside the translated subset. Its cancellation behaviour is specified by the translation's await budget instead.",
+      "Error::fmt": "Display output is reachable only through core::fmt machinery (format!, to_string) that the scenario cannot call directly."
+    }
   }
 }

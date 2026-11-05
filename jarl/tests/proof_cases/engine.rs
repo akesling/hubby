@@ -15,6 +15,8 @@ fn fixed_engine_safety_is_kernel_checked() {
         "Jarl.Engine.election_safety",
         "Jarl.Engine.raft_state_machine_safety",
         "Jarl.Engine.raft_snapshot_safety",
+        "Jarl.Engine.App.raft_snapshot_application_safety",
+        "Jarl.Engine.Host.host_state_machine_safety",
     ] {
         assert!(
             report.contains(&format!("PROVIUM_VERIFIED {theorem}")),
@@ -23,7 +25,7 @@ fn fixed_engine_safety_is_kernel_checked() {
     }
     assert!(report.contains("Differential: 40 scenarios"), "{report}");
     assert!(
-        report.contains("Differential coverage: 95 of 95 translated functions executed"),
+        report.contains("Differential coverage: 96 of 98 translated functions executed"),
         "{report}"
     );
     assert!(report.contains("rustc cross-check:"), "{report}");
@@ -60,6 +62,8 @@ fn fixed_engine_safety_holds_on_32_bit() {
         "Jarl.Engine.election_safety",
         "Jarl.Engine.raft_state_machine_safety",
         "Jarl.Engine.raft_snapshot_safety",
+        "Jarl.Engine.App.raft_snapshot_application_safety",
+        "Jarl.Engine.Host.host_state_machine_safety",
     ] {
         assert!(
             report.contains(&format!("PROVIUM_VERIFIED {theorem}")),

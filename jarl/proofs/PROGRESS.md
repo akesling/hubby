@@ -1828,3 +1828,23 @@ The typed front end is no longer only trusted:
   copy built from `Write` deltas, proposes batches, grows logs and feeds
   invalid inputs to every validating path. Widening it found two more
   front-end bugs, fixed.
+
+## M3 closed: delta persistence and snapshot values
+
+The two gaps recorded for M3 are proved:
+
+- **Delta persistence** (`engine/Engine/Host`). A host that applies each
+  `Write` delta to its own durable record and recovers with `State::restore`
+  refines the model, so election, state-machine and snapshot safety hold for
+  it. The core lemma, `DeltaOk`, establishes that Jarl's dirty tracking
+  (`log_from`, `snapshot_changed`) is exact on every reachable state.
+- **Snapshot application state** (`engine/Engine/App`). Under honest
+  compaction, every exposed snapshot holds the application state of the
+  committed history through its boundary, and snapshots at the same index
+  agree.
+
+The translation also covers Jarl's remaining functions: `host::persist`
+(consumer `Storage` trait), `host::persist_async` (async, with explicit
+cancellation) and `Display for Error`. The differential scenario's host
+persists through `host::persist` with its own `Storage` implementation.
+549 obligations verify on the host and on wasm32.

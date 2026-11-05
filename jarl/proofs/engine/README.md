@@ -32,6 +32,29 @@ A node exposes an entry when it is clean (nothing pending persistence) and the
 entry is retained at or below its commit index, which is exactly what
 `Node::committed` yields; it exposes a snapshot when it is clean and holds it.
 
+### Hosts that persist deltas
+
+`Engine/Host`: a real host keeps a durable record (hard state, snapshot,
+entries), applies each `Ready::write` delta to it as `ready.rs` documents, and
+recovers with `State::restore` and `Node::new`. `host_refinement` shows every
+such host execution is an execution of the model above whose durable states
+restore exactly from the host's records, and `host_election_safety`,
+`host_state_machine_safety` and `host_snapshot_safety` restate the three
+theorems for it. The core is `DeltaOk`: Jarl's dirty tracking (`log_from`,
+`snapshot_changed`) always describes exactly how the live state diverged from
+what was last saved, so applying the write reproduces the live state
+(`host_write_exact`).
+
+### Snapshot application state
+
+`Engine/App`: with the application given as `init : S` and
+`apply : S → Option V → S`, and a host that compacts honestly (the snapshot
+value is the current snapshot's state with the retained entries up to the
+index applied), `raft_snapshot_application_safety` shows every exposed
+snapshot's value is the application state of the committed history through
+its boundary, and `raft_snapshot_value_agreement` that two exposed snapshots
+at the same index hold the same value.
+
 ## Execution model
 
 `Engine/Cluster.lean`: a cluster is the live `Node` of each member, its
@@ -61,6 +84,8 @@ the node crashing and restarting.
 | `Invariant`, `Frame`, `LogFacts`, `Init` | The inductive invariant `Inv`, its framing over single-node updates, full-log facts and its initial establishment |
 | `Preserve/*` | `preserve`: every `Act` preserves `Inv`, extending the ghost history |
 | `Safety`, `Main` | Induction over executions and the theorems above |
+| `Host/*` | Delta-persisting hosts: `DeltaOk`, per-operation agreement, refinement to the model, host theorems |
+| `App/*` | Honest compaction, the snapshot-value invariant and the application-state theorems |
 
 ## Assumptions and limits
 
@@ -74,11 +99,9 @@ the node crashing and restarting.
   when a clone returns, it returns an equal value (`Rust.LawfulClone`).
   Without that, a follower could append a different entry than the leader
   sent. A panic ends the node's execution (see above).
-- Persistence writes the whole state at once (`Cluster.persist`); a host
-  writing only the `Write` delta is covered by `Contracts/StorageView`, not
-  here.
-- Snapshot application values are not tracked: snapshot safety is about the
-  boundary identity, not the snapshot's application state.
+- The host persists each write atomically before acknowledging it
+  (`Ready::persisted`), and compacts with the application state it actually
+  reached (the honest-compaction premise of `Engine/App`).
 - Only the fixed engine. The dynamic `Cluster` engine (M4) is translated
   (it is in the project's roots and the differential scenario drives it through
   learner addition, joint consensus and finalization), but its safety is not

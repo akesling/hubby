@@ -8,6 +8,7 @@
 //! consensus and removes a voter, then single nodes and clusters that grow
 //! their log storage, through seeded ticks, deliveries, persistence,
 //! proposals, batches and compaction, using only the public API.
+use jarl::host::{persist, Storage};
 use jarl::{
     Checkpoint, Cluster, ClusterState, Config, Entry, Envelope, HardState, Id, Membership, Node,
     Record, Role, Settings, Snapshot, State, Write,
@@ -52,9 +53,17 @@ fn empty_disk() -> Disk {
     }
 }
 
-/// Apply a storage transaction in the documented order: replace the snapshot
-/// and discard entries through its boundary, truncate, then append and
-/// replace the hard state.
+/// The host's storage backend: it applies each transaction in the documented
+/// order (replace the snapshot and discard entries through its boundary,
+/// truncate, then append and replace the hard state) and never fails.
+impl Storage<u64, u64> for Disk {
+    type Error = ();
+    fn save(&mut self, write: Write<'_, u64, u64>) -> Result<(), ()> {
+        apply(self, &write);
+        Ok(())
+    }
+}
+
 fn apply(disk: &mut Disk, write: &Write<'_, u64, u64>) {
     if let Some(snapshot) = write.snapshot {
         let mut covered = 0;
@@ -124,8 +133,8 @@ fn service(
     rng: &mut u64,
 ) {
     if let Some(ready) = node.ready() {
-        apply(disk, &ready.write());
-        ready.persisted();
+        let saved = persist(ready, disk);
+        let _ = saved;
     }
     while let Some(envelope) = node.next_message() {
         let owned = envelope.cloned();
