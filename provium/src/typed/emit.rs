@@ -765,8 +765,8 @@ impl<'a> Body<'a> {
                         Some(s) => self.value(s, Some(&Ty::usize()))?.0,
                         None => "0".into(),
                     };
-                    let hi = match &r.end {
-                        Some(s) => self.value(s, Some(&Ty::usize()))?.0,
+                    let hi = match self.range_end(r)? {
+                        Some(hi) => hi,
                         None => format!("(Rust.Slice.len {})", paren(&self.read_place(&base)?)),
                     };
                     base.projs.push(Proj::Range(lo, hi));
@@ -2690,8 +2690,8 @@ impl<'a> Body<'a> {
                     None => "0".into(),
                 };
                 let cur = self.read_place(&base)?;
-                let hi = match &r.end {
-                    Some(e) => self.value(e, Some(&Ty::usize()))?.0,
+                let hi = match self.range_end(r)? {
+                    Some(hi) => hi,
                     None => match self.resolve(&base.ty).peel() {
                         Ty::Slice(_) => format!("(Rust.usizeOf {}.size)", paren(&cur)),
                         _ => format!("(Rust.Slice.len {})", paren(&cur)),
@@ -2750,6 +2750,20 @@ impl<'a> Body<'a> {
         };
         self.write_place(&base, new)?;
         Ok(V::of("()", Ty::Unit))
+    }
+
+    /// The exclusive end of a slice-index range, if bounded: `..hi` is `hi`,
+    /// and `..=hi` is `hi + 1`, which panics at `usize::MAX` as Rust's
+    /// slice indexing does.
+    fn range_end(&mut self, r: &syn::ExprRange) -> R<Option<String>> {
+        let Some(e) = &r.end else {
+            return Ok(None);
+        };
+        let hi = self.value(e, Some(&Ty::usize()))?.0;
+        Ok(Some(match r.limits {
+            syn::RangeLimits::HalfOpen(_) => hi,
+            syn::RangeLimits::Closed(_) => self.bind(format!("Rust.add {} 1", paren(&hi))),
+        }))
     }
 
     /// The list a `for` loop iterates and its item type.

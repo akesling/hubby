@@ -134,6 +134,18 @@ impl Bag {
 }
 
 #[test]
+fn inclusive_slice_ranges_include_their_end() {
+    let w = Work::new(
+        r#"
+pub fn upto(a: &[u64; 4], n: usize) -> usize { a[..=n].len() }
+"#,
+    );
+    let lean = w.generate(&["upto"]).unwrap();
+    // `..=n` ends after `n`; `n + 1` overflowing panics as Rust does.
+    assert!(lean.contains("Rust.add n 1"), "{lean}");
+}
+
+#[test]
 fn unsupported_constructs_are_rejected_with_their_function() {
     for (source, root, message) in [
         (
