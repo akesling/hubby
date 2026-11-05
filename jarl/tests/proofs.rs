@@ -152,6 +152,8 @@ mod replication_contract;
 
 #[path = "proof_cases/engine.rs"]
 mod engine;
+#[path = "proof_cases/engine_mutations.rs"]
+mod engine_mutations;
 
 #[test]
 fn specification_witnesses_are_kernel_checked() {
