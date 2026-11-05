@@ -1,5 +1,15 @@
 import Generated
 import Engine.Main
+import Contracts.Capacity
+import Contracts.Initialization
+import Contracts.InputGating
+import Contracts.LogBoundary
+import Contracts.MessageDispatch
+import Contracts.Persistence
+import Contracts.Election
+import Contracts.MessageValidation
+import Contracts.StorageView
+import Contracts.Replication
 
 namespace Jarl.Engine
 open Jarl

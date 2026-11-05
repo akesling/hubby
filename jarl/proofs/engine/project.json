@@ -29,7 +29,42 @@
     "cluster::Cluster::finish_reconfiguration",
     "cluster::Cluster::grow",
     "cluster::ClusterState::new",
-    "cluster::ClusterState::restore"
+    "cluster::ClusterState::restore",
+    "membership::Membership::finalized",
+    "membership::Membership::is_joint",
+    "membership::Membership::voters",
+    "membership::Membership::old_voters",
+    "membership::Membership::learners",
+    "membership::Membership::contains",
+    "membership::Membership::is_voter",
+    "membership::Membership::include",
+    "membership::Membership::restore",
+    "membership::Membership::new",
+    "membership::Membership::peers",
+    "membership::Membership::with_learners",
+    "membership::Membership::joint",
+    "membership::Membership::quorum",
+    "membership::Membership::quorum_index",
+    "state::State::push",
+    "state::State::new",
+    "state::State::truncate",
+    "state::State::install",
+    "state::State::hard",
+    "state::State::snapshot",
+    "state::State::write",
+    "ready::Write::entries",
+    "state::State::base",
+    "state::State::get",
+    "state::State::id_at",
+    "state::State::entries",
+    "state::State::last",
+    "state::State::full",
+    "node::Node::valid",
+    "Message::term",
+    "node::Node::reset_election",
+    "node::Node::follow",
+    "node::Node::available",
+    "node::Node::idle"
   ],
   "proofs": "Proofs.lean",
   "proof_modules": [
@@ -128,6 +163,54 @@
     {
       "name": "Engine.Main",
       "path": "Engine/Main.lean"
+    },
+    {
+      "name": "Contracts.Capacity",
+      "path": "Contracts/Capacity.lean"
+    },
+    {
+      "name": "Contracts.Initialization",
+      "path": "Contracts/Initialization.lean"
+    },
+    {
+      "name": "Contracts.InputGating",
+      "path": "Contracts/InputGating.lean"
+    },
+    {
+      "name": "Contracts.LogBoundary",
+      "path": "Contracts/LogBoundary.lean"
+    },
+    {
+      "name": "Contracts.MessageDispatch",
+      "path": "Contracts/MessageDispatch.lean"
+    },
+    {
+      "name": "Contracts.Persistence",
+      "path": "Contracts/Persistence.lean"
+    },
+    {
+      "name": "Contracts.NodeElection",
+      "path": "Contracts/NodeElection.lean"
+    },
+    {
+      "name": "Contracts.Election",
+      "path": "Contracts/Election.lean"
+    },
+    {
+      "name": "Contracts.MessageValidation",
+      "path": "Contracts/MessageValidation.lean"
+    },
+    {
+      "name": "Contracts.StorageView",
+      "path": "Contracts/StorageView.lean"
+    },
+    {
+      "name": "Contracts.Storage",
+      "path": "Contracts/Storage.lean"
+    },
+    {
+      "name": "Contracts.Replication",
+      "path": "Contracts/Replication.lean"
     }
   ],
   "obligations": [
@@ -158,6 +241,1078 @@
     {
       "theorem": "Jarl.Engine.raft_snapshot_safety",
       "function": "node::Node::step"
+    },
+    {
+      "theorem": "Jarl.Contracts.Capacity.full_exact",
+      "function": "state::State::full"
+    },
+    {
+      "theorem": "Jarl.Contracts.Capacity.not_full_has_space",
+      "function": "state::State::full"
+    },
+    {
+      "theorem": "Jarl.Contracts.Election.deadline_exact",
+      "function": "node::Node::reset_election"
+    },
+    {
+      "theorem": "Jarl.Contracts.Election.deadline_range",
+      "function": "node::Node::reset_election"
+    },
+    {
+      "theorem": "Jarl.Contracts.Election.elapsed_reset",
+      "function": "node::Node::reset_election"
+    },
+    {
+      "theorem": "Jarl.Contracts.Election.random_advanced",
+      "function": "node::Node::reset_election"
+    },
+    {
+      "theorem": "Jarl.Contracts.Initialization.all_slots_empty",
+      "function": "state::State::new"
+    },
+    {
+      "theorem": "Jarl.Contracts.Initialization.fresh_fields",
+      "function": "state::State::new"
+    },
+    {
+      "theorem": "Jarl.Contracts.Initialization.initial_length_within_capacity",
+      "function": "state::State::new"
+    },
+    {
+      "theorem": "Jarl.Contracts.Initialization.source_fresh_fields",
+      "function": "state::State::new"
+    },
+    {
+      "theorem": "Jarl.Contracts.InputGating.ack_preserves_pending_outputs",
+      "function": "node::Node::available"
+    },
+    {
+      "theorem": "Jarl.Contracts.InputGating.ack_preserves_pending_outputs",
+      "function": "ready::Ready::persisted"
+    },
+    {
+      "theorem": "Jarl.Contracts.InputGating.after_ack_exact",
+      "function": "node::Node::available"
+    },
+    {
+      "theorem": "Jarl.Contracts.InputGating.after_ack_exact",
+      "function": "ready::Ready::persisted"
+    },
+    {
+      "theorem": "Jarl.Contracts.InputGating.clean_allows",
+      "function": "node::Node::available"
+    },
+    {
+      "theorem": "Jarl.Contracts.InputGating.dirty_blocks",
+      "function": "node::Node::available"
+    },
+    {
+      "theorem": "Jarl.Contracts.InputGating.exact_result",
+      "function": "node::Node::available"
+    },
+    {
+      "theorem": "Jarl.Contracts.InputGating.idle_agrees",
+      "function": "node::Node::available"
+    },
+    {
+      "theorem": "Jarl.Contracts.InputGating.idle_agrees",
+      "function": "node::Node::idle"
+    },
+    {
+      "theorem": "Jarl.Contracts.InputGating.pending_outbox_blocks",
+      "function": "node::Node::available"
+    },
+    {
+      "theorem": "Jarl.Contracts.InputGating.pending_reply_blocks",
+      "function": "node::Node::available"
+    },
+    {
+      "theorem": "Jarl.Contracts.LogBoundary.get_exact",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.LogBoundary.get_exact",
+      "function": "state::State::get"
+    },
+    {
+      "theorem": "Jarl.Contracts.LogBoundary.iterator_exact",
+      "function": "state::State::entries"
+    },
+    {
+      "theorem": "Jarl.Contracts.LogBoundary.iterator_rejects_invalid_length",
+      "function": "state::State::entries"
+    },
+    {
+      "theorem": "Jarl.Contracts.LogBoundary.last_empty",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.LogBoundary.last_empty",
+      "function": "state::State::last"
+    },
+    {
+      "theorem": "Jarl.Contracts.LogBoundary.last_exact",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.LogBoundary.last_exact",
+      "function": "state::State::last"
+    },
+    {
+      "theorem": "Jarl.Contracts.LogBoundary.last_final_slot",
+      "function": "state::State::last"
+    },
+    {
+      "theorem": "Jarl.Contracts.LogBoundary.last_skips_trailing_holes",
+      "function": "state::State::last"
+    },
+    {
+      "theorem": "Jarl.Contracts.LogBoundary.last_without_present",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.LogBoundary.last_without_present",
+      "function": "state::State::last"
+    },
+    {
+      "theorem": "Jarl.Contracts.LogBoundary.lookup_all_offsets",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.LogBoundary.lookup_all_offsets",
+      "function": "state::State::get"
+    },
+    {
+      "theorem": "Jarl.Contracts.LogBoundary.lookup_at_or_before_boundary",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.LogBoundary.lookup_at_or_before_boundary",
+      "function": "state::State::get"
+    },
+    {
+      "theorem": "Jarl.Contracts.LogBoundary.lookup_exact",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.LogBoundary.lookup_exact",
+      "function": "state::State::get"
+    },
+    {
+      "theorem": "Jarl.Contracts.LogBoundary.record_at_absent",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.LogBoundary.record_at_absent",
+      "function": "state::State::get"
+    },
+    {
+      "theorem": "Jarl.Contracts.LogBoundary.record_at_absent",
+      "function": "state::State::id_at"
+    },
+    {
+      "theorem": "Jarl.Contracts.LogBoundary.record_at_entry",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.LogBoundary.record_at_entry",
+      "function": "state::State::id_at"
+    },
+    {
+      "theorem": "Jarl.Contracts.LogBoundary.record_at_snapshot",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.LogBoundary.record_at_snapshot",
+      "function": "state::State::id_at"
+    },
+    {
+      "theorem": "Jarl.Contracts.LogBoundary.snapshot_boundary",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.LogBoundary.without_snapshot",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageDispatch.projection_places",
+      "function": "Message::term"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageDispatch.term_all_variants",
+      "function": "Message::term"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.append_accepted",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.append_decreasing_term",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.append_gap",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.append_overflow",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.append_payload_irrelevant",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.append_payload_unread",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.append_range",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.append_successor",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.batch_accepted",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.batch_accepts_iff",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.batch_decreasing_term",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.batch_future_term",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.batch_gap",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.batch_hole",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.batch_invalid_previous",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.batch_overflow",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.batch_range",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.campaign_range",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.conflict_positive",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.conflict_range",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.conflict_zero",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.empty_batch",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.empty_batch_any_length",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.full_batch",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.heartbeat",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.heartbeat_range",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.leading_hole_rejected",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.one_entry_batch",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.positive_campaign_ignores_term",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.prevote_empty",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.prevote_range",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.replicated_full",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.replicated_range",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.replicated_success",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.snapshot_empty",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.snapshot_future_term",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.snapshot_range",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.snapshot_valid",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.snapshot_zero_term",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.valid_false_iff",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.valid_iff",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.valid_spec",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.validation_no_fault",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.validation_terminates",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.validation_total",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.vote_empty",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.vote_future_log_term",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.vote_nonzero_term_zero_index",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.vote_range",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.vote_zero_log_term",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.voted",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.voted_range",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.zero_campaign",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.zero_campaign_ignores_term",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.zero_term_append",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.zero_term_appendbatch",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.zero_term_install",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.zero_term_prevote",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.zero_term_replicated",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.zero_term_vote",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.MessageValidation.zero_term_voted",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.NodeElection.follow_exact",
+      "function": "node::Node::follow"
+    },
+    {
+      "theorem": "Jarl.Contracts.NodeElection.reset_election_exact",
+      "function": "node::Node::reset_election"
+    },
+    {
+      "theorem": "Jarl.Contracts.Persistence.flags_cleared",
+      "function": "ready::Ready::persisted"
+    },
+    {
+      "theorem": "Jarl.Contracts.Persistence.idempotent",
+      "function": "ready::Ready::persisted"
+    },
+    {
+      "theorem": "Jarl.Contracts.Persistence.other_fields_unchanged",
+      "function": "ready::Ready::persisted"
+    },
+    {
+      "theorem": "Jarl.Contracts.Persistence.persisted_exact",
+      "function": "ready::Ready::persisted"
+    },
+    {
+      "theorem": "Jarl.Contracts.StorageView.checkpoint_witness",
+      "function": "ready::Write::entries"
+    },
+    {
+      "theorem": "Jarl.Contracts.StorageView.checkpoint_witness",
+      "function": "state::State::write"
+    },
+    {
+      "theorem": "Jarl.Contracts.StorageView.entries_exact",
+      "function": "ready::Write::entries"
+    },
+    {
+      "theorem": "Jarl.Contracts.StorageView.exact_view",
+      "function": "state::State::write"
+    },
+    {
+      "theorem": "Jarl.Contracts.StorageView.hard_matches_write",
+      "function": "state::State::hard"
+    },
+    {
+      "theorem": "Jarl.Contracts.StorageView.hard_matches_write",
+      "function": "state::State::write"
+    },
+    {
+      "theorem": "Jarl.Contracts.StorageView.materialize_returned",
+      "function": "state::State::write"
+    },
+    {
+      "theorem": "Jarl.Contracts.StorageView.metadata_only",
+      "function": "state::State::write"
+    },
+    {
+      "theorem": "Jarl.Contracts.StorageView.replacement_suffix",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.StorageView.replacement_suffix",
+      "function": "state::State::write"
+    },
+    {
+      "theorem": "Jarl.Contracts.StorageView.retained_prefix_plus_returned_payloads",
+      "function": "ready::Write::entries"
+    },
+    {
+      "theorem": "Jarl.Contracts.StorageView.retained_prefix_plus_returned_payloads",
+      "function": "state::State::write"
+    },
+    {
+      "theorem": "Jarl.Contracts.StorageView.returned_entries",
+      "function": "ready::Write::entries"
+    },
+    {
+      "theorem": "Jarl.Contracts.StorageView.returned_entries",
+      "function": "state::State::write"
+    },
+    {
+      "theorem": "Jarl.Contracts.StorageView.returned_payloads",
+      "function": "ready::Write::entries"
+    },
+    {
+      "theorem": "Jarl.Contracts.StorageView.returned_payloads",
+      "function": "state::State::write"
+    },
+    {
+      "theorem": "Jarl.Contracts.StorageView.source_checkpoint",
+      "function": "state::State::write"
+    },
+    {
+      "theorem": "Jarl.Contracts.StorageView.source_retry_none",
+      "function": "state::State::write"
+    },
+    {
+      "theorem": "Jarl.Contracts.StorageView.source_retry_some",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.StorageView.source_retry_some",
+      "function": "state::State::write"
+    },
+    {
+      "theorem": "Jarl.Contracts.StorageView.write_returns",
+      "function": "state::State::write"
+    },
+    {
+      "theorem": "Jarl.Contracts.Replication.append_accepted",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.Replication.lookup_identifies_predecessor",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.Replication.lookup_identifies_predecessor",
+      "function": "state::State::id_at"
+    },
+    {
+      "theorem": "Jarl.Contracts.Replication.lookup_retained_after_truncation",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.Replication.lookup_retained_after_truncation",
+      "function": "state::State::id_at"
+    },
+    {
+      "theorem": "Jarl.Contracts.Replication.lookup_retained_after_truncation",
+      "function": "state::State::last"
+    },
+    {
+      "theorem": "Jarl.Contracts.Replication.lookup_retained_after_truncation",
+      "function": "state::State::truncate"
+    },
+    {
+      "theorem": "Jarl.Contracts.Replication.matched_replacement_preserves_log",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.Replication.matched_replacement_preserves_log",
+      "function": "state::State::id_at"
+    },
+    {
+      "theorem": "Jarl.Contracts.Replication.matched_replacement_preserves_log",
+      "function": "state::State::push"
+    },
+    {
+      "theorem": "Jarl.Contracts.Replication.matched_replacement_preserves_log",
+      "function": "state::State::truncate"
+    },
+    {
+      "theorem": "Jarl.Contracts.Replication.predecessor_after_truncation",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.Replication.predecessor_after_truncation",
+      "function": "state::State::last"
+    },
+    {
+      "theorem": "Jarl.Contracts.Replication.predecessor_after_truncation",
+      "function": "state::State::truncate"
+    },
+    {
+      "theorem": "Jarl.Contracts.Replication.replacement_append_preserves_log",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.Replication.replacement_append_preserves_log",
+      "function": "state::State::push"
+    },
+    {
+      "theorem": "Jarl.Contracts.Replication.replacement_append_preserves_log",
+      "function": "state::State::truncate"
+    },
+    {
+      "theorem": "Jarl.Contracts.Replication.replacement_prepares_append",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.Replication.replacement_prepares_append",
+      "function": "state::State::truncate"
+    },
+    {
+      "theorem": "Jarl.Contracts.Replication.replacement_storage_succeeds",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.Replication.replacement_storage_succeeds",
+      "function": "state::State::push"
+    },
+    {
+      "theorem": "Jarl.Contracts.Replication.replacement_storage_succeeds",
+      "function": "state::State::truncate"
+    },
+    {
+      "theorem": "Jarl.Contracts.Replication.truncation_space_iff",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.Replication.truncation_space_iff",
+      "function": "state::State::truncate"
+    },
+    {
+      "theorem": "Jarl.Contracts.Replication.validated_append_preserves_log",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.Replication.validated_append_preserves_log",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.Replication.validated_append_preserves_log",
+      "function": "state::State::last"
+    },
+    {
+      "theorem": "Jarl.Contracts.Replication.validated_append_preserves_log",
+      "function": "state::State::push"
+    },
+    {
+      "theorem": "Jarl.Contracts.Replication.validation_supplies_successor",
+      "function": "node::Node::valid"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.append_exact",
+      "function": "state::State::push"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.append_preserves_committed_prefix",
+      "function": "state::State::push"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.append_preserves_log",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.append_preserves_log",
+      "function": "state::State::last"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.append_preserves_log",
+      "function": "state::State::push"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.append_preserves_prefix",
+      "function": "state::State::push"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.append_preserves_shape",
+      "function": "state::State::push"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.append_representation",
+      "function": "state::State::push"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.body_step",
+      "function": "state::State::push"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.fresh_representation",
+      "function": "state::State::new"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.full_preserves_state_at_drop",
+      "function": "state::State::push"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.grow_assertion_fails",
+      "function": "state::State::grow"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.grow_eq",
+      "function": "state::State::grow"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.grow_exact",
+      "function": "state::State::grow"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.grow_initialized_moves",
+      "function": "state::State::grow"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.grow_preserves_shape",
+      "function": "state::State::grow"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.grow_returns",
+      "function": "state::State::grow"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.growth_preserves_log",
+      "function": "state::State::grow"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.growth_representation",
+      "function": "state::State::grow"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.hard_copy",
+      "function": "state::State::hard"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.hard_loan_read",
+      "function": "state::State::hard"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.hard_source_read",
+      "function": "state::State::hard"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.history_preserves_shape",
+      "function": "state::State::push"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.history_supports_growth",
+      "function": "state::State::grow"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.history_supports_installation",
+      "function": "state::State::install"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.initial_inv",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.install_match_returns",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.install_match_returns",
+      "function": "state::State::id_at"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.install_match_returns",
+      "function": "state::State::install"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.install_mismatch_returns",
+      "function": "state::State::id_at"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.install_mismatch_returns",
+      "function": "state::State::install"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.install_returns",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.install_returns",
+      "function": "state::State::id_at"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.install_returns",
+      "function": "state::State::install"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.installation_matching_preserves_log",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.installation_matching_preserves_log",
+      "function": "state::State::id_at"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.installation_matching_preserves_log",
+      "function": "state::State::install"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.installation_matching_suffix",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.installation_matching_suffix",
+      "function": "state::State::id_at"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.installation_matching_suffix",
+      "function": "state::State::install"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.installation_matching_suffix_by_equality",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.installation_matching_suffix_by_equality",
+      "function": "state::State::id_at"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.installation_matching_suffix_by_equality",
+      "function": "state::State::install"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.installation_mismatching_prefix",
+      "function": "state::State::id_at"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.installation_mismatching_prefix",
+      "function": "state::State::install"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.installation_mismatching_resets_log",
+      "function": "state::State::id_at"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.installation_mismatching_resets_log",
+      "function": "state::State::install"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.installation_places",
+      "function": "state::State::install"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.installation_preserves_capacity_and_commit",
+      "function": "state::State::install"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.installation_preserves_shape",
+      "function": "state::State::install"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.last_of_slot",
+      "function": "state::State::last"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.logrep_contig",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.logrep_last",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.logrep_last",
+      "function": "state::State::last"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.restoration_accepts",
+      "function": "state::State::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.restoration_base_term_bound",
+      "function": "state::State::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.restoration_commit_bounds",
+      "function": "state::State::last"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.restoration_commit_bounds",
+      "function": "state::State::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.restoration_exact_indices",
+      "function": "state::State::last"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.restoration_exact_indices",
+      "function": "state::State::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.restoration_final_guard",
+      "function": "state::State::last"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.restoration_final_guard",
+      "function": "state::State::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.restoration_fuel_sufficient",
+      "function": "state::State::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.restoration_initial_guard",
+      "function": "state::State::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.restoration_log_representation",
+      "function": "state::State::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.restoration_orders_log",
+      "function": "state::State::last"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.restoration_orders_log",
+      "function": "state::State::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.restoration_places",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.restoration_places",
+      "function": "state::State::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.restoration_preserves_shape",
+      "function": "state::State::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.restoration_snapshot_nonzero",
+      "function": "state::State::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.restoration_zero_term_has_no_vote",
+      "function": "state::State::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.restore_complete",
+      "function": "state::State::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.restore_eq",
+      "function": "state::State::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.restore_sound",
+      "function": "state::State::last"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.restore_sound",
+      "function": "state::State::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.restore_term",
+      "function": "state::State::restore"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.snapshot_borrowed_payload",
+      "function": "state::State::snapshot"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.snapshot_excludes_writes",
+      "function": "state::State::snapshot"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.snapshot_none",
+      "function": "state::State::snapshot"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.snapshot_result_is_live",
+      "function": "state::State::snapshot"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.snapshot_some",
+      "function": "state::State::snapshot"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.term_last",
+      "function": "state::State::last"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.term_push",
+      "function": "state::State::push"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.truncate_step",
+      "function": "state::State::last"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.truncate_step",
+      "function": "state::State::truncate"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.truncation_complete_result",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.truncation_complete_result",
+      "function": "state::State::truncate"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.truncation_drop_order",
+      "function": "state::State::truncate"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.truncation_empty",
+      "function": "state::State::truncate"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.truncation_fuel_sufficient",
+      "function": "state::State::truncate"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.truncation_preserves_committed_prefix",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.truncation_preserves_committed_prefix",
+      "function": "state::State::truncate"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.truncation_preserves_log",
+      "function": "state::State::truncate"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.truncation_preserves_shape",
+      "function": "state::State::truncate"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.truncation_retains_base",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.truncation_retains_base",
+      "function": "state::State::last"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.truncation_retains_base",
+      "function": "state::State::truncate"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.truncation_retains_predecessor",
+      "function": "state::State::base"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.truncation_retains_predecessor",
+      "function": "state::State::last"
+    },
+    {
+      "theorem": "Jarl.Contracts.Storage.truncation_retains_predecessor",
+      "function": "state::State::truncate"
     }
   ],
   "differential": {
