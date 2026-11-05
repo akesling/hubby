@@ -365,7 +365,7 @@ theorem preserve_compact (ids : Vector Id N) (cfg : Fin N → Config N) (C : Clu
   have hcom0 : Committed G ((fullLog G (C.live k).state).take (C.live k).state.hard.commit.val) := by
     rw [hclean]; exact (hi.committed k).1
   obtain ⟨s2, hins2, hsn, hhard, hret, hlay⟩ := install_spec (C.live k).state { last := last, value := v }
-    (by have := hf.cap_lt; omega) hf.layout hf.contig
+    (by have := hf.cap_lt; uomega) hf.layout hf.contig
   obtain rfl : s' = s2 := pure_inj (hins.symm.trans hins2)
   have hpos : 0 < index.val := by omega
   obtain ⟨hbi, hil, hiid⟩ := (idAt_fullLog G _ hok0 index.val hpos last).mp hid

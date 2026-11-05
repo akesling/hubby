@@ -14,6 +14,22 @@ open Jarl
 
 variable {V S : Type} {CAP : Nat}
 
+/-- `omega` after rewriting the pointer width `Rust.usizeBits` to the build's literal
+    everywhere, so bounds stated with `2 ^ Rust.usizeBits` become linear facts. -/
+macro "uomega" : tactic => `(tactic| ((try simp only [Rust.usizeBits_eq] at *) <;> omega))
+
+/-- Every `usize` value fits a `u64` (`usize` is at most 64 bits wide). -/
+theorem usize_lt_u64 (x : Rust.usize) : x.val < 2 ^ 64 :=
+  Nat.lt_of_lt_of_le x.isLt (Nat.pow_le_pow_right (by decide) Rust.usizeBits_range.2)
+
+/-- `k as usize as u64` for a `k` that fits the pointer width. -/
+theorem cast_ofNat_usize (k : Nat) (h : k < 2 ^ Rust.usizeBits) :
+    (Rust.cast (Rust.ofNat k : Rust.usize) : Rust.u64) = Rust.ofNat k := by
+  have h64 : k < 2 ^ 64 := Nat.lt_of_lt_of_le h (Nat.pow_le_pow_right (by decide) Rust.usizeBits_range.2)
+  apply Fin.ext
+  simp only [Rust.cast, Rust.ofNat]
+  rw [Nat.mod_eq_of_lt h, Nat.mod_eq_of_lt h64]
+
 /-- Retained entries in slot order: the occupied prefix of the slots. -/
 def ret (s : State V S CAP) : List (Entry V) := (s.entries.toList.take s.len.val).filterMap id
 
@@ -65,17 +81,32 @@ theorem slot_eq (s : State V S CAP) (hl : Layout s) (k : Nat) :
     rw [List.getElem?_eq_none (by omega)]
     split <;> rfl
 
+theorem len_eq (s : State V S CAP) (hl : Layout s) : s.len.val = (ret s).length := by
+  have := congrArg List.length hl.2; have := hl.1; simp at *; omega
+
+-- Width-generic proofs: some simp arguments only fire at one pointer width.
+set_option linter.unusedSimpArgs false in
 theorem get_eq (s : State V S CAP) (hl : Layout s) (i : Rust.u64) :
     State.get s i = if s.base.index.val < i.val then (ret s)[i.val - s.base.index.val - 1]? else none := by
   unfold State.get
   by_cases h : s.base.index.val < i.val
   · have h1 : s.base.index.val ≤ i.val := by omega
     have h2 : 1 ≤ i.val - s.base.index.val := by omega
-    rw [if_pos h, ← slot_eq s hl]
-    simp [Rust.checked_sub_eq, h1, h2, Rust.try_from, Rust.Result.ok, Rust.Slice.get]
-    cases s.entries[i.val - s.base.index.val - 1]? with
-    | none => rfl
-    | some o => cases o <;> rfl
+    rw [if_pos h]
+    by_cases hw : i.val - s.base.index.val - 1 < 2 ^ Rust.usizeBits
+    · rw [← slot_eq s hl]
+      simp only [Rust.usizeBits_eq] at hw
+      simp [Rust.checked_sub_eq, h1, h2, Rust.try_from, Rust.Result.ok, Rust.Slice.get, hw]
+      cases s.entries[i.val - s.base.index.val - 1]? with
+      | none => rfl
+      | some o => cases o <;> rfl
+    · -- offsets past the pointer width are past every retained slot (`len` is a `usize`)
+      have hlen : (ret s).length < 2 ^ Rust.usizeBits := len_eq s hl ▸ s.len.isLt
+      rw [List.getElem?_eq_none (by omega)]
+      simp only [Rust.usizeBits_eq] at hw
+      first
+        | (exfalso; have := i.isLt; omega)
+        | simp [Rust.checked_sub_eq, h1, h2, Rust.try_from, Rust.Result.ok, hw]
   · rw [if_neg h]
     by_cases h1 : s.base.index.val ≤ i.val
     · have h2 : ¬ 1 ≤ i.val - s.base.index.val := by omega
@@ -97,21 +128,23 @@ theorem id_at_eq (s : State V S CAP) (hl : Layout s) (i : Rust.u64) :
     simp [this, h, get_eq s hl]
     split <;> rfl
 
-theorem push_full (s : State V S CAP) (e : Entry V) (hc : CAP < 2 ^ 64) (hf : s.len.val = CAP) :
+theorem push_full (s : State V S CAP) (e : Entry V) (hc : CAP < 2 ^ Rust.usizeBits) (hf : s.len.val = CAP) :
     State.push s e = pure (.Err .Full, s) := by
   have : s.len = Rust.usizeOf CAP := Fin.ext (by rw [Rust.val_usizeOf _ hc]; exact hf)
   simp [State.push, State.full, this]
 
 /-- Pushing into a free slot appends to the retained entries. -/
-theorem push_ok (s : State V S CAP) (e : Entry V) (hc : CAP < 2 ^ 64) (hl : Layout s)
+theorem push_ok (s : State V S CAP) (e : Entry V) (hc : CAP < 2 ^ Rust.usizeBits) (hl : Layout s)
     (hf : s.len.val < CAP) :
     ∃ s', State.push s e = pure (.Ok (), s') ∧ s'.hard = s.hard ∧ s'.snapshot = s.snapshot ∧
       ret s' = ret s ++ [e] ∧ s'.len.val = s.len.val + 1 ∧ Layout s' := by
   have hne : s.len ≠ Rust.usizeOf CAP := fun h => by
     have := congrArg Fin.val h; rw [Rust.val_usizeOf _ hc] at this; omega
-  have hlen : s.len.val + 1 < 2 ^ 64 := by omega
+  have hlen : s.len.val + 1 < 2 ^ Rust.usizeBits := by omega
   refine ⟨{ s with entries := s.entries.set s.len.val (some e) hf, len := ⟨s.len.val + 1, hlen⟩ }, ?_, rfl, rfl, ?_, rfl, ?_⟩
-  · simp [State.push, State.full, hne, hf, hlen]
+  · have hlen' := hlen
+    simp only [Rust.usizeBits_eq] at hlen'
+    simp [State.push, State.full, hne, hf, hlen']
   all_goals
     have hs : s.entries.toList.set s.len.val (some e) =
         (ret s ++ [e]).map some ++ List.replicate (CAP - (ret s ++ [e]).length) none := by
@@ -132,9 +165,6 @@ theorem push_ok (s : State V S CAP) (e : Entry V) (hc : CAP < 2 ^ 64) (hl : Layo
 /-- Retained entries are numbered consecutively after the snapshot boundary. -/
 def Contig (s : State V S CAP) : Prop :=
   ∀ k (h : k < (ret s).length), ((ret s)[k]).id.index.val = s.base.index.val + k + 1
-
-theorem len_eq (s : State V S CAP) (hl : Layout s) : s.len.val = (ret s).length := by
-  have := congrArg List.length hl.2; have := hl.1; simp at *; omega
 
 theorem lastId_eq (s : State V S CAP) (hc : Contig s) :
     (lastId s).index.val = s.base.index.val + (ret s).length := by
@@ -250,13 +280,15 @@ theorem idAt_some (s : State V S CAP) (_hl : Layout s) (_hc : Contig s) (id : Lo
       omega
     · simp at h
 
-theorem install_spec (s : State V S CAP) (snap : Snapshot S) (hcap : CAP < 2 ^ 64)
+set_option linter.unusedSimpArgs false in
+theorem install_spec (s : State V S CAP) (snap : Snapshot S) (hcap : CAP < 2 ^ Rust.usizeBits)
     (hl : Layout s) (hc : Contig s) :
     ∃ s', State.install s snap = pure s' ∧ s'.snapshot = some snap ∧
       s'.hard = { s.hard with commit := Rust.max s.hard.commit snap.last.index } ∧
       ret s' = (if idAt s snap.last.index.val = some snap.last
         then (ret s).drop (snap.last.index.val - s.base.index.val) else []) ∧ Layout s' := by
   have hlr := len_eq s hl
+  simp only [Rust.usizeBits_eq] at hcap
   by_cases hm : idAt s snap.last.index.val = some snap.last
   · obtain ⟨h1, h2⟩ := idAt_some s hl hc _ hm
     have hid : (State.id_at s snap.last.index == some snap.last) = true := by
@@ -264,7 +296,7 @@ theorem install_spec (s : State V S CAP) (snap : Snapshot S) (hcap : CAP < 2 ^ 6
     have hk : (snap.last.index.val - s.base.index.val) ≤ s.len.val := by omega
     have hL := hl.1
     unfold State.install
-    simp (disch := first | omega | (simp [Rust.val_usizeOf _ hcap]; omega)) [hid, Rust.Slice.mapRangeM_pure]
+    simp (disch := first | omega | (simp [Rust.val_usizeOf _ hcap]; omega)) [hid, Rust.Slice.mapRangeM_pure, Rust.cast, Nat.mod_eq_of_lt]
     refine ⟨_, rfl, rfl, rfl, ?_⟩
     rw [if_pos hm]
     refine And.symm (layout_of _ _ (by simp; omega) (by simp; omega) ?_)
@@ -288,7 +320,7 @@ theorem install_spec (s : State V S CAP) (snap : Snapshot S) (hcap : CAP < 2 ^ 6
       rw [id_at_eq s hl]; simp [hm]
     have hL := hl.1
     unfold State.install
-    simp (disch := first | omega | (simp [Rust.val_usizeOf _ hcap]; omega)) [hid, Rust.Slice.mapRangeM_pure]
+    simp (disch := first | omega | (simp [Rust.val_usizeOf _ hcap]; omega)) [hid, Rust.Slice.mapRangeM_pure, Rust.cast, Nat.mod_eq_of_lt]
     refine ⟨_, rfl, rfl, rfl, ?_⟩
     rw [if_neg hm]
     refine And.symm (layout_of _ _ rfl (by simp) ?_)

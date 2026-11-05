@@ -141,7 +141,7 @@ theorem propose_many_rel (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed id
     have : count ≠ 0 := by simpa using hz
     rw [← hc]; exact Nat.pos_of_ne_zero fun e => this (Fin.ext e)
   have hl := hf.layout
-  have hcap : CAP < 2 ^ 64 := by have := hf.cap_lt; omega
+  have hcap : CAP < 2 ^ Rust.usizeBits := by have := hf.cap_lt; uomega
   have hlen := len_eq _ hl
   have hrc : (Rust.Iter.count (ret n.state)).val = (ret n.state).length := by
     simp [Rust.Iter.count, Rust.ofNat]; have := hl.1; omega
@@ -153,8 +153,9 @@ theorem propose_many_rel (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed id
   rw [if_neg hfull] at h
   have hroom : vs.length ≤ CAP - (ret n.state).length := by
     simp only [decide_eq_true_eq, gt_iff_lt, Fin.lt_def, hrc, hCv] at hfull; omega
-  have htry : ((Rust.try_from (m := 64) count).map_err fun _ => Error.Exhausted) = Rust.Result.Ok count := by
-    simp [Rust.try_from, Rust.Result.map_err]
+  have htry : ((Rust.try_from (m := 64) count).map_err fun _ => Error.Exhausted) =
+      Rust.Result.Ok (⟨count.val, usize_lt_u64 count⟩ : Rust.u64) := by
+    simp [Rust.try_from, Rust.Result.map_err, usize_lt_u64 count]
   rw [last_eq _ hl.1, pure_bind, htry] at h
   simp only [pure_bind] at h
   by_cases hov : (lastId n.state).index.val + count.val < 2 ^ 64
@@ -181,12 +182,15 @@ theorem propose_many_rel (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed id
     obtain ⟨v, hv, hst⟩ := bind_eq_pure _ _ _ hst
     rw [enumerate_length, hvlen] at hk
     obtain rfl := hval k hk v hv
-    have hkv : (Rust.ofNat k : Rust.usize).val = k := by simp [Rust.ofNat]; omega
+    have hkv : (Rust.ofNat k : Rust.usize).val = k := by simp [Rust.ofNat]; uomega
+    have hkv64 : (Rust.ofNat k : Rust.u64).val = k := by
+      have := usize_lt_u64 count; simp [Rust.ofNat]; uomega
+    try simp only [cast_ofNat_usize k (by omega)] at hst
     have hlenk : (ret sk).length = (ret n.state).length + k := by
       rw [hr]; simp [hplen]; omega
     have hbase : sk.base = n.state.base := by simp [State.base, hs]
-    have hadd : (⟨(lastId n.state).index.val + (1 : Rust.u64).val, hF⟩ : Rust.u64).val + (Rust.ofNat k : Rust.usize).val < 2 ^ 64 := by
-      rw [hkv]; simp; omega
+    have hadd : (⟨(lastId n.state).index.val + (1 : Rust.u64).val, hF⟩ : Rust.u64).val + (Rust.ofNat k : Rust.u64).val < 2 ^ 64 := by
+      rw [hkv64]; simp; omega
     obtain ⟨s2, hp, hh2, hs2, hr2, -, hl2⟩ := push_ok sk
       { id := { index := ⟨_, hadd⟩, term := n.state.hard.term }, value := some vs[k] } hcap hlk
       (by rw [len_eq _ hlk]; omega)
@@ -196,10 +200,10 @@ theorem propose_many_rel (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed id
     · rw [hr2, hr, List.take_add_one, List.getElem?_eq_getElem (by rw [hplen]; exact hk),
         proposed_getElem n vs k hk]
       have hidx : (⟨_, hadd⟩ : Rust.u64) = Rust.ofNat ((lastId n.state).index.val + 1 + k) := by
-        apply Fin.ext; simp [Rust.ofNat]; omega
+        apply Fin.ext; simp [Rust.ofNat]; uomega
       rw [hidx]; simp
     · apply contig_push sk s2 _ hck (by simp [State.base, hs2]) hr2
-      simp only [hkv, hbase]; simp; omega
+      simp only [hkv64, hbase]; simp; omega
   obtain ⟨b, ⟨sk, hb, hr, hh, hs, hlk, hck⟩, h⟩ := key
   subst hb
   rw [enumerate_length, List.take_of_length_le (by omega)] at hr
@@ -208,12 +212,12 @@ theorem propose_many_rel (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed id
     fixed_state ids n hf sk hlk hck true _ n.matched
   rw [refresh_fixed ids _ hfx, pure_bind] at h
   have hlt : decide (n.local < Rust.usizeOf N) = true := by
-    simp [Fin.lt_def, Rust.val_usizeOf _ (show N < 2 ^ 64 by have := hf.n_lt; omega), hf.local_lt]
+    simp [Fin.lt_def, Rust.val_usizeOf _ (show N < 2 ^ Rust.usizeBits by have := hf.n_lt; uomega), hf.local_lt]
   simp only [hlt, if_true, Rust.Slice.set_ok _ _ _ hf.local_lt, pure_bind] at h
   have e1 : (⟨(lastId n.state).index.val + count.val, hov⟩ : Rust.u64) = Rust.ofNat ((lastId n.state).index.val + vs.length) := by
-    apply Fin.ext; simp [Rust.ofNat]; omega
+    apply Fin.ext; simp [Rust.ofNat]; uomega
   have e2 : (⟨(lastId n.state).index.val + (1 : Rust.u64).val, hF⟩ : Rust.u64) = Rust.ofNat ((lastId n.state).index.val + 1) := by
-    apply Fin.ext; simp [Rust.ofNat]; omega
+    apply Fin.ext; simp [Rust.ofNat]; uomega
   rw [e1, e2] at h
   have hfX := fixed_state ids n hf sk hlk hck true (some (Rust.ofNat ((lastId n.state).index.val + 1)))
     (n.matched.set n.local.val (Rust.ofNat ((lastId n.state).index.val + vs.length)) hf.local_lt)
@@ -257,7 +261,7 @@ theorem compact_with_rel (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed id
       simp only [hid, Rust.Option.ok_or, pure_bind] at h
       obtain ⟨v, hv, h⟩ := bind_eq_pure _ _ _ h
       obtain ⟨s', hins, hsn, hhard, hr, hl'⟩ := install_spec n.state { last := last, value := v }
-        (by have := hf.cap_lt; omega) hf.layout hf.contig
+        (by have := hf.cap_lt; uomega) hf.layout hf.contig
       have hc' := install_contig n.state s' _ hf.layout hf.contig hsn hr
       rw [hins, pure_bind] at h
       refine Or.inr ⟨hI, Fin.lt_def.mp hc.1, Fin.le_def.mp hc.2, last, v, s', rfl, hv, hins, ?_⟩
@@ -282,12 +286,12 @@ theorem persisted_eq (n : Node V S N CAP) :
 /-- `Node::new` from a well-formed checkpoint with a valid configuration of the
     distinct `ids`: a clean follower with no pending messages. -/
 theorem new_rel (ids : Vector Id N) (config : Config N) (s : State V S CAP) (n : Node V S N CAP)
-    (h : Node.new config s = pure (.Ok n)) (hn : 0 < N) (hN : N < 2 ^ 63) (hcap : CAP < 2 ^ 63)
+    (h : Node.new config s = pure (.Ok n)) (hn : 0 < N) (hN : N < 2 ^ (Rust.usizeBits - 1)) (hcap : CAP < 2 ^ (Rust.usizeBits - 1))
     (hm : config.members = ids) (hd : ids.toList.Nodup) (hl : Layout s) (hc : Contig s) :
     Fixed ids n ∧ n.state = s ∧ n.config = config ∧ n.role = .Follower ∧ n.dirty = false ∧
       (∀ j : Fin N, n.outbox[j] = none ∧ n.votes[j] = false ∧ n.matched[j] = 0) := by
   subst hm
-  have hN64 : N < 2 ^ 64 := by omega
+  have hN64 : N < 2 ^ Rust.usizeBits := by uomega
   unfold Node.new at h
   by_cases hcond : (!(Rust.usizeOf N == 0 || Rust.usizeOf CAP == 0 || (Rust.Iter.position config.members.toList fun id => id == config.id).isNone || config.heartbeat_ticks == 0 ||
                 decide (config.election_ticks ≤ config.heartbeat_ticks) ||
@@ -301,7 +305,7 @@ theorem new_rel (ids : Vector Id N) (config : Config N) (s : State V S CAP) (n :
       obtain ⟨k, hk, rfl⟩ := List.getElem_of_mem hx
       rw [enumerate_length] at hk
       have hkN : k < N := by simpa using hk
-      have hk2 : (Rust.ofNat k : Rust.usize).val = k := by simp [Rust.ofNat]; omega
+      have hk2 : (Rust.ofNat k : Rust.usize).val = k := by simp [Rust.ofNat]; uomega
       simp only [enumerate_get]
       rw [Rust.Slice.range_ok _ _ _ (by simp [hk2]; omega)]
       simp only [pure_bind, hk2]
@@ -341,8 +345,8 @@ theorem new_rel (ids : Vector Id N) (config : Config N) (s : State V S CAP) (n :
     have hjid : config.members[j] = config.id := by simpa using hjp
     have hloc : (Rust.Iter.position (stable config.members).peers.toList fun id => id == some config.id) = some (Rust.ofNat j) := by
       rw [stable_peers, ← hjid]; exact position_member _ hd j hjN
-    have hjv : (Rust.ofNat j : Rust.usize).val = j := by simp [Rust.ofNat]; omega
-    have hC : (Rust.usizeOf CAP).val = CAP := Rust.val_usizeOf _ (by omega)
+    have hjv : (Rust.ofNat j : Rust.usize).val = j := by simp [Rust.ofNat]; uomega
+    have hC : (Rust.usizeOf CAP).val = CAP := Rust.val_usizeOf _ (by uomega)
     have hdiv : (Rust.divK (Rust.umax 64) 2).val = 2 ^ 63 - 1 := by decide
     refine (fun key => ?_) (new_tail config.members _ n ?hf h)
     · obtain ⟨hF, r, d, rfl⟩ := key

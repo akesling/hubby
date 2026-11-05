@@ -242,7 +242,7 @@ variable {MAX : Nat}
 /-- `count > total / 2` in `quorum` is strict majority: `quorum` succeeds iff
     `total < 2 * count` for the current voters and, when joint, the old voters. -/
 theorem majority_strict (m : Jarl.Membership MAX) (a : Id → Rust.M Bool) (answer : Id → Bool)
-    (hMAX : MAX < 2 ^ 64) (normal : ∀ id, a id = pure (answer id)) :
+    (hMAX : MAX < 2 ^ Rust.usizeBits) (normal : ∀ id, a id = pure (answer id)) :
     m.quorum a = pure true ↔ m.voters.length < 2 * m.voters.countP answer ∧
       (m.is_joint = true → m.old_voters.length < 2 * m.old_voters.countP answer) := by
   rw [Quorum.result m a answer hMAX normal]
@@ -259,7 +259,7 @@ theorem majority_strict (m : Jarl.Membership MAX) (a : Id → Rust.M Bool) (answ
 /-- Two successful `quorum` calls over one configuration have acknowledgement
     counts summing to more than the voter count (current, and old when joint). -/
 theorem majority_cardinality_overlap (m : Jarl.Membership MAX) (a1 a2 : Id → Rust.M Bool) (first second : Id → Bool)
-    (hMAX : MAX < 2 ^ 64) (n1 : ∀ id, a1 id = pure (first id)) (n2 : ∀ id, a2 id = pure (second id))
+    (hMAX : MAX < 2 ^ Rust.usizeBits) (n1 : ∀ id, a1 id = pure (first id)) (n2 : ∀ id, a2 id = pure (second id))
     (q1 : m.quorum a1 = pure true) (q2 : m.quorum a2 = pure true) :
     m.voters.length < m.voters.countP first + m.voters.countP second ∧
       (m.is_joint = true → m.old_voters.length < m.old_voters.countP first + m.old_voters.countP second) := by
@@ -270,7 +270,7 @@ theorem majority_cardinality_overlap (m : Jarl.Membership MAX) (a1 a2 : Id → R
 /-- Majority intersection for the translated `quorum` (the old count-level
     lemma's connection to `quorum` is exactly `Quorum.quorums_intersect`). -/
 theorem majority_intersection (m : Jarl.Membership MAX) (a1 a2 : Id → Rust.M Bool) (first second : Id → Bool)
-    (hMAX : MAX < 2 ^ 64) (n1 : ∀ id, a1 id = pure (first id)) (n2 : ∀ id, a2 id = pure (second id))
+    (hMAX : MAX < 2 ^ Rust.usizeBits) (n1 : ∀ id, a1 id = pure (first id)) (n2 : ∀ id, a2 id = pure (second id))
     (q1 : m.quorum a1 = pure true) (q2 : m.quorum a2 = pure true) :
     (∃ voter ∈ m.voters, first voter = true ∧ second voter = true) ∧
       (m.is_joint = true → ∃ voter ∈ m.old_voters, first voter = true ∧ second voter = true) :=
@@ -287,7 +287,7 @@ theorem old_voters_nodup (m : Jarl.Membership MAX) (u : UniqueIdentities m) : m.
     voter, and a quorum of the joint configuration and a quorum of its
     finalization share a target voter. No overlap of arbitrary old/new sets is
     assumed; identities are unique, as `restore`/`new`/`joint` establish. -/
-theorem joint_transition_intersection (source target J : Jarl.Membership MAX) (hMAX : MAX < 2 ^ 64)
+theorem joint_transition_intersection (source target J : Jarl.Membership MAX) (hMAX : MAX < 2 ^ Rust.usizeBits)
     (us : UniqueIdentities source) (ut : UniqueIdentities target) (hJ : source.joint target = pure (.Ok J))
     (before during after : Id → Rust.M Bool) (gb gd ga : Id → Bool)
     (nb : ∀ id, before id = pure (gb id)) (nd : ∀ id, during id = pure (gd id)) (na : ∀ id, after id = pure (ga id))
@@ -335,7 +335,7 @@ theorem rank_mem (vals : List Rust.u64) (hne : vals ≠ []) : rank vals ∈ vals
     current voter set, `quorum_index` returns (no index panic) one of the
     acknowledged positions. -/
 theorem majority_position_in_bounds (m : Jarl.Membership MAX) (a : Id → Rust.M Rust.u64) (matched : Id → Rust.u64)
-    (hMAX : MAX < 2 ^ 64) (normal : ∀ id, a id = pure (matched id)) (nonempty : m.voters ≠ []) :
+    (hMAX : MAX < 2 ^ Rust.usizeBits) (normal : ∀ id, a id = pure (matched id)) (nonempty : m.voters ≠ []) :
     ∃ v, m.quorum_index a = pure v ∧ (v ∈ m.voters.map matched ∨ v ∈ m.old_voters.map matched) := by
   refine ⟨_, QuorumIndex.exact m a matched hMAX normal nonempty, ?_⟩
   have hc := rank_mem (m.voters.map matched) (by simpa using nonempty)
@@ -352,7 +352,7 @@ theorem majority_position_in_bounds (m : Jarl.Membership MAX) (a : Id → Rust.M
 /-- `new.min(old)` in `quorum_index`: a joint configuration commits exactly the
     smaller of the two majority positions, so never beyond either. -/
 theorem joint_commit_requires_both (m : Jarl.Membership MAX) (a : Id → Rust.M Rust.u64) (matched : Id → Rust.u64)
-    (hMAX : MAX < 2 ^ 64) (normal : ∀ id, a id = pure (matched id)) (joint : m.is_joint = true)
+    (hMAX : MAX < 2 ^ Rust.usizeBits) (normal : ∀ id, a id = pure (matched id)) (joint : m.is_joint = true)
     (r : Rust.u64) (result : m.quorum_index a = pure r) :
     r = Rust.min (rank (m.voters.map matched)) (rank (m.old_voters.map matched)) ∧
       r.val ≤ (rank (m.voters.map matched)).val ∧ r.val ≤ (rank (m.old_voters.map matched)).val := by

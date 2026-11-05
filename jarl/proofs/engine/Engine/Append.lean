@@ -78,7 +78,7 @@ theorem append_rel [Rust.LawfulClone V] (ids : Vector Id N) (n : Node V S N CAP)
     exact hrest
   have hl := hf.layout
   have hc := hf.contig
-  have hcap : CAP < 2 ^ 64 := by have := hf.cap_lt; omega
+  have hcap : CAP < 2 ^ Rust.usizeBits := by have := hf.cap_lt; uomega
   have hlr := len_eq _ hl
   have hlast := lastId_eq _ hc
   unfold Node.append

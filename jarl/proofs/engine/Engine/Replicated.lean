@@ -59,7 +59,7 @@ theorem replicated_rel (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids 
           n'.votes = m'.votes ∧ n'.dirty = m'.dirty ∧ n'.matched = m'.matched ∧ n'.local = m'.local ∧
           n'.extra_reply = m'.extra_reply ∧
           ∀ j : Fin N, n'.outbox[j] = m'.outbox[j] ∨ n'.outbox[j] = some .Replicate := by
-  have hN : N < 2 ^ 64 := by have := hf.n_lt; omega
+  have hN : N < 2 ^ Rust.usizeBits := by have := hf.n_lt; uomega
   have triv := replicated_trivial ids n hf p.val hp index rej (n.active.set p.val true hp) n.next n.outbox
     (fun _ => Or.inl rfl)
   unfold Node.replicated

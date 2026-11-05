@@ -4,7 +4,7 @@ import Contracts.MembershipSpec
 # Membership contracts: `restore`, `new`, `with_learners`, `joint`, `peers`
 
 All statements are about the translated functions. Inputs are Rust slices, so
-their lengths and `MAX` are below `2^64` (`usize`); those bounds appear as
+their lengths and `MAX` are below `2 ^ usizeBits` (`usize`); those bounds appear as
 explicit hypotheses because Lean arrays are unbounded.
 -/
 
@@ -17,7 +17,7 @@ theorem ofKind_zero : Flag.ofKind 0 = .voter := rfl
 theorem ofKind_one : Flag.ofKind 1 = .learner := rfl
 theorem ofKind_two : Flag.ofKind 2 = .old := rfl
 
-theorem include_ok_spec (m m' : Jarl.Membership MAX) (id : Id) (k : Rust.u8) (hMAX : MAX < 2 ^ 64)
+theorem include_ok_spec (m m' : Jarl.Membership MAX) (id : Id) (k : Rust.u8) (hMAX : MAX < 2 ^ Rust.usizeBits)
     (h : m.include id k = pure (.Ok (), m')) : incSpec m id k = some m' := by
   rw [include_eq m id k hMAX] at h
   cases hs : incSpec m id k with
@@ -30,8 +30,8 @@ theorem include_ok_spec (m m' : Jarl.Membership MAX) (id : Id) (k : Rust.u8) (hM
 def ValidInputs (voters old learners : List Id) : Prop :=
   voters ≠ [] ∧ voters.Nodup ∧ old.Nodup ∧ learners.Nodup ∧ ∀ key ∈ learners, key ∉ voters
 
-theorem restore_ok (voters old learners : Array Id) (hMAX : MAX < 2 ^ 64) (hv : voters.size < 2 ^ 64)
-    (ho : old.size < 2 ^ 64) (hl : learners.size < 2 ^ 64) (r : Jarl.Membership MAX)
+theorem restore_ok (voters old learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits) (hv : voters.size < 2 ^ Rust.usizeBits)
+    (ho : old.size < 2 ^ Rust.usizeBits) (hl : learners.size < 2 ^ Rust.usizeBits) (r : Jarl.Membership MAX)
     (success : Jarl.Membership.restore voters old learners = pure (.Ok r)) :
     voters.toList ≠ [] ∧ ∃ a b,
       pass true (fun _ => false) 0 [] voters.toList (empty MAX) = .ok a ∧
@@ -56,8 +56,8 @@ theorem restore_ok (voters old learners : Array Id) (hMAX : MAX < 2 ^ 64) (hv : 
   cases h
   exact ⟨a, b, h1, h2, h3⟩
 
-theorem restore_err (voters old learners : Array Id) (hMAX : MAX < 2 ^ 64) (hv : voters.size < 2 ^ 64)
-    (ho : old.size < 2 ^ 64) (hl : learners.size < 2 ^ 64) :
+theorem restore_err (voters old learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits) (hv : voters.size < 2 ^ Rust.usizeBits)
+    (ho : old.size < 2 ^ Rust.usizeBits) (hl : learners.size < 2 ^ Rust.usizeBits) :
     (∃ r, Jarl.Membership.restore (MAX := MAX) voters old learners = pure (.Ok r)) ∨
       Jarl.Membership.restore (MAX := MAX) voters old learners = pure (.Err .Config) := by
   rw [restore_eq voters old learners hMAX hv ho hl]
@@ -78,8 +78,8 @@ theorem capacity_preserved (voters old learners : Array Id) (r : Jarl.Membership
     (_success : Jarl.Membership.restore voters old learners = pure (.Ok r)) :
     r.members.toList.length = MAX := by simp
 
-theorem unique_identities (voters old learners : Array Id) (hMAX : MAX < 2 ^ 64) (hv : voters.size < 2 ^ 64)
-    (ho : old.size < 2 ^ 64) (hl : learners.size < 2 ^ 64) (r : Jarl.Membership MAX)
+theorem unique_identities (voters old learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits) (hv : voters.size < 2 ^ Rust.usizeBits)
+    (ho : old.size < 2 ^ Rust.usizeBits) (hl : learners.size < 2 ^ Rust.usizeBits) (r : Jarl.Membership MAX)
     (success : Jarl.Membership.restore voters old learners = pure (.Ok r)) : UniqueIdentities r := by
   obtain ⟨_, a, b, h1, h2, h3⟩ := restore_ok voters old learners hMAX hv ho hl r success
   exact pass_unique _ _ _ _ _ _ _ h3 (pass_unique _ _ _ _ _ _ _ h2 (pass_unique _ _ _ _ _ _ _ h1 empty_unique))
@@ -104,13 +104,13 @@ theorem learner_overlap (key : Id) :
   rw [restore_eq _ _ _ (by decide) (by simp) (by simp) (by simp)]
   simp [restoreSpec, pass, stepOk, incSpec, findSlot, empty, setFlag, blank, List.findIdx?_cons]
 
-theorem nonempty_voters (voters old learners : Array Id) (hMAX : MAX < 2 ^ 64) (hv : voters.size < 2 ^ 64)
-    (ho : old.size < 2 ^ 64) (hl : learners.size < 2 ^ 64) (r : Jarl.Membership MAX)
+theorem nonempty_voters (voters old learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits) (hv : voters.size < 2 ^ Rust.usizeBits)
+    (ho : old.size < 2 ^ Rust.usizeBits) (hl : learners.size < 2 ^ Rust.usizeBits) (r : Jarl.Membership MAX)
     (success : Jarl.Membership.restore voters old learners = pure (.Ok r)) : voters.toList ≠ [] :=
   (restore_ok voters old learners hMAX hv ho hl r success).1
 
-theorem distinct_inputs (voters old learners : Array Id) (hMAX : MAX < 2 ^ 64) (hv : voters.size < 2 ^ 64)
-    (ho : old.size < 2 ^ 64) (hl : learners.size < 2 ^ 64) (r : Jarl.Membership MAX)
+theorem distinct_inputs (voters old learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits) (hv : voters.size < 2 ^ Rust.usizeBits)
+    (ho : old.size < 2 ^ Rust.usizeBits) (hl : learners.size < 2 ^ Rust.usizeBits) (r : Jarl.Membership MAX)
     (success : Jarl.Membership.restore voters old learners = pure (.Ok r)) :
     voters.toList.Nodup ∧ old.toList.Nodup ∧ learners.toList.Nodup := by
   obtain ⟨_, a, b, h1, h2, h3⟩ := restore_ok voters old learners hMAX hv ho hl r success
@@ -119,8 +119,8 @@ theorem distinct_inputs (voters old learners : Array Id) (hMAX : MAX < 2 ^ 64) (
   have v3 := (valid_iff _ _ _ _).mp (pass_valid _ _ _ _ _ _ _ h3)
   exact ⟨(v1.1 rfl).1, (v3.1 rfl).1, (v2.1 rfl).1⟩
 
-theorem learners_disjoint (voters old learners : Array Id) (hMAX : MAX < 2 ^ 64) (hv : voters.size < 2 ^ 64)
-    (ho : old.size < 2 ^ 64) (hl : learners.size < 2 ^ 64) (r : Jarl.Membership MAX)
+theorem learners_disjoint (voters old learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits) (hv : voters.size < 2 ^ Rust.usizeBits)
+    (ho : old.size < 2 ^ Rust.usizeBits) (hl : learners.size < 2 ^ Rust.usizeBits) (r : Jarl.Membership MAX)
     (success : Jarl.Membership.restore voters old learners = pure (.Ok r)) :
     ∀ key ∈ learners.toList, key ∉ voters.toList := by
   obtain ⟨_, a, b, _, h2, _⟩ := restore_ok voters old learners hMAX hv ho hl r success
@@ -129,8 +129,8 @@ theorem learners_disjoint (voters old learners : Array Id) (hMAX : MAX < 2 ^ 64)
   have := v2.2 key hk
   simp [hkv] at this
 
-theorem valid (voters old learners : Array Id) (hMAX : MAX < 2 ^ 64) (hv : voters.size < 2 ^ 64)
-    (ho : old.size < 2 ^ 64) (hl : learners.size < 2 ^ 64) (r : Jarl.Membership MAX)
+theorem valid (voters old learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits) (hv : voters.size < 2 ^ Rust.usizeBits)
+    (ho : old.size < 2 ^ Rust.usizeBits) (hl : learners.size < 2 ^ Rust.usizeBits) (r : Jarl.Membership MAX)
     (success : Jarl.Membership.restore voters old learners = pure (.Ok r)) :
     ValidInputs voters.toList old.toList learners.toList := by
   have d := distinct_inputs voters old learners hMAX hv ho hl r success
@@ -148,14 +148,14 @@ theorem delegates_to_restore (voters learners : Array Id) :
 theorem capacity_preserved (voters learners : Array Id) (r : Jarl.Membership MAX)
     (_success : Jarl.Membership.new voters learners = pure (.Ok r)) : r.members.toList.length = MAX := by simp
 
-theorem unique_identities (voters learners : Array Id) (hMAX : MAX < 2 ^ 64) (hv : voters.size < 2 ^ 64)
-    (hl : learners.size < 2 ^ 64) (r : Jarl.Membership MAX)
+theorem unique_identities (voters learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits) (hv : voters.size < 2 ^ Rust.usizeBits)
+    (hl : learners.size < 2 ^ Rust.usizeBits) (r : Jarl.Membership MAX)
     (success : Jarl.Membership.new voters learners = pure (.Ok r)) : UniqueIdentities r := by
   rw [new_eq] at success
   exact Restoration.unique_identities voters #[] learners hMAX hv (by simp) hl r success
 
-theorem valid_inputs (voters learners : Array Id) (hMAX : MAX < 2 ^ 64) (hv : voters.size < 2 ^ 64)
-    (hl : learners.size < 2 ^ 64) (r : Jarl.Membership MAX)
+theorem valid_inputs (voters learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits) (hv : voters.size < 2 ^ Rust.usizeBits)
+    (hl : learners.size < 2 ^ Rust.usizeBits) (r : Jarl.Membership MAX)
     (success : Jarl.Membership.new voters learners = pure (.Ok r)) :
     voters.toList ≠ [] ∧ voters.toList.Nodup ∧ learners.toList.Nodup ∧ ∀ key ∈ learners.toList, key ∉ voters.toList := by
   rw [new_eq] at success
@@ -169,13 +169,13 @@ end StableConstruction
 namespace SetInterpretation
 open MembershipProjection
 
-theorem include_flag (F : Flag) (m m' : Jarl.Membership MAX) (q id : Id) (k : Rust.u8) (hMAX : MAX < 2 ^ 64)
+theorem include_flag (F : Flag) (m m' : Jarl.Membership MAX) (q id : Id) (k : Rust.u8) (hMAX : MAX < 2 ^ Rust.usizeBits)
     (success : m.include id k = pure (.Ok (), m')) :
     FlagMember F m' q ↔ FlagMember F m q ∨ (id = q ∧ F = Flag.ofKind k) :=
   Membership.include_flag F m m' q id k (include_ok_spec m m' id k hMAX success)
 
-theorem restore_flags (F : Flag) (voters old learners : Array Id) (hMAX : MAX < 2 ^ 64)
-    (hv : voters.size < 2 ^ 64) (ho : old.size < 2 ^ 64) (hl : learners.size < 2 ^ 64) (r : Jarl.Membership MAX)
+theorem restore_flags (F : Flag) (voters old learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits)
+    (hv : voters.size < 2 ^ Rust.usizeBits) (ho : old.size < 2 ^ Rust.usizeBits) (hl : learners.size < 2 ^ Rust.usizeBits) (r : Jarl.Membership MAX)
     (success : Jarl.Membership.restore voters old learners = pure (.Ok r)) (q : Id) :
     FlagMember F r q ↔ (q ∈ voters.toList ∧ F = .voter) ∨ (q ∈ learners.toList ∧ F = .learner) ∨
       (q ∈ old.toList ∧ F = .old) := by
@@ -194,40 +194,40 @@ theorem restore_flags (F : Flag) (voters old learners : Array Id) (hMAX : MAX < 
     · exact Or.inl (Or.inr h)
     · exact Or.inr h
 
-theorem voters_exact (voters old learners : Array Id) (hMAX : MAX < 2 ^ 64)
-    (hv : voters.size < 2 ^ 64) (ho : old.size < 2 ^ 64) (hl : learners.size < 2 ^ 64) (r : Jarl.Membership MAX)
+theorem voters_exact (voters old learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits)
+    (hv : voters.size < 2 ^ Rust.usizeBits) (ho : old.size < 2 ^ Rust.usizeBits) (hl : learners.size < 2 ^ Rust.usizeBits) (r : Jarl.Membership MAX)
     (success : Jarl.Membership.restore voters old learners = pure (.Ok r)) (q : Id) :
     q ∈ r.voters ↔ q ∈ voters.toList := by
   rw [voters_flag, restore_flags .voter voters old learners hMAX hv ho hl r success q]; simp
 
-theorem old_voters_exact (voters old learners : Array Id) (hMAX : MAX < 2 ^ 64)
-    (hv : voters.size < 2 ^ 64) (ho : old.size < 2 ^ 64) (hl : learners.size < 2 ^ 64) (r : Jarl.Membership MAX)
+theorem old_voters_exact (voters old learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits)
+    (hv : voters.size < 2 ^ Rust.usizeBits) (ho : old.size < 2 ^ Rust.usizeBits) (hl : learners.size < 2 ^ Rust.usizeBits) (r : Jarl.Membership MAX)
     (success : Jarl.Membership.restore voters old learners = pure (.Ok r)) (q : Id) :
     q ∈ r.old_voters ↔ q ∈ old.toList := by
   rw [old_voters_flag, restore_flags .old voters old learners hMAX hv ho hl r success q]; simp
 
-theorem learners_exact (voters old learners : Array Id) (hMAX : MAX < 2 ^ 64)
-    (hv : voters.size < 2 ^ 64) (ho : old.size < 2 ^ 64) (hl : learners.size < 2 ^ 64) (r : Jarl.Membership MAX)
+theorem learners_exact (voters old learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits)
+    (hv : voters.size < 2 ^ Rust.usizeBits) (ho : old.size < 2 ^ Rust.usizeBits) (hl : learners.size < 2 ^ Rust.usizeBits) (r : Jarl.Membership MAX)
     (success : Jarl.Membership.restore voters old learners = pure (.Ok r)) (q : Id) :
     q ∈ r.learners ↔ q ∈ learners.toList := by
   rw [learners_flag, restore_flags .learner voters old learners hMAX hv ho hl r success q]; simp
 
-theorem stable_voters_exact (voters learners : Array Id) (hMAX : MAX < 2 ^ 64)
-    (hv : voters.size < 2 ^ 64) (hl : learners.size < 2 ^ 64) (r : Jarl.Membership MAX)
+theorem stable_voters_exact (voters learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits)
+    (hv : voters.size < 2 ^ Rust.usizeBits) (hl : learners.size < 2 ^ Rust.usizeBits) (r : Jarl.Membership MAX)
     (success : Jarl.Membership.new voters learners = pure (.Ok r)) (q : Id) :
     q ∈ r.voters ↔ q ∈ voters.toList := by
   rw [new_eq] at success
   exact voters_exact voters #[] learners hMAX hv (by simp) hl r success q
 
-theorem stable_learners_exact (voters learners : Array Id) (hMAX : MAX < 2 ^ 64)
-    (hv : voters.size < 2 ^ 64) (hl : learners.size < 2 ^ 64) (r : Jarl.Membership MAX)
+theorem stable_learners_exact (voters learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits)
+    (hv : voters.size < 2 ^ Rust.usizeBits) (hl : learners.size < 2 ^ Rust.usizeBits) (r : Jarl.Membership MAX)
     (success : Jarl.Membership.new voters learners = pure (.Ok r)) (q : Id) :
     q ∈ r.learners ↔ q ∈ learners.toList := by
   rw [new_eq] at success
   exact learners_exact voters #[] learners hMAX hv (by simp) hl r success q
 
-theorem stable_old_empty (voters learners : Array Id) (hMAX : MAX < 2 ^ 64)
-    (hv : voters.size < 2 ^ 64) (hl : learners.size < 2 ^ 64) (r : Jarl.Membership MAX)
+theorem stable_old_empty (voters learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits)
+    (hv : voters.size < 2 ^ Rust.usizeBits) (hl : learners.size < 2 ^ Rust.usizeBits) (r : Jarl.Membership MAX)
     (success : Jarl.Membership.new voters learners = pure (.Ok r)) : r.old_voters = [] := by
   rw [new_eq] at success
   apply List.eq_nil_iff_forall_not_mem.mpr
@@ -235,13 +235,13 @@ theorem stable_old_empty (voters learners : Array Id) (hMAX : MAX < 2 ^ 64)
   have := (old_voters_exact voters #[] learners hMAX hv (by simp) hl r success q).mp hq
   simp at this
 
-theorem include_identity (m m' : Jarl.Membership MAX) (q id : Id) (k : Rust.u8) (hMAX : MAX < 2 ^ 64)
+theorem include_identity (m m' : Jarl.Membership MAX) (q id : Id) (k : Rust.u8) (hMAX : MAX < 2 ^ Rust.usizeBits)
     (success : m.include id k = pure (.Ok (), m')) :
     HasIdentity m' q ↔ HasIdentity m q ∨ id = q :=
   Membership.include_identity m m' q id k (include_ok_spec m m' id k hMAX success)
 
-theorem restore_identities (voters old learners : Array Id) (hMAX : MAX < 2 ^ 64)
-    (hv : voters.size < 2 ^ 64) (ho : old.size < 2 ^ 64) (hl : learners.size < 2 ^ 64) (r : Jarl.Membership MAX)
+theorem restore_identities (voters old learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits)
+    (hv : voters.size < 2 ^ Rust.usizeBits) (ho : old.size < 2 ^ Rust.usizeBits) (hl : learners.size < 2 ^ Rust.usizeBits) (r : Jarl.Membership MAX)
     (success : Jarl.Membership.restore voters old learners = pure (.Ok r)) (q : Id) :
     HasIdentity r q ↔ q ∈ voters.toList ∨ q ∈ learners.toList ∨ q ∈ old.toList := by
   obtain ⟨_, a, b, h1, h2, h3⟩ := restore_ok voters old learners hMAX hv ho hl r success
@@ -258,8 +258,8 @@ theorem restore_identities (voters old learners : Array Id) (hMAX : MAX < 2 ^ 64
     · exact Or.inl (Or.inr h)
     · exact Or.inr h
 
-theorem restored_contains_exact (voters old learners : Array Id) (hMAX : MAX < 2 ^ 64)
-    (hv : voters.size < 2 ^ 64) (ho : old.size < 2 ^ 64) (hl : learners.size < 2 ^ 64) (r : Jarl.Membership MAX)
+theorem restored_contains_exact (voters old learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits)
+    (hv : voters.size < 2 ^ Rust.usizeBits) (ho : old.size < 2 ^ Rust.usizeBits) (hl : learners.size < 2 ^ Rust.usizeBits) (r : Jarl.Membership MAX)
     (success : Jarl.Membership.restore voters old learners = pure (.Ok r)) (q : Id) :
     r.contains q = true ↔ q ∈ voters.toList ∨ q ∈ learners.toList ∨ q ∈ old.toList := by
   rw [IdentityQuery.contains_iff_has]
@@ -268,8 +268,8 @@ theorem restored_contains_exact (voters old learners : Array Id) (hMAX : MAX < 2
 theorem joint_iff_old_nonempty (m : Jarl.Membership MAX) : m.is_joint = true ↔ m.old_voters ≠ [] := by
   simp [Jarl.Membership.is_joint, Jarl.Membership.old_voters, List.filter_eq_nil_iff]
 
-theorem stable_not_joint (voters learners : Array Id) (hMAX : MAX < 2 ^ 64)
-    (hv : voters.size < 2 ^ 64) (hl : learners.size < 2 ^ 64) (r : Jarl.Membership MAX)
+theorem stable_not_joint (voters learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits)
+    (hv : voters.size < 2 ^ Rust.usizeBits) (hl : learners.size < 2 ^ Rust.usizeBits) (r : Jarl.Membership MAX)
     (success : Jarl.Membership.new voters learners = pure (.Ok r)) : r.is_joint = false := by
   cases h : r.is_joint with
   | false => rfl
@@ -282,8 +282,8 @@ theorem voters_length_le (m : Jarl.Membership MAX) : m.voters.length ≤ MAX := 
   simp only [Keys, List.length_map] at h2
   exact Nat.le_trans h1 (by simpa [occ] using h2)
 
-theorem voter_count_bounds (voters old learners : Array Id) (hMAX : MAX < 2 ^ 64)
-    (hv : voters.size < 2 ^ 64) (ho : old.size < 2 ^ 64) (hl : learners.size < 2 ^ 64) (r : Jarl.Membership MAX)
+theorem voter_count_bounds (voters old learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits)
+    (hv : voters.size < 2 ^ Rust.usizeBits) (ho : old.size < 2 ^ Rust.usizeBits) (hl : learners.size < 2 ^ Rust.usizeBits) (r : Jarl.Membership MAX)
     (success : Jarl.Membership.restore voters old learners = pure (.Ok r)) :
     0 < r.voters.length ∧ r.voters.length ≤ MAX := by
   refine ⟨?_, voters_length_le r⟩
@@ -302,13 +302,13 @@ open SetInterpretation
 def Covered (capacity : Nat) (D : List Id) (m : Jarl.Membership MAX) : Prop :=
   UniqueIdentities m ∧ MAX = capacity ∧ ∀ key, HasIdentity m key → key ∈ D
 
-theorem include_available (m : Jarl.Membership MAX) (D : List Id) (hMAX : MAX < 2 ^ 64) (fits : D.length ≤ MAX)
+theorem include_available (m : Jarl.Membership MAX) (D : List Id) (hMAX : MAX < 2 ^ Rust.usizeBits) (fits : D.length ≤ MAX)
     (covered : Covered MAX D m) (key : Id) (admitted : key ∈ D) (k : Rust.u8) :
     ∃ m', m.include key k = pure (.Ok (), m') := by
   obtain ⟨m', h⟩ := Membership.include_available m D fits covered.1 covered.2.2 key admitted k
   exact ⟨m', by rw [include_eq m key k hMAX, h]⟩
 
-theorem include_covered (m m' : Jarl.Membership MAX) (D : List Id) (hMAX : MAX < 2 ^ 64)
+theorem include_covered (m m' : Jarl.Membership MAX) (D : List Id) (hMAX : MAX < 2 ^ Rust.usizeBits)
     (covered : Covered MAX D m) (key : Id) (admitted : key ∈ D) (k : Rust.u8)
     (success : m.include key k = pure (.Ok (), m')) : Covered MAX D m' := by
   have hs := include_ok_spec m m' key k hMAX success
@@ -317,8 +317,8 @@ theorem include_covered (m m' : Jarl.Membership MAX) (D : List Id) (hMAX : MAX <
   · exact covered.2.2 q h
   · exact admitted
 
-theorem restore_accepts (voters old learners : Array Id) (hMAX : MAX < 2 ^ 64)
-    (hv : voters.size < 2 ^ 64) (ho : old.size < 2 ^ 64) (hl : learners.size < 2 ^ 64)
+theorem restore_accepts (voters old learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits)
+    (hv : voters.size < 2 ^ Rust.usizeBits) (ho : old.size < 2 ^ Rust.usizeBits) (hl : learners.size < 2 ^ Rust.usizeBits)
     (valid : ValidInputs voters.toList old.toList learners.toList)
     (fits : Fits MAX (voters.toList ++ learners.toList ++ old.toList)) :
     ∃ r, Jarl.Membership.restore (MAX := MAX) voters old learners = pure (.Ok r) := by
@@ -351,8 +351,8 @@ theorem restore_accepts (voters old learners : Array Id) (hMAX : MAX < 2 ^ 64)
     (fun x hx => covers x (by simp [hx])) b ub cb
   exact ⟨c, by simp only [h1, h2, h3]⟩
 
-theorem restore_accepts_iff (voters old learners : Array Id) (hMAX : MAX < 2 ^ 64)
-    (hv : voters.size < 2 ^ 64) (ho : old.size < 2 ^ 64) (hl : learners.size < 2 ^ 64) :
+theorem restore_accepts_iff (voters old learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits)
+    (hv : voters.size < 2 ^ Rust.usizeBits) (ho : old.size < 2 ^ Rust.usizeBits) (hl : learners.size < 2 ^ Rust.usizeBits) :
     (∃ r, Jarl.Membership.restore (MAX := MAX) voters old learners = pure (.Ok r)) ↔
       ValidInputs voters.toList old.toList learners.toList ∧
         Fits MAX (voters.toList ++ learners.toList ++ old.toList) := by
@@ -364,28 +364,28 @@ theorem restore_accepts_iff (voters old learners : Array Id) (hMAX : MAX < 2 ^ 6
   · rintro ⟨valid, fits⟩
     exact restore_accepts voters old learners hMAX hv ho hl valid fits
 
-theorem stable_accepts_iff (voters learners : Array Id) (hMAX : MAX < 2 ^ 64)
-    (hv : voters.size < 2 ^ 64) (hl : learners.size < 2 ^ 64) :
+theorem stable_accepts_iff (voters learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits)
+    (hv : voters.size < 2 ^ Rust.usizeBits) (hl : learners.size < 2 ^ Rust.usizeBits) :
     (∃ r, Jarl.Membership.new (MAX := MAX) voters learners = pure (.Ok r)) ↔
       ValidInputs voters.toList [] learners.toList ∧ Fits MAX (voters.toList ++ learners.toList) := by
   simp only [new_eq]
   simpa using restore_accepts_iff (MAX := MAX) voters #[] learners hMAX hv (by simp) hl
 
-theorem restore_accepts_by_count (voters old learners : Array Id) (hMAX : MAX < 2 ^ 64)
-    (hv : voters.size < 2 ^ 64) (ho : old.size < 2 ^ 64) (hl : learners.size < 2 ^ 64) :
+theorem restore_accepts_by_count (voters old learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits)
+    (hv : voters.size < 2 ^ Rust.usizeBits) (ho : old.size < 2 ^ Rust.usizeBits) (hl : learners.size < 2 ^ Rust.usizeBits) :
     (∃ r, Jarl.Membership.restore (MAX := MAX) voters old learners = pure (.Ok r)) ↔
       ValidInputs voters.toList old.toList learners.toList ∧
         (uniqueKeys (voters.toList ++ learners.toList ++ old.toList)).length ≤ MAX := by
   rw [restore_accepts_iff voters old learners hMAX hv ho hl, fits_iff_count]
 
-theorem stable_accepts_by_count (voters learners : Array Id) (hMAX : MAX < 2 ^ 64)
-    (hv : voters.size < 2 ^ 64) (hl : learners.size < 2 ^ 64) :
+theorem stable_accepts_by_count (voters learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits)
+    (hv : voters.size < 2 ^ Rust.usizeBits) (hl : learners.size < 2 ^ Rust.usizeBits) :
     (∃ r, Jarl.Membership.new (MAX := MAX) voters learners = pure (.Ok r)) ↔
       ValidInputs voters.toList [] learners.toList ∧ (uniqueKeys (voters.toList ++ learners.toList)).length ≤ MAX := by
   rw [stable_accepts_iff voters learners hMAX hv hl, fits_iff_count]
 
-theorem stored_identity_count (voters old learners : Array Id) (hMAX : MAX < 2 ^ 64)
-    (hv : voters.size < 2 ^ 64) (ho : old.size < 2 ^ 64) (hl : learners.size < 2 ^ 64) (r : Jarl.Membership MAX)
+theorem stored_identity_count (voters old learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits)
+    (hv : voters.size < 2 ^ Rust.usizeBits) (ho : old.size < 2 ^ Rust.usizeBits) (hl : learners.size < 2 ^ Rust.usizeBits) (r : Jarl.Membership MAX)
     (success : Jarl.Membership.restore voters old learners = pure (.Ok r)) :
     (Keys r).length = (uniqueKeys (voters.toList ++ learners.toList ++ old.toList)).length := by
   apply keys_count r (Restoration.unique_identities voters old learners hMAX hv ho hl r success)
@@ -393,15 +393,15 @@ theorem stored_identity_count (voters old learners : Array Id) (hMAX : MAX < 2 ^
   rw [restore_identities voters old learners hMAX hv ho hl r success q]
   simp
 
-theorem restore_error_code (voters old learners : Array Id) (hMAX : MAX < 2 ^ 64)
-    (hv : voters.size < 2 ^ 64) (ho : old.size < 2 ^ 64) (hl : learners.size < 2 ^ 64) (e : Error)
+theorem restore_error_code (voters old learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits)
+    (hv : voters.size < 2 ^ Rust.usizeBits) (ho : old.size < 2 ^ Rust.usizeBits) (hl : learners.size < 2 ^ Rust.usizeBits) (e : Error)
     (failure : Jarl.Membership.restore (MAX := MAX) voters old learners = pure (.Err e)) : e = .Config := by
   rcases restore_err (MAX := MAX) voters old learners hMAX hv ho hl with ⟨r, h⟩ | h
   · rw [h] at failure; have := Rust.pure_inj failure; cases this
   · rw [h] at failure; have := Rust.pure_inj failure; cases this; rfl
 
-theorem restore_rejects_iff (voters old learners : Array Id) (hMAX : MAX < 2 ^ 64)
-    (hv : voters.size < 2 ^ 64) (ho : old.size < 2 ^ 64) (hl : learners.size < 2 ^ 64) :
+theorem restore_rejects_iff (voters old learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits)
+    (hv : voters.size < 2 ^ Rust.usizeBits) (ho : old.size < 2 ^ Rust.usizeBits) (hl : learners.size < 2 ^ Rust.usizeBits) :
     Jarl.Membership.restore (MAX := MAX) voters old learners = pure (.Err .Config) ↔
       ¬(ValidInputs voters.toList old.toList learners.toList ∧
         (uniqueKeys (voters.toList ++ learners.toList ++ old.toList)).length ≤ MAX) := by
@@ -414,8 +414,8 @@ theorem restore_rejects_iff (voters old learners : Array Id) (hMAX : MAX < 2 ^ 6
     · exact absurd h rejected
     · exact h
 
-theorem stable_rejects_iff (voters learners : Array Id) (hMAX : MAX < 2 ^ 64)
-    (hv : voters.size < 2 ^ 64) (hl : learners.size < 2 ^ 64) :
+theorem stable_rejects_iff (voters learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits)
+    (hv : voters.size < 2 ^ Rust.usizeBits) (hl : learners.size < 2 ^ Rust.usizeBits) :
     Jarl.Membership.new (MAX := MAX) voters learners = pure (.Err .Config) ↔
       ¬(ValidInputs voters.toList [] learners.toList ∧ (uniqueKeys (voters.toList ++ learners.toList)).length ≤ MAX) := by
   simp only [new_eq]
@@ -445,14 +445,14 @@ theorem member_iff (m : Jarl.Membership MAX) (q : Id) : some q ∈ m.peers.toLis
   · rintro ⟨s, hs, hq⟩
     exact ⟨some s, hs, by simp [hq]⟩
 
-theorem restored_members (voters old learners : Array Id) (hMAX : MAX < 2 ^ 64)
-    (hv : voters.size < 2 ^ 64) (ho : old.size < 2 ^ 64) (hl : learners.size < 2 ^ 64) (r : Jarl.Membership MAX)
+theorem restored_members (voters old learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits)
+    (hv : voters.size < 2 ^ Rust.usizeBits) (ho : old.size < 2 ^ Rust.usizeBits) (hl : learners.size < 2 ^ Rust.usizeBits) (r : Jarl.Membership MAX)
     (success : Jarl.Membership.restore voters old learners = pure (.Ok r)) (q : Id) :
     some q ∈ r.peers.toList ↔ q ∈ voters.toList ∨ q ∈ learners.toList ∨ q ∈ old.toList := by
   rw [member_iff]; exact restore_identities voters old learners hMAX hv ho hl r success q
 
-theorem stable_members (voters learners : Array Id) (hMAX : MAX < 2 ^ 64)
-    (hv : voters.size < 2 ^ 64) (hl : learners.size < 2 ^ 64) (r : Jarl.Membership MAX)
+theorem stable_members (voters learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits)
+    (hv : voters.size < 2 ^ Rust.usizeBits) (hl : learners.size < 2 ^ Rust.usizeBits) (r : Jarl.Membership MAX)
     (success : Jarl.Membership.new voters learners = pure (.Ok r)) (q : Id) :
     some q ∈ r.peers.toList ↔ q ∈ voters.toList ∨ q ∈ learners.toList := by
   rw [new_eq] at success

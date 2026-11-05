@@ -48,8 +48,8 @@ theorem wf_empty : Wf (Ghost.empty : Ghost V N) where
   elect := by intro T c eL h; simp [Ghost.empty] at h
   ballot := by intro T w c v h; simp [Ghost.empty] at h
 
-theorem init_inv (ids : Vector Id N) (cfg : Fin N → Config N) (hn : 0 < N) (hN : N < 2 ^ 63)
-    (hcap : CAP < 2 ^ 63) (hd : ids.toList.Nodup) (hm : ∀ k, (cfg k).members = ids)
+theorem init_inv (ids : Vector Id N) (cfg : Fin N → Config N) (hn : 0 < N) (hN : N < 2 ^ (Rust.usizeBits - 1))
+    (hcap : CAP < 2 ^ (Rust.usizeBits - 1)) (hd : ids.toList.Nodup) (hm : ∀ k, (cfg k).members = ids)
     (hid : ∀ k, (cfg k).id = ids[k])
     (C : Cluster V S N CAP) (hC : Initial cfg C) : Inv ids cfg C Ghost.empty := by
   obtain ⟨hs, hk⟩ := hC

@@ -4,7 +4,7 @@ import Contracts.MembershipBase
 # Membership contracts: `include`
 
 `Membership::include` is translated to a monadic function that, for a slot
-array of at most `2^64` entries (`usize` positions), always returns. Its effect
+array of fewer than `2 ^ usizeBits` entries (`usize` positions), always returns. Its effect
 is the pure `incSpec` below: the first slot already holding the identity, else
 the first empty slot, gets the requested flag; with neither, it returns
 `Err(Config)` and leaves the configuration unchanged.
@@ -109,7 +109,7 @@ private theorem orElse_map {α β : Type} (a b : Option α) (g : α → β) :
   cases a <;> rfl
 
 /-- `include` always returns, with exactly the effect `incSpec`. -/
-theorem include_eq (m : Jarl.Membership MAX) (id : Id) (k : Rust.u8) (hMAX : MAX < 2 ^ 64) :
+theorem include_eq (m : Jarl.Membership MAX) (id : Id) (k : Rust.u8) (hMAX : MAX < 2 ^ Rust.usizeBits) :
     m.include id k = pure (match incSpec m id k with
       | some m' => (.Ok (), m')
       | none => (.Err .Config, m)) := by
@@ -123,7 +123,7 @@ theorem include_eq (m : Jarl.Membership MAX) (id : Id) (k : Rust.u8) (hMAX : MAX
   | none => simp [Rust.Option.ok_or, incSpec, hf]
   | some i =>
     have hi := findSlot_lt m id i hf
-    have hv : (Rust.ofNat i : Rust.usize).val = i := by simp [Rust.ofNat]; omega
+    have hv : (Rust.ofNat i : Rust.usize).val = i := by simp [Rust.ofNat] at hMAX ⊢; omega
     have hlt : (Rust.ofNat i : Rust.usize).val < MAX := by omega
     simp only [Option.map_some, Rust.Option.ok_or, pure_bind, Rust.Slice.index_ok _ _ hlt,
       Rust.Slice.set_ok _ _ _ hlt, incSpec, hf, hv, hi, dif_pos]
@@ -338,7 +338,7 @@ theorem capacity_preserved (m : Jarl.Membership MAX) (id : Id) (k : Rust.u8) (r 
     (m' : Jarl.Membership MAX) (_ : m.include id k = pure (r, m')) :
     m'.members.toList.length = m.members.toList.length := by simp
 
-theorem selected_slot (m : Jarl.Membership MAX) (id : Id) (k : Rust.u8) (i : Nat) (hMAX : MAX < 2 ^ 64)
+theorem selected_slot (m : Jarl.Membership MAX) (id : Id) (k : Rust.u8) (i : Nat) (hMAX : MAX < 2 ^ Rust.usizeBits)
     (selected : findSlot m.members.toList id = some i) :
     ∃ hi : i < MAX, m.include id k =
       pure (.Ok (), ⟨m.members.set i (some (setFlag k (m.members[i].getD (blank id)))) hi⟩) := by
@@ -347,7 +347,7 @@ theorem selected_slot (m : Jarl.Membership MAX) (id : Id) (k : Rust.u8) (i : Nat
   rw [include_eq m id k hMAX]
   simp [incSpec, selected, hi]
 
-theorem full_error (m : Jarl.Membership MAX) (id : Id) (k : Rust.u8) (hMAX : MAX < 2 ^ 64) :
+theorem full_error (m : Jarl.Membership MAX) (id : Id) (k : Rust.u8) (hMAX : MAX < 2 ^ Rust.usizeBits) :
     (∃ m', m.include id k = pure (.Err .Config, m')) ↔ findSlot m.members.toList id = none := by
   rw [include_eq m id k hMAX, ← incSpec_none]
   cases incSpec m id k with
@@ -358,12 +358,12 @@ theorem full_error (m : Jarl.Membership MAX) (id : Id) (k : Rust.u8) (hMAX : MAX
     have := Rust.pure_inj h
     simp at this
 
-theorem full_exact (m : Jarl.Membership MAX) (id : Id) (k : Rust.u8) (hMAX : MAX < 2 ^ 64) :
+theorem full_exact (m : Jarl.Membership MAX) (id : Id) (k : Rust.u8) (hMAX : MAX < 2 ^ Rust.usizeBits) :
     (∃ m', m.include id k = pure (.Err .Config, m')) ↔
       (∀ s, some s ∈ m.members.toList → s.id ≠ id) ∧ none ∉ m.members.toList := by
   rw [full_error m id k hMAX, findSlot_none]
 
-theorem other_slots_unchanged (m : Jarl.Membership MAX) (id : Id) (k : Rust.u8) (i : Nat) (hMAX : MAX < 2 ^ 64)
+theorem other_slots_unchanged (m : Jarl.Membership MAX) (id : Id) (k : Rust.u8) (i : Nat) (hMAX : MAX < 2 ^ Rust.usizeBits)
     (selected : findSlot m.members.toList id = some i) (r : Rust.Result Unit Error) (m' : Jarl.Membership MAX)
     (result : m.include id k = pure (r, m')) (j : Nat) (hj : j < MAX) (different : j ≠ i) :
     m'.members[j] = m.members[j] := by
@@ -373,7 +373,7 @@ theorem other_slots_unchanged (m : Jarl.Membership MAX) (id : Id) (k : Rust.u8) 
   cases this
   simp [Ne.symm different]
 
-theorem selected_identity (m : Jarl.Membership MAX) (id : Id) (k : Rust.u8) (i : Nat) (hMAX : MAX < 2 ^ 64)
+theorem selected_identity (m : Jarl.Membership MAX) (id : Id) (k : Rust.u8) (i : Nat) (hMAX : MAX < 2 ^ Rust.usizeBits)
     (selected : findSlot m.members.toList id = some i) (r : Rust.Result Unit Error) (m' : Jarl.Membership MAX)
     (result : m.include id k = pure (r, m')) :
     ∃ hi : i < MAX, ∃ s, m'.members[i] = some s ∧ s.id = id := by
@@ -391,7 +391,7 @@ theorem selected_identity (m : Jarl.Membership MAX) (id : Id) (k : Rust.u8) (i :
 
 /-- The selected slot held `id` or was empty, and receives exactly the
     previous record (or a fresh all-false record) with the requested flag set. -/
-theorem selected_effect (m : Jarl.Membership MAX) (id : Id) (k : Rust.u8) (i : Nat) (hMAX : MAX < 2 ^ 64)
+theorem selected_effect (m : Jarl.Membership MAX) (id : Id) (k : Rust.u8) (i : Nat) (hMAX : MAX < 2 ^ Rust.usizeBits)
     (selected : findSlot m.members.toList id = some i) :
     ∃ hi : i < MAX,
       ((∃ s, m.members[i] = some s ∧ s.id = id) ∨
@@ -402,7 +402,7 @@ theorem selected_effect (m : Jarl.Membership MAX) (id : Id) (k : Rust.u8) (i : N
   simp only [Vector.getElem_toList] at hc
   exact ⟨hi, hc, he⟩
 
-theorem full_unchanged (m : Jarl.Membership MAX) (id : Id) (k : Rust.u8) (hMAX : MAX < 2 ^ 64)
+theorem full_unchanged (m : Jarl.Membership MAX) (id : Id) (k : Rust.u8) (hMAX : MAX < 2 ^ Rust.usizeBits)
     (e : Error) (m' : Jarl.Membership MAX) (full : m.include id k = pure (.Err e, m')) : m' = m := by
   rw [include_eq m id k hMAX] at full
   cases h : incSpec m id k with
@@ -413,7 +413,7 @@ theorem full_unchanged (m : Jarl.Membership MAX) (id : Id) (k : Rust.u8) (hMAX :
     simp only [h] at full
     have := Rust.pure_inj full; simp at this
 
-theorem preserves_unique (m : Jarl.Membership MAX) (id : Id) (k : Rust.u8) (hMAX : MAX < 2 ^ 64)
+theorem preserves_unique (m : Jarl.Membership MAX) (id : Id) (k : Rust.u8) (hMAX : MAX < 2 ^ Rust.usizeBits)
     (r : Rust.Result Unit Error) (m' : Jarl.Membership MAX) (result : m.include id k = pure (r, m'))
     (unique : UniqueIdentities m) : UniqueIdentities m' := by
   rw [include_eq m id k hMAX] at result

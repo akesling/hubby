@@ -8,16 +8,16 @@ import Generated
 
 namespace Jarl.Contracts.Capacity
 
-theorem full_exact {V S : Type} {CAP : Nat} (s : State V S CAP) (hc : CAP < 2^64) :
+theorem full_exact {V S : Type} {CAP : Nat} (s : State V S CAP) (hc : CAP < 2 ^ Rust.usizeBits) :
     State.full s = decide (s.len.val = CAP) := by
   unfold State.full
   by_cases h : s.len.val = CAP
-  · simp [h, Fin.ext_iff, Rust.val_usizeOf CAP hc]
-  · simp [h, Fin.ext_iff, Rust.val_usizeOf CAP hc]
+  · simp [h, Fin.ext_iff, Rust.val_usizeOf CAP (by simpa using hc)]
+  · simp [h, Fin.ext_iff, Rust.val_usizeOf CAP (by simpa using hc)]
 
 /-- The representation invariant `len ≤ CAP` is a caller obligation, not inferred
     from the source equality. Under that invariant, admission has room. -/
-theorem not_full_has_space {V S : Type} {CAP : Nat} (s : State V S CAP) (hc : CAP < 2^64)
+theorem not_full_has_space {V S : Type} {CAP : Nat} (s : State V S CAP) (hc : CAP < 2 ^ Rust.usizeBits)
     (within : s.len.val ≤ CAP) (available : State.full s = false) : s.len.val < CAP := by
   rw [full_exact s hc] at available
   simp only [decide_eq_false_iff_not] at available

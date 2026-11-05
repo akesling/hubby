@@ -22,8 +22,9 @@ theorem snapshot_boundary {V S : Type} {CAP : Nat} (s : State V S CAP) (snap : S
 theorem get_exact {V S : Type} {CAP : Nat} (s : State V S CAP) (i : Rust.u64) :
     State.get s i =
       if i.val ≤ (State.base s).index.val then none
-      else if h : i.val - (State.base s).index.val - 1 < CAP then
-        s.entries[i.val - (State.base s).index.val - 1] else none := by
+      else if h : i.val - (State.base s).index.val - 1 < CAP ∧
+          i.val - (State.base s).index.val - 1 < 2 ^ Rust.usizeBits then
+        s.entries[i.val - (State.base s).index.val - 1]'h.1 else none := by
   unfold State.get
   simp only [Rust.checked_sub_eq]
   by_cases h1 : (State.base s).index.val ≤ i.val
@@ -32,11 +33,20 @@ theorem get_exact {V S : Type} {CAP : Nat} (s : State V S CAP) (i : Rust.u64) :
       simp [this]
     · have h3 : 1 ≤ i.val - (State.base s).index.val := by omega
       simp [h1, h2, h3, Id.run, Rust.try_from, Rust.Result.ok, Rust.Slice.get]
-      by_cases h4 : i.val - (State.base s).index.val - 1 < CAP
-      · rw [dif_pos h4, Vector.getElem?_eq_getElem h4]
-        cases s.entries[i.val - (State.base s).index.val - 1] <;> rfl
-      · rw [dif_neg h4, Vector.getElem?_eq_none (by omega)]
-        rfl
+      by_cases h5 : i.val - (State.base s).index.val - 1 < 2 ^ Rust.usizeBits
+      · have h5' := h5
+        simp only [Rust.usizeBits_eq] at h5'
+        by_cases h4 : i.val - (State.base s).index.val - 1 < CAP
+        · simp [h5', h4]
+          cases s.entries[i.val - (State.base s).index.val - 1] <;> rfl
+        · simp [h5', h4]
+          rfl
+      · have h5' := h5
+        simp only [Rust.usizeBits_eq] at h5'
+        -- 32-bit: `try_from` fails, so `none`; 64-bit: the offset of a `u64` always fits.
+        have := i.isLt
+        simp [h5']
+        first | rfl | omega
   · have h2 : i.val ≤ (State.base s).index.val := by omega
     simp [h1]
     intro _ _
@@ -66,16 +76,18 @@ theorem last_exact {V S : Type} {CAP : Nat} (s : State V S CAP) (bound : s.len.v
 
 theorem lookup_all_offsets {V S : Type} {CAP : Nat} (s : State V S CAP) (i : Rust.u64) (offset : Nat)
     (index : i.val = (State.base s).index.val + 1 + offset) :
-    State.get s i = if h : offset < CAP then s.entries[offset] else none := by
+    State.get s i =
+      if h : offset < CAP ∧ offset < 2 ^ Rust.usizeBits then s.entries[offset]'h.1 else none := by
   rw [get_exact, if_neg (by omega)]
   have : i.val - (State.base s).index.val - 1 = offset := by omega
   simp only [this]
 
 theorem lookup_exact {V S : Type} {CAP : Nat} (s : State V S CAP) (i : Rust.u64) (offset : Nat)
     (entry : Entry V) (index : i.val = (State.base s).index.val + 1 + offset)
-    (target : offset < CAP) (present : s.entries[offset] = some entry) :
+    (target : offset < CAP) (addressable : offset < 2 ^ Rust.usizeBits)
+    (present : s.entries[offset] = some entry) :
     State.get s i = some entry := by
-  rw [lookup_all_offsets s i offset index, dif_pos target, present]
+  rw [lookup_all_offsets s i offset index, dif_pos ⟨target, addressable⟩, present]
 
 theorem lookup_at_or_before_boundary {V S : Type} {CAP : Nat} (s : State V S CAP) (i : Rust.u64)
     (before : i.val ≤ (State.base s).index.val) : State.get s i = none := by
@@ -87,11 +99,12 @@ theorem record_at_snapshot {V S : Type} {CAP : Nat} (s : State V S CAP) (i : Rus
 
 theorem record_at_entry {V S : Type} {CAP : Nat} (s : State V S CAP) (i : Rust.u64) (offset : Nat)
     (entry : Entry V) (index : i.val = (State.base s).index.val + 1 + offset)
-    (target : offset < CAP) (present : s.entries[offset] = some entry) :
+    (target : offset < CAP) (addressable : offset < 2 ^ Rust.usizeBits)
+    (present : s.entries[offset] = some entry) :
     State.id_at s i = some entry.id := by
   have different : i ≠ (State.base s).index := by
     intro h; rw [h] at index; omega
-  simp [State.id_at, different, lookup_exact s i offset entry index target present]
+  simp [State.id_at, different, lookup_exact s i offset entry index target addressable present]
 
 theorem record_at_absent {V S : Type} {CAP : Nat} (s : State V S CAP) (i : Rust.u64)
     (different : i ≠ (State.base s).index) (missing : State.get s i = none) :

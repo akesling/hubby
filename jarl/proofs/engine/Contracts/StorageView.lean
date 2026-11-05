@@ -176,16 +176,22 @@ def materialize (w : Jarl.Write V S) : Delta.Write HardState (Snapshot S) (Entry
 
 private theorem write_offset (s : State V S CAP) (first : Option Rust.u64) :
     (Rust.Option.map_or first s.len (fun index => Rust.min (Rust.Result.unwrap_or
-      (Rust.try_from (m := 64) (Rust.saturating_sub (Rust.saturating_sub index (State.base s).index) 1)) s.len)
+      (Rust.try_from (m := Rust.usizeBits) (Rust.saturating_sub (Rust.saturating_sub index (State.base s).index) 1)) s.len)
       s.len)).val = writeStart s first := by
   cases first with
   | none => rfl
   | some index =>
-    have tf : ∀ a : Rust.u64, Rust.try_from (m := 64) a = .Ok a := fun a => by
-      simp [Rust.try_from, a.isLt]
-    simp only [writeStart, Rust.Option.map_or, tf, Rust.Result.unwrap_or, Rust.val_min,
+    -- An offset that does not fit a `usize` (only possible on 32-bit targets) falls
+    -- back to `len`, which is also `min offset len` since `len` is a `usize`.
+    have hl := s.len.isLt
+    simp only [writeStart, Rust.Option.map_or, Rust.try_from, Rust.Result.unwrap_or, Rust.val_min,
       Rust.val_saturating_sub]
-    rfl
+    by_cases hf : index.val - (State.base s).index.val - 1 < 2 ^ Rust.usizeBits
+    · simp only [Rust.usizeBits_eq] at hf hl
+      simp [hf, Nat.min_def]
+    · simp only [Rust.usizeBits_eq] at hf hl
+      simp [hf, Nat.min_def]
+      omega
 
 /-- Any returned view has exactly this form. -/
 theorem write_returns (s : State V S CAP) (first : Option Rust.u64) (changed : Bool) (w : Jarl.Write V S)
@@ -216,7 +222,7 @@ theorem exact_view (s : State V S CAP) (first : Option Rust.u64) (changed : Bool
   unfold State.write
   dsimp only
   have c : (Rust.Option.map_or first s.len (fun index => Rust.min (Rust.Result.unwrap_or
-      (Rust.try_from (m := 64) (Rust.saturating_sub (Rust.saturating_sub index (State.base s).index) 1)) s.len)
+      (Rust.try_from (m := Rust.usizeBits) (Rust.saturating_sub (Rust.saturating_sub index (State.base s).index) 1)) s.len)
       s.len)).val ≤ s.len.val ∧ s.len.val ≤ CAP := ⟨by rw [write_offset]; exact writeStart_le s first, capacity⟩
   rw [Rust.Slice.range_ok _ _ _ c, pure_bind, write_offset]
   cases changed <;> cases s.snapshot <;> rfl

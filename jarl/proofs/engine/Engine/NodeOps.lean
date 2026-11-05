@@ -17,9 +17,9 @@ variable {V S : Type} {N CAP : Nat} [Rust.Clone V] [Rust.Clone S]
 /-- Facts of every node of a fixed cluster of the distinct identities `ids`. -/
 structure Fixed (ids : Vector Id N) (n : Node V S N CAP) : Prop where
   n_pos : 0 < N
-  n_lt : N < 2 ^ 63
+  n_lt : N < 2 ^ (Rust.usizeBits - 1)
   cap_pos : 0 < CAP
-  cap_lt : CAP < 2 ^ 63
+  cap_lt : CAP < 2 ^ (Rust.usizeBits - 1)
   nodup : ids.toList.Nodup
   hooks : n.hooks = none
   members : n.config.members = ids
@@ -68,18 +68,18 @@ theorem follow_eq (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n) (l
   cases l <;> simp_all [Node.follow]
 
 /-- `send` to a peer slot overwrites that slot's pending descriptor. -/
-theorem send_eq (n : Node V S N CAP) (p : Rust.usize) (o : Outbound) (hN : N < 2 ^ 64) (hp : p.val < N) :
+theorem send_eq (n : Node V S N CAP) (p : Rust.usize) (o : Outbound) (hN : N < 2 ^ Rust.usizeBits) (hp : p.val < N) :
     Node.send n p o = pure { n with outbox := n.outbox.set p.val (some o) hp } := by
   have : p ≠ Rust.usizeOf N := fun e => by
     have := congrArg Fin.val e; rw [Rust.val_usizeOf _ hN] at this; omega
   simp [Node.send, this, Rust.Slice.set_ok _ _ _ hp]
 
 theorem reply_eq (n : Node V S N CAP) (p : Rust.usize) (i : Rust.u64) (r : Option Rejection)
-    (hN : N < 2 ^ 64) (hp : p.val < N) :
+    (hN : N < 2 ^ Rust.usizeBits) (hp : p.val < N) :
     Node.reply n p i r = pure { n with outbox := n.outbox.set p.val (some (.Replicated i r)) hp } := by
   simp [Node.reply, send_eq n p _ hN hp]
 
-theorem replicate_eq (n : Node V S N CAP) (p : Rust.usize) (hN : N < 2 ^ 64) (hp : p.val < N) :
+theorem replicate_eq (n : Node V S N CAP) (p : Rust.usize) (hN : N < 2 ^ Rust.usizeBits) (hp : p.val < N) :
     Node.replicate n p = pure { n with outbox := n.outbox.set p.val (some .Replicate) hp } := by
   simp [Node.replicate, send_eq n p _ hN hp]
 
@@ -170,14 +170,14 @@ theorem election_quorum_eq (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed 
     Node.election_quorum n = pure (decide (N / 2 < (List.finRange N).countP (fun j => n.votes[j]))) := by
   unfold Node.election_quorum
   simp only [hf.membership]
-  rw [quorum_stable ids (by have := hf.n_lt; omega) _ (fun id => match Rust.Iter.position (ids.map some).toList
+  rw [quorum_stable ids (by have := hf.n_lt; uomega) _ (fun id => match Rust.Iter.position (ids.map some).toList
       (fun p => p == some id) with | some j => n.votes[j.val]! | none => false)]
   · rw [ids_filter_count ids _ (fun j => n.votes[j])]
     intro j
     show (match Rust.Iter.position (ids.map some).toList (fun p => p == some (ids[j.val]'j.isLt)) with
       | some j => n.votes[j.val]! | none => false) = n.votes[j]
     rw [position_member ids hf.nodup j.val j.isLt]
-    simp [Rust.ofNat, Nat.mod_eq_of_lt (show j.val < 2 ^ 64 by have := hf.n_lt; omega)]
+    simp (disch := (have := hf.n_lt; uomega)) [Rust.ofNat, Nat.mod_eq_of_lt]
   · intro id hid
     obtain ⟨j, hj, rfl⟩ := List.getElem_of_mem hid
     have hj' : j < N := by simpa using hj
@@ -186,7 +186,7 @@ theorem election_quorum_eq (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed 
     simp only [Vector.getElem_toList] at hp ⊢
     rw [hp]
     have hv : (Rust.ofNat j : Rust.usize).val = j := by
-      simp [Rust.ofNat]; have := hf.n_lt; omega
+      simp [Rust.ofNat]; have := hf.n_lt; uomega
     simp only [Rust.Option.is_some_andM]
     rw [Rust.Slice.index_ok _ _ (by rw [hv]; exact hj')]
     simp [hv, hj']
@@ -195,13 +195,13 @@ theorem election_quorum_eq (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed 
 def bcast (n : Node V S N CAP) : Node V S N CAP :=
   { n with outbox := Vector.ofFn fun j => if j.val ≠ n.local.val then some .Replicate else n.outbox[j] }
 
-theorem range_get (N : Nat) (hN : N < 2 ^ 64) (k : Nat) (hk : k < (Rust.Iter.range 0 (Rust.usizeOf N)).length) :
+theorem range_get (N : Nat) (hN : N < 2 ^ Rust.usizeBits) (k : Nat) (hk : k < (Rust.Iter.range 0 (Rust.usizeOf N)).length) :
     (Rust.Iter.range 0 (Rust.usizeOf N))[k] = Rust.ofNat k ∧ k < N := by
   simp [Rust.Iter.range, Rust.val_usizeOf _ hN] at hk ⊢; omega
 
 theorem broadcast_eq (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n) :
     Node.broadcast n = pure (bcast n) := by
-  have hN : N < 2 ^ 64 := by have := hf.n_lt; omega
+  have hN : N < 2 ^ Rust.usizeBits := by have := hf.n_lt; uomega
   unfold Node.broadcast
   simp only [bind_pure]
   refine Rust.forIn_eq_inv _ _ _ _
@@ -214,7 +214,7 @@ theorem broadcast_eq (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n)
   · intro k hk b hb
     obtain ⟨hget, hkN⟩ := range_get N hN k hk
     rw [hget]
-    have hv : (Rust.ofNat k : Rust.usize).val = k := by simp [Rust.ofNat]; omega
+    have hv : (Rust.ofNat k : Rust.usize).val = k := by simp [Rust.ofNat]; uomega
     rw [hb]
     by_cases hkl : k = n.local.val
     · refine ⟨_, ?_, rfl⟩
@@ -268,7 +268,7 @@ theorem matched_fn_eq (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n
     Node.matched_fn n (ids[j]'hj) = pure (n.matched[j]'hj) := by
   unfold Node.matched_fn
   rw [hf.peers, position_member ids hf.nodup j hj]
-  have hv : (Rust.ofNat j : Rust.usize).val = j := by simp [Rust.ofNat]; have := hf.n_lt; omega
+  have hv : (Rust.ofNat j : Rust.usize).val = j := by simp [Rust.ofNat]; have := hf.n_lt; uomega
   simp [Rust.Option.map_orM, Rust.Slice.index_ok _ _ (by rw [hv]; exact hj), hv]
 
 /-- `advance_commit`: commit the largest index matched by a majority, if it is
@@ -278,7 +278,7 @@ theorem advance_commit_eq (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed i
       Node.advance_commit n = pure (
         if n.state.hard.commit < v ∧ Rust.Option.is_some_and (State.id_at n.state v) (fun id => id.term == n.state.hard.term) = true
         then (true, commitTo n v) else (false, n)) := by
-  have hN : N < 2 ^ 63 := hf.n_lt
+  have hN : N < 2 ^ (Rust.usizeBits - 1) := hf.n_lt
   obtain ⟨v, hq, hmaj⟩ := quorum_index_stable ids hf.n_pos hN (fun id => do let t ← Node.matched_fn n id; pure t)
     (fun id => match Rust.Iter.position (ids.map some).toList (fun p => p == some id) with
       | some j => n.matched[j.val]! | none => 0) (by
@@ -287,7 +287,7 @@ theorem advance_commit_eq (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed i
       have hj' : j < N := by simpa using hj
       simp only [Vector.getElem_toList]
       rw [matched_fn_eq ids n hf j hj', position_member ids hf.nodup j hj']
-      have hv : (Rust.ofNat j : Rust.usize).val = j := by simp [Rust.ofNat]; omega
+      have hv : (Rust.ofNat j : Rust.usize).val = j := by simp [Rust.ofNat]; uomega
       simp [hv, hj'])
   refine ⟨v, ?_, ?_⟩
   · rw [← ids_filter_count ids _ (fun j => decide (v.val ≤ (n.matched[j]).val))]
@@ -296,7 +296,7 @@ theorem advance_commit_eq (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed i
       show decide (v.val ≤ (match Rust.Iter.position (ids.map some).toList (fun p => p == some (ids[j.val]'j.isLt)) with
         | some j => n.matched[j.val]! | none => 0).val) = _
       rw [position_member ids hf.nodup j.val j.isLt]
-      simp [Rust.ofNat, Nat.mod_eq_of_lt (show j.val < 2 ^ 64 by omega)]
+      simp (disch := (uomega)) [Rust.ofNat, Nat.mod_eq_of_lt]
   · unfold Node.advance_commit
     simp only [hf.membership, hq, pure_bind]
     by_cases hc : n.state.hard.commit < v ∧ Rust.Option.is_some_and (State.id_at n.state v) (fun id => id.term == n.state.hard.term) = true
@@ -349,7 +349,7 @@ def Barrier (n n' : Node V S N CAP) : Prop :=
     a no-op at the next index, then try to advance the commit index. -/
 theorem barrier_rel (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n) :
     ∃ n', Node.barrier n = pure n' ∧ Barrier n n' := by
-  have hcap : CAP < 2 ^ 64 := by have := hf.cap_lt; omega
+  have hcap : CAP < 2 ^ Rust.usizeBits := by have := hf.cap_lt; uomega
   have hl := hf.layout
   unfold Node.barrier
   simp only [last_eq _ hl.1, pure_bind]
@@ -379,7 +379,7 @@ theorem barrier_rel (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n) 
       rw [hpush]
       simp only [pure_bind, Rust.Result.is_ok, if_true]
       have hlt : decide (n.local < Rust.usizeOf N) = true := by
-        simp [Fin.lt_def, Rust.val_usizeOf _ (show N < 2 ^ 64 by have := hf.n_lt; omega), hf.local_lt]
+        simp [Fin.lt_def, Rust.val_usizeOf _ (show N < 2 ^ Rust.usizeBits by have := hf.n_lt; uomega), hf.local_lt]
       simp only [hlt, if_true, Rust.Slice.set_ok _ _ _ hf.local_lt, pure_bind]
       have hf1 := fixed_state ids n hf s' hl' hc' true (some ⟨(lastId n.state).index.val + (1 : Rust.u64).val, h2⟩)
         (n.matched.set n.local.val ⟨(lastId n.state).index.val + (1 : Rust.u64).val, h2⟩ hf.local_lt)
@@ -422,7 +422,7 @@ theorem fixed_barrier (ids : Vector Id N) (n n' : Node V S N CAP) (hf : Fixed id
 
 theorem become_leader_rel (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n) :
     ∃ n', Node.become_leader n = pure n' ∧ BecomeLeader n n' := by
-  have hN : N < 2 ^ 64 := by have := hf.n_lt; omega
+  have hN : N < 2 ^ Rust.usizeBits := by have := hf.n_lt; uomega
   obtain ⟨n2, hb, hB⟩ := barrier_rel ids _ (fixed_leaderInit ids n hf)
   refine ⟨bcast n2, ?_, hf.local_lt, n2, hB, rfl⟩
   have hlt : decide (n.local < Rust.usizeOf N) = true := by
@@ -470,7 +470,7 @@ theorem candidate_votes (n : Node V S N CAP) (t : Rust.u64) (h : n.local.val < N
 theorem campaign_rel (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n) (t : Rust.u64) :
     ∃ n', Node.campaign n t = pure n' ∧ ∃ n1, Timers (candidate n t hf.local_lt) n1 ∧
       ((N / 2 < 1 ∧ BecomeLeader n1 n') ∨ (¬ N / 2 < 1 ∧ n' = requestVotes n1)) := by
-  have hN : N < 2 ^ 64 := by have := hf.n_lt; omega
+  have hN : N < 2 ^ Rust.usizeBits := by have := hf.n_lt; uomega
   have hc := fixed_candidate ids n hf t
   obtain ⟨n1, hr, ht⟩ := reset_timers ids _ hc
   have hf1 := fixed_timers ids _ _ hc ht
@@ -499,7 +499,7 @@ theorem campaign_rel (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n)
     · intro k hk b hb
       obtain ⟨hget, hkN⟩ := range_get N hN k hk
       rw [hget]
-      have hv : (Rust.ofNat k : Rust.usize).val = k := by simp [Rust.ofNat]; omega
+      have hv : (Rust.ofNat k : Rust.usize).val = k := by simp [Rust.ofNat]; uomega
       rw [hb]
       by_cases hkl : k = n1.local.val
       · refine ⟨_, ?_, rfl⟩

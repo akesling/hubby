@@ -26,16 +26,16 @@ def jointSpec (source target : Jarl.Membership MAX) : Rust.Result (Jarl.Membersh
   | .error _ => .Err .Full
   | .ok r => .Ok r
 
-theorem rangeA_prefix (set : Array Id) (j : Nat) (hj : j < set.size) (hs : set.size < 2 ^ 64) :
+theorem rangeA_prefix (set : Array Id) (j : Nat) (hj : j < set.size) (hs : set.size < 2 ^ Rust.usizeBits) :
     Rust.Slice.rangeA set 0 (Rust.ofNat j) = pure (set.extract 0 j) := by
-  have hv : (Rust.ofNat j : Rust.usize).val = j := by simp [Rust.ofNat]; omega
+  have hv : (Rust.ofNat j : Rust.usize).val = j := by simp [Rust.ofNat] at hs ⊢; omega
   simp [Rust.Slice.rangeA, hv]; omega
 
 theorem extract_prefix (set : Array Id) (j : Nat) : (set.extract 0 j).toList = set.toList.take j := by
   simp [Array.toList_extract, List.extract_eq_take_drop]
 
-theorem with_learners_eq (m : Jarl.Membership MAX) (learners : Array Id) (hMAX : MAX < 2 ^ 64)
-    (hl : learners.size < 2 ^ 64) : m.with_learners learners = pure (withLearnersSpec m learners) := by
+theorem with_learners_eq (m : Jarl.Membership MAX) (learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits)
+    (hl : learners.size < 2 ^ Rust.usizeBits) : m.with_learners learners = pure (withLearnersSpec m learners) := by
   unfold Jarl.Membership.with_learners withLearnersSpec
   dsimp only
   rw [forIn_list m.voters 0 (Rust.Result.Err Error.Config) _ ?h1 [] _]
@@ -65,7 +65,7 @@ theorem with_learners_eq (m : Jarl.Membership MAX) (learners : Array Id) (hMAX :
     | error b => simp [out]
     | ok b => simp [out]
 
-theorem joint_eq (source target : Jarl.Membership MAX) (hMAX : MAX < 2 ^ 64) :
+theorem joint_eq (source target : Jarl.Membership MAX) (hMAX : MAX < 2 ^ Rust.usizeBits) :
     source.joint target = pure (jointSpec source target) := by
   unfold Jarl.Membership.joint jointSpec
   by_cases g : (source.is_joint || target.is_joint) = true
@@ -93,8 +93,8 @@ def restoreSpec (voters old learners : Array Id) : Rust.Result (Jarl.Membership 
       | .error _ => .Err .Config
       | .ok c => .Ok c
 
-theorem restore_eq (voters old learners : Array Id) (hMAX : MAX < 2 ^ 64) (hv : voters.size < 2 ^ 64)
-    (ho : old.size < 2 ^ 64) (hl : learners.size < 2 ^ 64) :
+theorem restore_eq (voters old learners : Array Id) (hMAX : MAX < 2 ^ Rust.usizeBits) (hv : voters.size < 2 ^ Rust.usizeBits)
+    (ho : old.size < 2 ^ Rust.usizeBits) (hl : learners.size < 2 ^ Rust.usizeBits) :
     Jarl.Membership.restore (MAX := MAX) voters old learners = pure (restoreSpec voters old learners) := by
   unfold Jarl.Membership.restore restoreSpec
   by_cases he : voters.isEmpty = true

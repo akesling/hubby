@@ -42,15 +42,16 @@ theorem position_free (pre : List Id) (r : Nat) (hr : 0 < r) :
 
 /-- `include(id, 0)` of a fresh voter into the first free slot. -/
 theorem include_voter {MAX : Nat} (m : Membership MAX) (pre : List Id) (r : Nat) (id : Id)
-    (hm : m.members.toList = slots pre (r + 1)) (hd : id ∉ pre) (hmax : MAX < 2 ^ 64) :
+    (hm : m.members.toList = slots pre (r + 1)) (hd : id ∉ pre) (hmax : MAX < 2 ^ Rust.usizeBits) :
     ∃ m', Membership.«include» m id 0 = pure (.Ok (), m') ∧ m'.members.toList = slots (pre ++ [id]) r := by
+  simp only [Rust.usizeBits_eq] at hmax
   have hlen : MAX = pre.length + (r + 1) := by
     have := congrArg List.length hm; simp [slots] at this; omega
   have hpos1 := position_id_none pre (r + 1) id hd
   have hpos2 := position_free pre (r + 1) (by omega)
   rw [← hm] at hpos1 hpos2
   have hslot : (Rust.ofNat pre.length : Rust.usize).val = pre.length := by
-    simp [Rust.ofNat]; omega
+    simp [Rust.ofNat]; uomega
   have hlt : (Rust.ofNat pre.length : Rust.usize).val < MAX := by omega
   have hget : m.members[pre.length]'(by omega) = none := by
     have : m.members[pre.length]'(by omega) = m.members.toList[pre.length]'(by simp; omega) := by simp
@@ -75,8 +76,9 @@ theorem enumerate_get {α : Type} (l : List α) (k : Nat) (hk : k < (Rust.Iter.e
 def stable {N : Nat} (ids : Vector Id N) : Membership N := ⟨ids.map (fun i => some (voter i))⟩
 
 /-- `Membership::new(&members, &[])` for distinct members. -/
-theorem new_stable {N : Nat} (ids : Vector Id N) (hn : 0 < N) (hN : N < 2 ^ 64) (hd : ids.toList.Nodup) :
+theorem new_stable {N : Nat} (ids : Vector Id N) (hn : 0 < N) (hN : N < 2 ^ Rust.usizeBits) (hd : ids.toList.Nodup) :
     Membership.new (MAX := N) ids.toArray #[] = pure (.Ok (stable ids)) := by
+  simp only [Rust.usizeBits_eq] at hN
   unfold Membership.new Membership.restore
   have hne : (ids.toArray.isEmpty) = false := by
     simp [Array.isEmpty]; omega
@@ -90,7 +92,7 @@ theorem new_stable {N : Nat} (ids : Vector Id N) (hn : 0 < N) (hN : N < 2 ^ 64) 
     rw [enumerate_length] at hk
     simp only [Array.length_toList, Vector.size_toArray] at hk
     have hkN : k < N := hk
-    have hk2 : (Rust.ofNat k : Rust.usize).val = k := by simp [Rust.ofNat]; omega
+    have hk2 : (Rust.ofNat k : Rust.usize).val = k := by simp [Rust.ofNat]; uomega
     have hkl : k < ids.toList.length := by simpa using hkN
     have hnot : ids.toList[k] ∉ ids.toList.take k := by
       intro hm
@@ -173,9 +175,10 @@ theorem stable_peers {N : Nat} (ids : Vector Id N) : Membership.peers (stable id
   simp [Membership.peers, stable, voter, Vector.map_map, Function.comp_def]
 
 /-- A quorum of the stable configuration is a strict majority of its members. -/
-theorem quorum_stable {N : Nat} (ids : Vector Id N) (hN : N < 2 ^ 64) (f : Id → Rust.M Bool) (g : Id → Bool)
+theorem quorum_stable {N : Nat} (ids : Vector Id N) (hN : N < 2 ^ Rust.usizeBits) (f : Id → Rust.M Bool) (g : Id → Bool)
     (hf : ∀ id ∈ ids.toList, f id = pure (g id)) :
     Membership.quorum (stable ids) f = pure (decide (N / 2 < (ids.toList.filter g).length)) := by
+  simp only [Rust.usizeBits_eq] at hN
   have hv : List.filter (fun m => m.voter) (Rust.Iter.flatten (stable ids).members.toList) = ids.toList.map voter := by
     rw [stable_members]; simp [voter]
   have hfil : List.filterM (fun m => f m.id) (ids.toList.map voter) =
@@ -214,10 +217,11 @@ theorem sorted_count (s : List Rust.u64) (hs : s.Pairwise (fun a b => a.val ≤ 
   simpa using this
 
 /-- `quorum_index` of the stable configuration: a value matched by a strict majority. -/
-theorem quorum_index_stable {N : Nat} (ids : Vector Id N) (hN0 : 0 < N) (hN : N < 2 ^ 63)
+theorem quorum_index_stable {N : Nat} (ids : Vector Id N) (hN0 : 0 < N) (hN : N < 2 ^ (Rust.usizeBits - 1))
     (f : Id → Rust.M Rust.u64) (h : Id → Rust.u64) (hf : ∀ id ∈ ids.toList, f id = pure (h id)) :
     ∃ v, Membership.quorum_index (stable ids) f = pure v ∧
       N / 2 < (ids.toList.filter (fun id => decide (v.val ≤ (h id).val))).length := by
+  simp only [Rust.usizeBits_eq] at hN
   unfold Membership.quorum_index
   simp only [stable_voters, stable_not_joint, Bool.not_false, if_true]
   have hl : ids.toList.length = N := by simp
@@ -250,15 +254,15 @@ theorem quorum_index_stable {N : Nat} (ids : Vector Id N) (hN0 : 0 < N) (hN : N 
       exact hb2
     have hcnt : b.2 = Rust.usizeOf N := Fin.ext (by rw [Rust.val_usizeOf _ (by omega)]; exact hb1)
     have hext : b.1.toArray.extract 0 N = b.1.toArray := by simp
-    rw [hcnt, Rust.Slice.range_ok _ _ _ (by simp [Rust.val_usizeOf _ (show N < 2 ^ 64 by omega)])]
-    simp only [pure_bind, Rust.val_usizeOf _ (show N < 2 ^ 64 by omega), Fin.val_zero, hext]
+    rw [hcnt, Rust.Slice.range_ok _ _ _ (by simp [Rust.val_usizeOf _ (show N < 2 ^ Rust.usizeBits by simp only [Rust.usizeBits_eq]; omega)])]
+    simp only [pure_bind, Rust.val_usizeOf _ (show N < 2 ^ Rust.usizeBits by simp only [Rust.usizeBits_eq]; omega), Fin.val_zero, hext]
     have hsort : (Rust.Slice.sort_unstable b.1.toArray) = srt.toArray := by
       simp only [Rust.Slice.sort_unstable, srt]
       congr 1
       show b.1.toList.mergeSort _ = _
       rw [hfull]
     rw [hsort]
-    have hN64 : N < 2 ^ 64 := by omega
+    have hN64 : N < 2 ^ Rust.usizeBits := by simp only [Rust.usizeBits_eq]; omega
     have hdiv : (Rust.divK (Rust.usizeOf N) 2).val = N / 2 := by
       simp [Rust.divK, Rust.val_usizeOf _ hN64]
     rw [Rust.add_ok _ _ (by rw [hdiv]; simp; omega)]

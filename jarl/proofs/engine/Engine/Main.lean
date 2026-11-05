@@ -17,8 +17,8 @@ variable {V S : Type} {N CAP : Nat} [Rust.Clone V] [Rust.Clone S]
 /-- The configuration assumptions under which the theorems below hold. -/
 structure Assumptions (ids : Vector Id N) (cfg : Fin N → Config N) (CAP : Nat) : Prop where
   nonempty : 0 < N
-  members_fit : N < 2 ^ 63
-  capacity_fits : CAP < 2 ^ 63
+  members_fit : N < 2 ^ (Rust.usizeBits - 1)
+  capacity_fits : CAP < 2 ^ (Rust.usizeBits - 1)
   distinct : ids.toList.Nodup
   members : ∀ k, (cfg k).members = ids
   identity : ∀ k, (cfg k).id = ids[k]

@@ -1,0 +1,6 @@
+{
+  "manifest": "../Cargo.toml",
+  "target": "wasm32-unknown-unknown",
+  "features": [],
+  "no_default_features": false
+}

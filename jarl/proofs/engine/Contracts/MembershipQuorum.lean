@@ -82,12 +82,12 @@ theorem oldM_length (m : Jarl.Membership MAX) : (oldM m).length ≤ MAX := by
   simp only [Keys, List.length_map] at h2
   omega
 
-theorem count_gt (c l : List Member) (hc : c.length < 2 ^ 64) (hl : l.length < 2 ^ 64) :
+theorem count_gt (c l : List Member) (hc : c.length < 2 ^ Rust.usizeBits) (hl : l.length < 2 ^ Rust.usizeBits) :
     decide (Rust.Iter.count c > Rust.divK (Rust.Iter.count l) 2) = decide (l.length / 2 < c.length) := by
   simp only [Rust.Iter.count, Rust.divK, Rust.ofNat, gt_iff_lt, Fin.lt_def]
   rw [Nat.mod_eq_of_lt hc, Nat.mod_eq_of_lt hl]
 
-theorem quorum_execution (m : Jarl.Membership MAX) (a : Id → Rust.M Bool) (hMAX : MAX < 2 ^ 64) :
+theorem quorum_execution (m : Jarl.Membership MAX) (a : Id → Rust.M Bool) (hMAX : MAX < 2 ^ Rust.usizeBits) :
     m.quorum a = (do
       let c ← (curM m).filterM (fun s => a s.id)
       if (curM m).length / 2 < c.length then
@@ -161,7 +161,7 @@ theorem old_voters_eq (m : Jarl.Membership MAX) : m.old_voters = (oldM m).map Me
 /-- For any callback, `quorum` asks about the current voters (in slot order),
     stops with `false` without a strict current majority, and otherwise, when
     joint, asks about the old voters too and reports their strict majority. -/
-theorem execution (m : Jarl.Membership MAX) (a : Id → Rust.M Bool) (hMAX : MAX < 2 ^ 64) :
+theorem execution (m : Jarl.Membership MAX) (a : Id → Rust.M Bool) (hMAX : MAX < 2 ^ Rust.usizeBits) :
     m.quorum a = (do
       let c ← (curM m).filterM (fun s => a s.id)
       if (curM m).length / 2 < c.length then
@@ -172,7 +172,7 @@ theorem execution (m : Jarl.Membership MAX) (a : Id → Rust.M Bool) (hMAX : MAX
       else pure false) :=
   quorum_execution m a hMAX
 
-theorem stable_execution (m : Jarl.Membership MAX) (a : Id → Rust.M Bool) (hMAX : MAX < 2 ^ 64)
+theorem stable_execution (m : Jarl.Membership MAX) (a : Id → Rust.M Bool) (hMAX : MAX < 2 ^ Rust.usizeBits)
     (stable : m.is_joint = false) :
     m.quorum a = (do
       let c ← (curM m).filterM (fun s => a s.id)
@@ -182,14 +182,14 @@ theorem stable_execution (m : Jarl.Membership MAX) (a : Id → Rust.M Bool) (hMA
   by_cases h : (curM m).length / 2 < c.length <;> simp [h, stable]
 
 /-- With no current voters, `quorum` reports `false` without calling the callback. -/
-theorem empty_current (m : Jarl.Membership MAX) (a : Id → Rust.M Bool) (hMAX : MAX < 2 ^ 64)
+theorem empty_current (m : Jarl.Membership MAX) (a : Id → Rust.M Bool) (hMAX : MAX < 2 ^ Rust.usizeBits)
     (empty : m.voters = []) : m.quorum a = pure false := by
   have h : curM m = [] := by simpa [voters_eq] using empty
   rw [execution m a hMAX, h]
   simp [List.filterM, List.filterAuxM]
 
 /-- The callback is consulted only on current and old voters. -/
-theorem response_budget (m : Jarl.Membership MAX) (a b : Id → Rust.M Bool) (hMAX : MAX < 2 ^ 64)
+theorem response_budget (m : Jarl.Membership MAX) (a b : Id → Rust.M Bool) (hMAX : MAX < 2 ^ Rust.usizeBits)
     (current : ∀ id ∈ m.voters, a id = b id) (old : ∀ id ∈ m.old_voters, a id = b id) :
     m.quorum a = m.quorum b := by
   rw [execution m a hMAX, execution m b hMAX,
@@ -198,7 +198,7 @@ theorem response_budget (m : Jarl.Membership MAX) (a b : Id → Rust.M Bool) (hM
 
 /-- Under a normally returning callback reporting `answer`, `quorum` reports
     exactly a strict majority of current voters and, when joint, of old voters. -/
-theorem result (m : Jarl.Membership MAX) (a : Id → Rust.M Bool) (answer : Id → Bool) (hMAX : MAX < 2 ^ 64)
+theorem result (m : Jarl.Membership MAX) (a : Id → Rust.M Bool) (answer : Id → Bool) (hMAX : MAX < 2 ^ Rust.usizeBits)
     (normal : ∀ id, a id = pure (answer id)) :
     m.quorum a = pure (decide (Majority answer m.voters ∧
       (m.is_joint = true → Majority answer m.old_voters))) := by
@@ -218,7 +218,7 @@ theorem result (m : Jarl.Membership MAX) (a : Id → Rust.M Bool) (answer : Id �
   · simp [h1]
 
 /-- Under normally returning callbacks, `quorum` completes. -/
-theorem observation_complete (m : Jarl.Membership MAX) (a : Id → Rust.M Bool) (hMAX : MAX < 2 ^ 64)
+theorem observation_complete (m : Jarl.Membership MAX) (a : Id → Rust.M Bool) (hMAX : MAX < 2 ^ Rust.usizeBits)
     (normal : ∀ id, ∃ r, a id = pure r) : ∃ r, m.quorum a = pure r :=
   ⟨_, result m a (fun id => Classical.choose (normal id)) hMAX (fun id => Classical.choose_spec (normal id))⟩
 
@@ -247,7 +247,7 @@ theorem majorities_intersect (first second : Id → Bool) (values : List Id)
     normally returning callbacks that both obtain a quorum agree on some
     current voter and, in a joint configuration, on some old voter. -/
 theorem quorums_intersect (m : Jarl.Membership MAX) (a1 a2 : Id → Rust.M Bool) (first second : Id → Bool)
-    (hMAX : MAX < 2 ^ 64) (n1 : ∀ id, a1 id = pure (first id)) (n2 : ∀ id, a2 id = pure (second id))
+    (hMAX : MAX < 2 ^ Rust.usizeBits) (n1 : ∀ id, a1 id = pure (first id)) (n2 : ∀ id, a2 id = pure (second id))
     (q1 : m.quorum a1 = pure true) (q2 : m.quorum a2 = pure true) :
     (∃ voter ∈ m.voters, first voter = true ∧ second voter = true) ∧
       (m.is_joint = true → ∃ voter ∈ m.old_voters, first voter = true ∧ second voter = true) := by
@@ -275,8 +275,9 @@ def MajorityAt (matched : Id → Rust.u64) (voters : List Id) (x : Rust.u64) : P
   voters.length / 2 < (voters.map matched).countP (fun v => decide (x.val ≤ v.val))
 
 theorem collect_normal (a : Id → Rust.M Rust.u64) (h : Id → Rust.u64) (L : List Id)
-    (normal : ∀ id ∈ L, a id = pure (h id)) (P0 : Vector Rust.u64 MAX) (hL : L.length ≤ MAX) (hMAX : MAX < 2 ^ 64) :
+    (normal : ∀ id ∈ L, a id = pure (h id)) (P0 : Vector Rust.u64 MAX) (hL : L.length ≤ MAX) (hMAX : MAX < 2 ^ Rust.usizeBits) :
     ∃ P, collect a L P0 = pure (P, Rust.usizeOf L.length) ∧ P.toList.take L.length = L.map h := by
+  simp only [Rust.usizeBits_eq] at hMAX
   unfold collect
   obtain ⟨b, hb, hb1, hb2⟩ := Rust.forIn_inv L (P0, (0 : Rust.usize))
     (fun id (s : Vector Rust.u64 MAX × Rust.usize) => do
@@ -289,7 +290,7 @@ theorem collect_normal (a : Id → Rust.M Rust.u64) (h : Id → Rust.u64) (L : L
       have hset : b.2.val < MAX := by omega
       refine ⟨(b.1.set b.2.val (h L[k]) hset, ⟨k + 1, by omega⟩), ?_, rfl, ?_⟩
       · simp only [normal L[k] (List.getElem_mem hk), pure_bind, Rust.Slice.set_ok _ _ _ hset]
-        rw [Rust.add_ok _ _ (by show b.2.val + 1 < 2 ^ 64; omega)]
+        rw [Rust.add_ok _ _ (by show b.2.val + 1 < 2 ^ Rust.usizeBits; simp only [Rust.usizeBits_eq]; omega)]
         subst hb1; rfl
       · show (b.1.set b.2.val (h L[k]) hset).toList.take (k + 1) = _
         rw [Vector.toList_set, hb1]
@@ -384,10 +385,10 @@ theorem setRange_get {α : Type} (P : Vector α MAX) (arr : Array α) (j : Nat) 
   simp
 
 theorem select_rank (P : Vector Rust.u64 MAX) (vals : List Rust.u64) (hP : P.toList.take vals.length = vals)
-    (hne : vals ≠ []) (hnM : vals.length ≤ MAX) (hMAX : MAX < 2 ^ 64) :
+    (hne : vals ≠ []) (hnM : vals.length ≤ MAX) (hMAX : MAX < 2 ^ Rust.usizeBits) :
     ∃ P', select P (Rust.usizeOf vals.length) = pure (P', rank vals) := by
   have hn1 : 0 < vals.length := List.length_pos_iff.mpr hne
-  have h64 : vals.length < 2 ^ 64 := by omega
+  have h64 : vals.length < 2 ^ Rust.usizeBits := by omega
   have hv : (Rust.usizeOf vals.length).val = vals.length := Rust.val_usizeOf _ h64
   have hdiv : (Rust.divK (Rust.usizeOf vals.length) 2).val = vals.length / 2 := by simp [Rust.divK, hv]
   have hext : ∀ c, c = vals.length → (P.toArray.extract 0 c).toList = vals := by
@@ -434,7 +435,7 @@ theorem empty_current (m : Jarl.Membership MAX) (a : Id → Rust.M Rust.u64) (em
 
 /-- Exact value under a normally returning callback reporting `matched`. -/
 theorem exact (m : Jarl.Membership MAX) (a : Id → Rust.M Rust.u64) (matched : Id → Rust.u64)
-    (hMAX : MAX < 2 ^ 64) (normal : ∀ id, a id = pure (matched id)) (nonempty : m.voters ≠ []) :
+    (hMAX : MAX < 2 ^ Rust.usizeBits) (normal : ∀ id, a id = pure (matched id)) (nonempty : m.voters ≠ []) :
     m.quorum_index a = pure (if m.is_joint then
       Rust.min (rank (m.voters.map matched)) (rank (m.old_voters.map matched))
       else rank (m.voters.map matched)) := by
@@ -464,7 +465,7 @@ theorem exact (m : Jarl.Membership MAX) (a : Id → Rust.M Rust.u64) (matched : 
     voters, otherwise the exact rank value (the typed counterpart of the old
     protocol-lowering `execution`). -/
 theorem execution (m : Jarl.Membership MAX) (a : Id → Rust.M Rust.u64) (matched : Id → Rust.u64)
-    (hMAX : MAX < 2 ^ 64) (normal : ∀ id, a id = pure (matched id)) :
+    (hMAX : MAX < 2 ^ Rust.usizeBits) (normal : ∀ id, a id = pure (matched id)) :
     m.quorum_index a = if m.voters = [] then Rust.fail "attempt to subtract with overflow" else
       pure (if m.is_joint then Rust.min (rank (m.voters.map matched)) (rank (m.old_voters.map matched))
         else rank (m.voters.map matched)) := by
@@ -473,7 +474,7 @@ theorem execution (m : Jarl.Membership MAX) (a : Id → Rust.M Rust.u64) (matche
   · rw [if_neg h]; exact exact m a matched hMAX normal h
 
 theorem stable_execution (m : Jarl.Membership MAX) (a : Id → Rust.M Rust.u64) (matched : Id → Rust.u64)
-    (hMAX : MAX < 2 ^ 64) (normal : ∀ id, a id = pure (matched id)) (stable : m.is_joint = false) :
+    (hMAX : MAX < 2 ^ Rust.usizeBits) (normal : ∀ id, a id = pure (matched id)) (stable : m.is_joint = false) :
     m.quorum_index a = if m.voters = [] then Rust.fail "attempt to subtract with overflow" else
       pure (rank (m.voters.map matched)) := by
   rw [execution m a matched hMAX normal, stable]; rfl
@@ -492,11 +493,11 @@ theorem response_budget (m : Jarl.Membership MAX) (a b : Id → Rust.M Rust.u64)
     normally returning callback; its panics are unreachable, since a joint
     configuration always has old voters. -/
 theorem completes (m : Jarl.Membership MAX) (a : Id → Rust.M Rust.u64) (matched : Id → Rust.u64)
-    (hMAX : MAX < 2 ^ 64) (normal : ∀ id, a id = pure (matched id)) (nonempty : m.voters ≠ []) :
+    (hMAX : MAX < 2 ^ Rust.usizeBits) (normal : ∀ id, a id = pure (matched id)) (nonempty : m.voters ≠ []) :
     ∃ r, m.quorum_index a = pure r :=
   ⟨_, exact m a matched hMAX normal nonempty⟩
 
-theorem observation_complete (m : Jarl.Membership MAX) (a : Id → Rust.M Rust.u64) (hMAX : MAX < 2 ^ 64)
+theorem observation_complete (m : Jarl.Membership MAX) (a : Id → Rust.M Rust.u64) (hMAX : MAX < 2 ^ Rust.usizeBits)
     (normal : ∀ id, ∃ r, a id = pure r) (nonempty : m.voters ≠ []) : ∃ r, m.quorum_index a = pure r :=
   completes m a (fun id => Classical.choose (normal id)) hMAX (fun id => Classical.choose_spec (normal id)) nonempty
 
@@ -505,7 +506,7 @@ theorem observation_complete (m : Jarl.Membership MAX) (a : Id → Rust.M Rust.u
     position acknowledged by a strict majority of the current voters and, in a
     joint configuration, also by a strict majority of the old voters. -/
 theorem result_majority (m : Jarl.Membership MAX) (a : Id → Rust.M Rust.u64) (matched : Id → Rust.u64)
-    (hMAX : MAX < 2 ^ 64) (normal : ∀ id, a id = pure (matched id)) (r : Rust.u64)
+    (hMAX : MAX < 2 ^ Rust.usizeBits) (normal : ∀ id, a id = pure (matched id)) (r : Rust.u64)
     (completed : m.quorum_index a = pure r) (x : Rust.u64) :
     x.val ≤ r.val ↔ MajorityAt matched m.voters x ∧ (m.is_joint = true → MajorityAt matched m.old_voters x) := by
   have nonempty : m.voters ≠ [] := by

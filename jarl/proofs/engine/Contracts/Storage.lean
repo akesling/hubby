@@ -146,18 +146,19 @@ theorem shape_iff_layout (s : State V S CAP) : Shape s ↔ Layout s := by
 
 /-- With room, `push` stores the entry in slot `len` and advances `len`, returning `Ok`. -/
 theorem append_exact (s : State V S CAP) (input : Entry V)
-    (shape : Shape s) (space : s.len.val < CAP) (word : CAP < 2 ^ 64) :
+    (shape : Shape s) (space : s.len.val < CAP) (word : CAP < 2 ^ Rust.usizeBits) :
     State.push s input =
       pure (.Ok (), { s with entries := s.entries.set s.len.val (some input) space,
-                             len := ⟨s.len.val + 1, by omega⟩ }) := by
+                             len := ⟨s.len.val + 1, by uomega⟩ }) := by
   have hne : s.len ≠ Rust.usizeOf CAP := fun h => by
     have := congrArg Fin.val h; rw [Rust.val_usizeOf _ word] at this; omega
-  have hlen : s.len.val + 1 < 2 ^ 64 := by omega
+  have hlen : s.len.val + 1 < 2 ^ Rust.usizeBits := by uomega
+  simp only [Rust.usizeBits_eq] at hlen
   have _ := shape
   simp [State.push, State.full, hne, space, hlen]
 
 theorem append_preserves_shape (s : State V S CAP) (input : Entry V)
-    (shape : Shape s) (space : s.len.val < CAP) (word : CAP < 2 ^ 64) :
+    (shape : Shape s) (space : s.len.val < CAP) (word : CAP < 2 ^ Rust.usizeBits) :
     ∃ next, State.push s input = pure (.Ok (), next) ∧ Shape next ∧ next.len.val = s.len.val + 1 := by
   obtain ⟨s', h1, _, _, _, h4, h5⟩ := push_ok s input word ((shape_iff_layout s).1 shape) space
   exact ⟨s', h1, (shape_iff_layout s').2 h5, h4⟩
@@ -168,10 +169,10 @@ not stored.) -/
 theorem full_preserves_state_at_drop (s : State V S CAP) (input : Entry V)
     (full : s.len.val = CAP) :
     State.push s input = pure (.Err .Full, s) :=
-  push_full s input (by have := s.len.isLt; omega) full
+  push_full s input (by have := s.len.isLt; uomega) full
 
 theorem append_preserves_prefix (s : State V S CAP) (input : Entry V)
-    (shape : Shape s) (space : s.len.val < CAP) (word : CAP < 2 ^ 64) :
+    (shape : Shape s) (space : s.len.val < CAP) (word : CAP < 2 ^ Rust.usizeBits) :
     ∃ next, State.push s input = pure (.Ok (), next) ∧
       ∀ i, i < s.len.val → next.entries.toList[i]? = s.entries.toList[i]? := by
   refine ⟨_, append_exact s input shape space word, ?_⟩
@@ -182,7 +183,7 @@ theorem append_preserves_prefix (s : State V S CAP) (input : Entry V)
 /-- `push` writes only the `entries` and `len` fields (the typed form of binding the
 projected buffer to the source places `entries`, `len` and `CAP`). -/
 theorem append_representation (s : State V S CAP) (input : Entry V)
-    (shape : Shape s) (space : s.len.val < CAP) (word : CAP < 2 ^ 64) :
+    (shape : Shape s) (space : s.len.val < CAP) (word : CAP < 2 ^ Rust.usizeBits) :
     ∃ next, State.push s input = pure (.Ok (), next) ∧
       next.hard = s.hard ∧ next.snapshot = s.snapshot ∧
       next.entries = s.entries.set s.len.val (some input) space ∧ next.len.val = s.len.val + 1 :=
@@ -221,7 +222,7 @@ private theorem push_space (s : State V S CAP) (input : Entry V) (next : State V
     simp at this
 
 private theorem push_shape (s : State V S CAP) (input : Entry V) (next : State V S CAP)
-    (shape : Shape s) (word : CAP < 2 ^ 64)
+    (shape : Shape s) (word : CAP < 2 ^ Rust.usizeBits)
     (execution : State.push s input = pure (.Ok (), next)) : Shape next ∧ next.len.val = s.len.val + 1 := by
   obtain ⟨n, h, hs, hl⟩ := append_preserves_shape s input shape (push_space s input next shape execution) word
   rw [h] at execution
@@ -231,7 +232,7 @@ private theorem push_shape (s : State V S CAP) (input : Entry V) (next : State V
   exact ⟨hs, hl⟩
 
 theorem history_preserves_shape (s : State V S CAP) (input : Entry V)
-    (word : CAP < 2 ^ 64) (history : AppendHistory s) :
+    (word : CAP < 2 ^ Rust.usizeBits) (history : AppendHistory s) :
     Shape s ∧ (s.len.val < CAP →
       ∃ next, State.push s input = pure (.Ok (), next) ∧ Shape next ∧ next.len.val = s.len.val + 1) := by
   have shape : Shape s := by
@@ -430,17 +431,21 @@ theorem mapRange_pure {α : Type} {n : Nat} {a b : Vector α n} {lo hi : Rust.us
     rw [if_neg c] at h
     exact absurd h (fail_ne_pure _ _)
 
-/-- Everything a returning `install` does. -/
+/-- Everything a returning `install` does. The removed prefix length is
+`(index - base) as usize`, i.e. reduced modulo `2 ^ usizeBits`; that is the plain
+difference on 64-bit targets, and on 32-bit ones whenever the slot array fits a
+`usize` (see `installation_matching_suffix`). -/
 theorem install_returns (s next : State V S CAP) (snap : Snapshot S)
     (h : State.install s snap = pure next) :
     next.hard = { s.hard with commit := Rust.max s.hard.commit snap.last.index } ∧
     next.snapshot = some snap ∧
     ((State.id_at s snap.last.index = some snap.last ∧
       s.base.index.val ≤ snap.last.index.val ∧ s.len.val ≤ CAP ∧
-      snap.last.index.val - s.base.index.val ≤ s.len.val ∧
-      next.len.val = s.len.val - (snap.last.index.val - s.base.index.val) ∧
-      (CAP < 2 ^ 64 → next.entries.toList =
-        (s.entries.toList.take s.len.val).drop (snap.last.index.val - s.base.index.val) ++
+      (snap.last.index.val - s.base.index.val) % 2 ^ Rust.usizeBits ≤ s.len.val ∧
+      next.len.val = s.len.val - (snap.last.index.val - s.base.index.val) % 2 ^ Rust.usizeBits ∧
+      (CAP < 2 ^ Rust.usizeBits → next.entries.toList =
+        (s.entries.toList.take s.len.val).drop
+          ((snap.last.index.val - s.base.index.val) % 2 ^ Rust.usizeBits) ++
           List.replicate (CAP - next.len.val) none)) ∨
      (State.id_at s snap.last.index ≠ some snap.last ∧ s.len.val ≤ CAP ∧ next.len.val = 0 ∧
       next.entries.toList = List.replicate s.len.val none ++ s.entries.toList.drop s.len.val)) := by
@@ -461,7 +466,15 @@ theorem install_returns (s next : State V S CAP) (snap : Snapshot S)
     subst e2 e3 e5
     have hm' : State.id_at s snap.last.index = some snap.last := by simpa using hm
     simp only [Array.size_extract] at b3
-    refine ⟨rfl, rfl, Or.inl ⟨hm', by omega, by simpa using b2, by simp at b3; omega, by simp; omega, ?_⟩⟩
+    -- `remove` is `(index - base) as usize`: the identity on 64-bit targets, reduction
+    -- modulo `2 ^ 32` on 32-bit ones.
+    have t1lt := t1.isLt
+    have xlt : snap.last.index.val - s.base.index.val < 2 ^ 64 := e1 ▸ t1lt
+    refine ⟨rfl, rfl, Or.inl ⟨hm', by omega, by simpa using b2, ?_, ?_, ?_⟩⟩
+    all_goals ((try unfold Rust.cast at *); simp only [Rust.usizeBits_eq] at *)
+    all_goals (try simp only [Nat.mod_eq_of_lt xlt] at *)
+    · simp at b3; omega
+    · simp; omega
     intro hcap
     apply List.ext_getElem
     · simp; omega
@@ -498,14 +511,15 @@ theorem exists_bind {α β : Type} {m : Rust.M α} {f : α → Rust.M β} (a : �
 theorem install_match_returns (s : State V S CAP) (snap : Snapshot S)
     (hm : State.id_at s snap.last.index = some snap.last)
     (hb : s.base.index.val ≤ snap.last.index.val) (hlen : s.len.val ≤ CAP)
-    (hr : snap.last.index.val - s.base.index.val ≤ s.len.val) (hcap : CAP < 2 ^ 64) :
+    (hr : snap.last.index.val - s.base.index.val ≤ s.len.val) (hcap : CAP < 2 ^ Rust.usizeBits) :
     ∃ next, State.install s snap = pure next := by
   unfold State.install; dsimp only
   rw [if_pos (by simp [hm])]
   refine exists_bind _ (Rust.sub_ok _ _ hb) ?_
   refine exists_bind _ (Rust.Slice.range_ok _ _ _ ⟨Nat.zero_le _, hlen⟩) ?_
-  refine exists_bind _ (Rust.Slice.rotate_left_ok _ _ (by simp; omega)) ?_
-  refine exists_bind _ (Rust.sub_ok _ _ (by simp; omega)) ?_
+  have := s.len.isLt
+  refine exists_bind _ (Rust.Slice.rotate_left_ok _ _ (by (try unfold Rust.cast); simp; uomega)) ?_
+  refine exists_bind _ (Rust.sub_ok _ _ (by (try unfold Rust.cast); simp; uomega)) ?_
   refine exists_bind _ (Rust.Slice.mapRangeM_pure _ _ _ (fun _ => none) ?_) ?_
   · simp [Rust.val_usizeOf _ hcap]; omega
   · exact ⟨_, rfl⟩
@@ -555,7 +569,7 @@ theorem installation_matching_suffix_by_equality (s : State V S CAP) (snap : Sna
     (length : s.len.val = removed.length + retained.length)
     (index : snap.last.index.val = s.base.index.val + removed.length)
     (matched : State.id_at s snap.last.index = some found)
-    (equal : found.index = snap.last.index ∧ found.term = snap.last.term) (word : CAP < 2 ^ 64) :
+    (equal : found.index = snap.last.index ∧ found.term = snap.last.term) (word : CAP < 2 ^ Rust.usizeBits) :
     ∃ next, State.install s snap = pure next ∧
       next.entries.toList = retained ++ List.replicate (removed.length + padding.length) none ∧
       next.len.val = retained.length ∧
@@ -568,8 +582,9 @@ theorem installation_matching_suffix_by_equality (s : State V S CAP) (snap : Sna
   obtain ⟨next, h⟩ := install_match_returns s snap matched (by omega) (by omega) (by omega) word
   obtain ⟨hh, hs, rest⟩ := install_returns s next snap h
   rcases rest with ⟨_, _, _, _, hl, he⟩ | ⟨hm, _⟩
-  · refine ⟨next, h, ?_, by omega, hh, hs⟩
-    have r : snap.last.index.val - s.base.index.val = removed.length := by omega
+  · have r : (snap.last.index.val - s.base.index.val) % 2 ^ Rust.usizeBits = removed.length := by
+      have := s.len.isLt; uomega
+    refine ⟨next, h, ?_, by omega, hh, hs⟩
     have tk : List.take (removed.length + retained.length) (removed ++ retained ++ padding) =
         removed ++ retained := List.take_left' (by simp)
     rw [he word, slots, length, hl, length, r, tk, List.drop_left]
@@ -581,7 +596,7 @@ theorem installation_matching_suffix (s : State V S CAP) (snap : Snapshot S)
     (slots : s.entries.toList = removed ++ retained ++ padding)
     (length : s.len.val = removed.length + retained.length)
     (index : snap.last.index.val = s.base.index.val + removed.length)
-    (matched : State.id_at s snap.last.index = some snap.last) (word : CAP < 2 ^ 64) :
+    (matched : State.id_at s snap.last.index = some snap.last) (word : CAP < 2 ^ Rust.usizeBits) :
     ∃ next, State.install s snap = pure next ∧
       next.entries.toList = retained ++ List.replicate (removed.length + padding.length) none ∧
       next.len.val = retained.length ∧
@@ -610,7 +625,7 @@ theorem installation_mismatching_prefix (s : State V S CAP) (snap : Snapshot S)
     rw [he, slots, length, List.drop_left]
 
 theorem installation_preserves_shape (s next : State V S CAP) (snap : Snapshot S)
-    (shape : Shape s) (word : CAP < 2 ^ 64)
+    (shape : Shape s) (word : CAP < 2 ^ Rust.usizeBits)
     (execution : State.install s snap = pure next) : Shape next := by
   have hl := (shape_iff_layout s).1 shape
   have hlr := len_eq s hl
@@ -618,10 +633,10 @@ theorem installation_preserves_shape (s next : State V S CAP) (snap : Snapshot S
   obtain ⟨_, _, rest⟩ := install_returns s next snap execution
   apply (shape_iff_layout next).2
   rcases rest with ⟨_, _, _, hr, hlen, he⟩ | ⟨_, _, hlen, he⟩
-  · refine (layout_of next ((ret s).drop (snap.last.index.val - s.base.index.val))
-      (by simp; omega) (by simp; omega) ?_).1
+  · refine (layout_of next ((ret s).drop ((snap.last.index.val - s.base.index.val) % 2 ^ Rust.usizeBits))
+      (by simp; uomega) (by simp; uomega) ?_).1
     rw [he word, tk, ← List.map_drop]
-    congr 2; simp; omega
+    congr 2; simp; uomega
   · refine (layout_of next [] hlen (Nat.zero_le _) ?_).1
     rw [he, dr, List.replicate_append_replicate]
     simp; omega
@@ -830,7 +845,7 @@ theorem truncation_retains_base {hard : HardState} {base : LogId}
 
 theorem append_preserves_log {hard : HardState} {base last : LogId} (s : State V S CAP)
     (input : Entry V) (selected : s.base = base) (valid : LogRep hard base s)
-    (space : s.len.val < CAP) (word : CAP < 2 ^ 64)
+    (space : s.len.val < CAP) (word : CAP < 2 ^ Rust.usizeBits)
     (fetched : State.last s = pure last) (follows : LogSuccessor hard last input.id) :
     ∃ next, State.push s input = pure (.Ok (), next) ∧ LogRep hard base next ∧
       next.len.val = s.len.val + 1 ∧
@@ -849,7 +864,7 @@ theorem append_preserves_log {hard : HardState} {base last : LogId} (s : State V
   refine ⟨next, h, logrep_of_layout hln (hr ▸ Ordered.snoc input chain succ pos mono up), hlen, unchanged⟩
 
 theorem append_preserves_committed_prefix (s : State V S CAP) (input : Entry V) (baseIndex commit : Nat)
-    (shape : Shape s) (space : s.len.val < CAP) (word : CAP < 2 ^ 64)
+    (shape : Shape s) (space : s.len.val < CAP) (word : CAP < 2 ^ Rust.usizeBits)
     (commitBounds : baseIndex ≤ commit ∧ commit ≤ baseIndex + s.len.val) :
     ∃ next, State.push s input = pure (.Ok (), next) ∧
       commit ≤ baseIndex + next.len.val ∧
@@ -875,7 +890,7 @@ theorem installation_matching_preserves_log {hard : HardState} {base last : LogI
     (index : snap.last.index.val = base.index.val + removed.length)
     (commitBound : s.hard.commit.val ≤ base.index.val + removed.length + retained.length)
     (matched : State.id_at s snap.last.index = some found)
-    (equal : found.index = snap.last.index ∧ found.term = snap.last.term) (word : CAP < 2 ^ 64) :
+    (equal : found.index = snap.last.index ∧ found.term = snap.last.term) (word : CAP < 2 ^ Rust.usizeBits) :
     ∃ next, State.install s snap = pure next ∧
       LogRep hard snap.last next ∧
       next.snapshot = some snap ∧
@@ -938,7 +953,7 @@ theorem installation_mismatching_resets_log {hard : HardState} (s : State V S CA
     (slots : s.entries.toList = entries.map some ++ List.replicate padding none)
     (length : s.len.val = entries.length)
     (covered : s.hard.commit.val ≤ snap.last.index.val)
-    (different : State.id_at s snap.last.index ≠ some snap.last) (word : CAP < 2 ^ 64) :
+    (different : State.id_at s snap.last.index ≠ some snap.last) (word : CAP < 2 ^ Rust.usizeBits) :
     ∃ next, State.install s snap = pure next ∧
       LogRep hard snap.last next ∧ next.len.val = 0 ∧
       next.hard.commit = snap.last.index ∧ next.snapshot = some snap := by
@@ -1039,7 +1054,7 @@ theorem entryGuard_false (hard : HardState) (last : LogId) (entry : Entry V) :
     omega
 
 theorem body_step (hard : HardState) (x : Rust.M (Entry V)) (st : State V S CAP)
-    (r0 : Option (Rust.Result (State V S CAP) Error)) (step) (word : CAP < 2 ^ 64) (hl : Layout st)
+    (r0 : Option (Rust.Result (State V S CAP) Error)) (step) (word : CAP < 2 ^ Rust.usizeBits) (hl : Layout st)
     (h : restoreBody hard x (r0, st) = pure step) :
     ∃ e, x = pure e ∧
       ((LogSuccessor hard (lastId st) e.id ∧ st.len.val < CAP ∧
@@ -1070,7 +1085,7 @@ theorem body_step (hard : HardState) (x : Rust.M (Entry V)) (st : State V S CAP)
 def LoopInv (hard : HardState) (st : State V S CAP) : Prop :=
   Layout st ∧ Ordered hard st.base (ret st) (lastId st)
 
-theorem loop_sound (hard : HardState) (word : CAP < 2 ^ 64) :
+theorem loop_sound (hard : HardState) (word : CAP < 2 ^ Rust.usizeBits) :
     ∀ (es : List (Rust.M (Entry V))) (st : State V S CAP) p, LoopInv hard st →
       forIn es (none, st) (restoreBody hard) = pure p →
       (∃ err, p.1 = some (.Err err)) ∨
@@ -1117,7 +1132,7 @@ theorem initial_inv (hard : HardState) (snap : Option (Snapshot S)) :
 
 /-- Everything a successful `restore` establishes. -/
 theorem restore_sound (hard : HardState) (snap : Option (Snapshot S)) (es : List (Rust.M (Entry V)))
-    (out : State V S CAP) (word : CAP < 2 ^ 64)
+    (out : State V S CAP) (word : CAP < 2 ^ Rust.usizeBits)
     (execution : State.restore hard snap es = pure (.Ok out)) :
     initialGuard hard snap = false ∧ ∃ vs, es = vs.map pure ∧ Layout out ∧ ret out = vs ∧
       out.hard = hard ∧ out.snapshot = snap ∧ Ordered hard (boundaryOf snap) vs (lastId out) ∧
@@ -1178,7 +1193,7 @@ theorem ordered_head {hard : HardState} {m last : LogId} {e : Entry V} {rest : L
     exact ⟨⟨succ, pos, mono, up⟩, remaining⟩
 
 theorem body_yield (hard : HardState) (e : Entry V) (st : State V S CAP)
-    (r0 : Option (Rust.Result (State V S CAP) Error)) (word : CAP < 2 ^ 64) (hl : Layout st)
+    (r0 : Option (Rust.Result (State V S CAP) Error)) (word : CAP < 2 ^ Rust.usizeBits) (hl : Layout st)
     (succ : LogSuccessor hard (lastId st) e.id) (space : st.len.val < CAP) :
     ∃ st', restoreBody hard (pure e) (r0, st) = pure (.yield (none, st')) ∧
       Layout st' ∧ ret st' = ret st ++ [e] ∧ st'.hard = st.hard ∧ st'.snapshot = st.snapshot := by
@@ -1188,7 +1203,7 @@ theorem body_yield (hard : HardState) (e : Entry V) (st : State V S CAP)
   unfold restoreBody
   simp [last_eq st hl.1, g, hp]
 
-theorem loop_complete (hard : HardState) (word : CAP < 2 ^ 64) :
+theorem loop_complete (hard : HardState) (word : CAP < 2 ^ Rust.usizeBits) :
     ∀ (rest : List (Entry V)) (st : State V S CAP) (final : LogId), Layout st →
       Ordered hard (lastId st) rest final → (ret st).length + rest.length ≤ CAP →
       ∃ st', forIn (rest.map pure) (none, st) (restoreBody hard) = pure (none, st') ∧
@@ -1210,7 +1225,7 @@ theorem loop_complete (hard : HardState) (word : CAP < 2 ^ 64) :
 /-- Every checkpoint meeting `restore`'s validity conditions is accepted, with exactly
 its entries. -/
 theorem restore_complete (hard : HardState) (snap : Option (Snapshot S)) (vs : List (Entry V))
-    (last : LogId) (word : CAP < 2 ^ 64)
+    (last : LogId) (word : CAP < 2 ^ Rust.usizeBits)
     (snapshotNonzero : ∀ sn, snap = some sn → sn.last.index.val ≠ 0 ∧ sn.last.term.val ≠ 0)
     (termBound : (boundaryOf snap).term.val ≤ hard.term.val)
     (noVote : hard.term.val = 0 → hard.voted_for = none)
@@ -1327,7 +1342,7 @@ theorem initialGuard_false (hard : HardState) (snap : Option (Snapshot S)) :
 /-! ### Restore obligations -/
 
 theorem restoration_preserves_shape (hard : HardState) (snap : Option (Snapshot S))
-    (es : List (Rust.M (Entry V))) (out : State V S CAP) (word : CAP < 2 ^ 64)
+    (es : List (Rust.M (Entry V))) (out : State V S CAP) (word : CAP < 2 ^ Rust.usizeBits)
     (execution : State.restore hard snap es = pure (.Ok out)) :
     Shape out ∧ out.hard = hard ∧ out.snapshot = snap := by
   obtain ⟨_, _, _, hl, _, hh, hs, _⟩ := restore_sound hard snap es out word execution
@@ -1343,7 +1358,7 @@ theorem restoration_fuel_sufficient (hard : HardState) (snap : Option (Snapshot 
 
 /-- A successful `restore` passed its final guard: neither comparison rejected. -/
 theorem restoration_final_guard (hard : HardState) (snap : Option (Snapshot S))
-    (es : List (Rust.M (Entry V))) (out : State V S CAP) (word : CAP < 2 ^ 64)
+    (es : List (Rust.M (Entry V))) (out : State V S CAP) (word : CAP < 2 ^ Rust.usizeBits)
     (execution : State.restore hard snap es = pure (.Ok out)) :
     ¬ (hard.commit < (boundaryOf snap).index) ∧
       ∃ last, State.last out = pure last ∧ ¬ (hard.commit > last.index) := by
@@ -1353,14 +1368,14 @@ theorem restoration_final_guard (hard : HardState) (snap : Option (Snapshot S))
 /-- `restore` installs the supplied `hard` and `snapshot` and a shape-valid buffer;
 its boundary is the supplied snapshot's. -/
 theorem restoration_places (hard : HardState) (snap : Option (Snapshot S))
-    (es : List (Rust.M (Entry V))) (out : State V S CAP) (word : CAP < 2 ^ 64)
+    (es : List (Rust.M (Entry V))) (out : State V S CAP) (word : CAP < 2 ^ Rust.usizeBits)
     (execution : State.restore hard snap es = pure (.Ok out)) :
     out.hard = hard ∧ out.snapshot = snap ∧ State.base out = boundaryOf snap ∧ Shape out := by
   obtain ⟨shape, hh, hs⟩ := restoration_preserves_shape hard snap es out word execution
   exact ⟨hh, hs, by simp [State.base, boundaryOf, hs], shape⟩
 
 theorem restoration_commit_bounds (hard : HardState) (snap : Option (Snapshot S))
-    (es : List (Rust.M (Entry V))) (out : State V S CAP) (word : CAP < 2 ^ 64)
+    (es : List (Rust.M (Entry V))) (out : State V S CAP) (word : CAP < 2 ^ Rust.usizeBits)
     (execution : State.restore hard snap es = pure (.Ok out)) :
     ∃ last, State.last out = pure last ∧
       (boundaryOf snap).index.val ≤ out.hard.commit.val ∧ out.hard.commit.val ≤ last.index.val := by
@@ -1369,26 +1384,26 @@ theorem restoration_commit_bounds (hard : HardState) (snap : Option (Snapshot S)
 
 /-- A successful `restore` passed its initial guard. -/
 theorem restoration_initial_guard (hard : HardState) (snap : Option (Snapshot S))
-    (es : List (Rust.M (Entry V))) (out : State V S CAP) (word : CAP < 2 ^ 64)
+    (es : List (Rust.M (Entry V))) (out : State V S CAP) (word : CAP < 2 ^ Rust.usizeBits)
     (execution : State.restore hard snap es = pure (.Ok out)) :
     initialGuard hard snap = false :=
   (restore_sound hard snap es out word execution).1
 
 theorem restoration_base_term_bound (hard : HardState) (snap : Option (Snapshot S))
-    (es : List (Rust.M (Entry V))) (out : State V S CAP) (word : CAP < 2 ^ 64)
+    (es : List (Rust.M (Entry V))) (out : State V S CAP) (word : CAP < 2 ^ Rust.usizeBits)
     (execution : State.restore hard snap es = pure (.Ok out)) :
     (boundaryOf snap).term.val ≤ hard.term.val :=
   ((initialGuard_false hard snap).1 (restoration_initial_guard hard snap es out word execution)).2.1
 
 theorem restoration_zero_term_has_no_vote (hard : HardState) (snap : Option (Snapshot S))
-    (es : List (Rust.M (Entry V))) (out : State V S CAP) (word : CAP < 2 ^ 64)
+    (es : List (Rust.M (Entry V))) (out : State V S CAP) (word : CAP < 2 ^ Rust.usizeBits)
     (zero : hard.term.val = 0)
     (execution : State.restore hard snap es = pure (.Ok out)) :
     hard.voted_for = none :=
   ((initialGuard_false hard snap).1 (restoration_initial_guard hard snap es out word execution)).2.2 zero
 
 theorem restoration_snapshot_nonzero (hard : HardState) (snap : Snapshot S)
-    (es : List (Rust.M (Entry V))) (out : State V S CAP) (word : CAP < 2 ^ 64)
+    (es : List (Rust.M (Entry V))) (out : State V S CAP) (word : CAP < 2 ^ Rust.usizeBits)
     (execution : State.restore hard (some snap) es = pure (.Ok out)) :
     0 < snap.last.index.val ∧ 0 < snap.last.term.val := by
   have := ((initialGuard_false hard (some snap)).1
@@ -1398,7 +1413,7 @@ theorem restoration_snapshot_nonzero (hard : HardState) (snap : Snapshot S)
 /-- A successful `restore` consumed every input item, and the result holds exactly
 those entries as an ordered chain from the snapshot boundary. -/
 theorem restoration_orders_log (hard : HardState) (snap : Option (Snapshot S))
-    (es : List (Rust.M (Entry V))) (out : State V S CAP) (word : CAP < 2 ^ 64)
+    (es : List (Rust.M (Entry V))) (out : State V S CAP) (word : CAP < 2 ^ Rust.usizeBits)
     (execution : State.restore hard snap es = pure (.Ok out)) :
     ∃ vs last, es = vs.map pure ∧
       out.entries.toList = vs.map some ++ List.replicate (CAP - vs.length) none ∧
@@ -1409,7 +1424,7 @@ theorem restoration_orders_log (hard : HardState) (snap : Option (Snapshot S))
   rw [hl.2, hr, len_eq out hl, hr]
 
 theorem restoration_exact_indices (hard : HardState) (snap : Option (Snapshot S))
-    (es : List (Rust.M (Entry V))) (out : State V S CAP) (word : CAP < 2 ^ 64)
+    (es : List (Rust.M (Entry V))) (out : State V S CAP) (word : CAP < 2 ^ Rust.usizeBits)
     (execution : State.restore hard snap es = pure (.Ok out)) :
     ∃ last, State.last out = pure last ∧
       last.index.val = (boundaryOf snap).index.val + out.len.val ∧
@@ -1425,7 +1440,7 @@ theorem restoration_exact_indices (hard : HardState) (snap : Option (Snapshot S)
   exact ordered_entry_index chain position e he
 
 theorem restoration_log_representation (hard : HardState) (snap : Option (Snapshot S))
-    (es : List (Rust.M (Entry V))) (out : State V S CAP) (word : CAP < 2 ^ 64)
+    (es : List (Rust.M (Entry V))) (out : State V S CAP) (word : CAP < 2 ^ Rust.usizeBits)
     (execution : State.restore hard snap es = pure (.Ok out)) :
     LogRep hard (boundaryOf snap) out := by
   obtain ⟨vs, last, _, slots, length, chain, _⟩ := restoration_orders_log hard snap es out word execution
@@ -1437,7 +1452,7 @@ theorem restoration_log_representation (hard : HardState) (snap : Option (Snapsh
 ordered chain from the snapshot that fits, and commit between the boundary and the
 last index) is accepted, yielding exactly those entries. -/
 theorem restoration_accepts (hard : HardState) (snap : Option (Snapshot S)) (vs : List (Entry V))
-    (last : LogId) (word : CAP < 2 ^ 64)
+    (last : LogId) (word : CAP < 2 ^ Rust.usizeBits)
     (snapshotNonzero : ∀ sn, snap = some sn → sn.last.index.val ≠ 0 ∧ sn.last.term.val ≠ 0)
     (termBound : (boundaryOf snap).term.val ≤ hard.term.val)
     (noVote : hard.term.val = 0 → hard.voted_for = none)
@@ -1457,26 +1472,26 @@ translated; instantiate it with the translated function. These are buffer
 histories; they do not encode protocol or durable-history reachability. -/
 inductive StorageHistory (grow : ∀ {c d : Nat}, State V S c → State V S d → Prop) :
     (CAP : Nat) → State V S CAP → Prop where
-  | fresh (CAP : Nat) (word : CAP < 2 ^ 64) : StorageHistory grow CAP State.new
+  | fresh (CAP : Nat) (word : CAP < 2 ^ Rust.usizeBits) : StorageHistory grow CAP State.new
   | append {CAP : Nat} {s next : State V S CAP} (input : Entry V) :
       StorageHistory grow CAP s → State.push s input = pure (.Ok (), next) → StorageHistory grow CAP next
   | grow {c d : Nat} {s : State V S c} {next : State V S d} :
-      StorageHistory grow c s → c ≤ d → d < 2 ^ 64 → grow s next → StorageHistory grow d next
+      StorageHistory grow c s → c ≤ d → d < 2 ^ Rust.usizeBits → grow s next → StorageHistory grow d next
   | truncate {CAP : Nat} {s next : State V S CAP} (f : Rust.u64) :
       StorageHistory grow CAP s → State.truncate s f = pure next → StorageHistory grow CAP next
   | install {CAP : Nat} {s next : State V S CAP} (snap : Snapshot S) :
       StorageHistory grow CAP s → State.install s snap = pure next → StorageHistory grow CAP next
   | restore (CAP : Nat) (hard : HardState) (snap : Option (Snapshot S)) (es : List (Rust.M (Entry V)))
       (out : State V S CAP) :
-      CAP < 2 ^ 64 → State.restore hard snap es = pure (.Ok out) → StorageHistory grow CAP out
+      CAP < 2 ^ Rust.usizeBits → State.restore hard snap es = pure (.Ok out) → StorageHistory grow CAP out
 
 /-- Every history state is shape-valid with a word-sized capacity, given that the
 growth step preserves shape. -/
 theorem storage_history_valid (grow : ∀ {c d : Nat}, State V S c → State V S d → Prop)
-    (growShape : ∀ {c d : Nat} (s : State V S c) (next : State V S d), Shape s → c ≤ d → d < 2 ^ 64 →
+    (growShape : ∀ {c d : Nat} (s : State V S c) (next : State V S d), Shape s → c ≤ d → d < 2 ^ Rust.usizeBits →
       grow s next → Shape next)
     (CAP : Nat) (s : State V S CAP) (history : StorageHistory grow CAP s) :
-    Shape s ∧ CAP < 2 ^ 64 := by
+    Shape s ∧ CAP < 2 ^ Rust.usizeBits := by
   induction history with
   | fresh CAP word => exact ⟨fresh_representation.2.2.2.2, word⟩
   | append input _ execution ih => exact ⟨(push_shape _ input _ ih.1 ih.2 execution).1, ih.2⟩
@@ -1487,7 +1502,7 @@ theorem storage_history_valid (grow : ∀ {c d : Nat}, State V S c → State V S
     exact ⟨(restoration_preserves_shape hard snap es out word execution).1, word⟩
 
 theorem history_supports_installation (grow : ∀ {c d : Nat}, State V S c → State V S d → Prop)
-    (growShape : ∀ {c d : Nat} (s : State V S c) (next : State V S d), Shape s → c ≤ d → d < 2 ^ 64 →
+    (growShape : ∀ {c d : Nat} (s : State V S c) (next : State V S d), Shape s → c ≤ d → d < 2 ^ Rust.usizeBits →
       grow s next → Shape next)
     (s next : State V S CAP) (snap : Snapshot S)
     (history : StorageHistory grow CAP s)
@@ -1536,7 +1551,7 @@ def movedSlot (s : State V S CAP) (i : Nat) : Option (Entry V) :=
   if i < s.len.val then (s.entries.toList[i]?).getD none else none
 
 theorem grow_loop {NEW : Nat} (s : State V S CAP) (hlen : s.len.val ≤ CAP) (grows : CAP ≤ NEW)
-    (word : NEW < 2 ^ 64) :
+    (word : NEW < 2 ^ Rust.usizeBits) :
     ∃ p : State V S CAP × Array (Option (Entry V)),
       forIn (List.range NEW) (({ s with snapshot := none } : State V S CAP), (#[] : Array (Option (Entry V)))) growBody = pure p ∧
       p.1.hard = s.hard ∧ p.1.len = s.len ∧ p.1.snapshot = none ∧
@@ -1551,7 +1566,7 @@ theorem grow_loop {NEW : Nat} (s : State V S CAP) (hlen : s.len.val ≤ CAP) (gr
       intro k hk b ⟨b1, b2, b3, b4, b5⟩
       simp only [List.length_range] at hk
       simp only [List.getElem_range]
-      have uk : (Rust.usizeOf k).val = k := Rust.val_usizeOf k (by omega)
+      have uk : (Rust.usizeOf k).val = k := Rust.val_usizeOf k (by uomega)
       unfold growBody
       by_cases live : k < s.len.val
       · have c : Rust.usizeOf k < b.1.len := by rw [Fin.lt_def, uk, b2]; exact live
@@ -1597,7 +1612,7 @@ private theorem moved_list (s : State V S CAP) (NEW : Nat) (hlen : s.len.val ≤
 /-- Everything a valid `grow` does: live slots move unchanged into the new array,
 the rest of it is empty, and `len`, `hard` and `snapshot` carry over. -/
 theorem grow_returns {NEW : Nat} (s : State V S CAP) (hlen : s.len.val ≤ CAP) (grows : CAP ≤ NEW)
-    (word : NEW < 2 ^ 64) :
+    (word : NEW < 2 ^ Rust.usizeBits) :
     ∃ p : State V S CAP × Array (Option (Entry V)),
       forIn (List.range NEW) (({ s with snapshot := none } : State V S CAP), (#[] : Array (Option (Entry V))))
         growBody = pure p ∧
@@ -1611,7 +1626,7 @@ theorem grow_returns {NEW : Nat} (s : State V S CAP) (hlen : s.len.val ≤ CAP) 
     have := congrArg List.length h4; simpa using this
   have c : (!decide (Rust.usizeOf NEW ≥ Rust.usizeOf CAP)) = false := by
     simp only [Bool.not_eq_false', decide_eq_true_eq, ge_iff_le, Fin.le_def]
-    rw [Rust.val_usizeOf _ word, Rust.val_usizeOf _ (by omega)]; exact grows
+    rw [Rust.val_usizeOf _ word, Rust.val_usizeOf _ (by uomega)]; exact grows
   refine ⟨p, hp, h5, ⟨p.1.hard, s.snapshot, ⟨p.2, size⟩, p.1.len⟩, ?_, ?_, rfl, h2, h1, rfl⟩
   · rw [grow_eq, c]
     simp only [Bool.false_eq_true, if_false, pure_bind, hp, growFinish, Rust.Slice.ofArray, dif_pos size]
@@ -1619,17 +1634,17 @@ theorem grow_returns {NEW : Nat} (s : State V S CAP) (hlen : s.len.val ≤ CAP) 
     rw [h4, moved_list s NEW hlen grows]
 
 /-- The const assertion: shrinking panics. -/
-theorem grow_assertion_fails {NEW : Nat} (s : State V S CAP) (shrinks : NEW < CAP) (word : CAP < 2 ^ 64) :
+theorem grow_assertion_fails {NEW : Nat} (s : State V S CAP) (shrinks : NEW < CAP) (word : CAP < 2 ^ Rust.usizeBits) :
     (State.grow s : Rust.M (State V S NEW)) = Rust.fail "assertion failed" := by
   have c : (!decide (Rust.usizeOf NEW ≥ Rust.usizeOf CAP)) = true := by
     simp only [Bool.not_eq_true', decide_eq_false_iff_not, ge_iff_le, Fin.le_def]
-    rw [Rust.val_usizeOf _ word, Rust.val_usizeOf _ (by omega)]; omega
+    rw [Rust.val_usizeOf _ word, Rust.val_usizeOf _ (by uomega)]; omega
   rw [grow_eq, c, if_pos rfl]
   rfl
 
 theorem grow_exact {NEW : Nat} (s : State V S CAP) (live : List (Entry V))
     (slots : s.entries.toList = live.map some ++ List.replicate (CAP - live.length) none)
-    (length : s.len.val = live.length) (grows : CAP ≤ NEW) (word : NEW < 2 ^ 64) :
+    (length : s.len.val = live.length) (grows : CAP ≤ NEW) (word : NEW < 2 ^ Rust.usizeBits) :
     ∃ next : State V S NEW, State.grow s = pure next ∧
       next.entries.toList = live.map some ++ List.replicate (NEW - live.length) none ∧
       next.len = s.len ∧ next.hard = s.hard ∧ next.snapshot = s.snapshot := by
@@ -1643,7 +1658,7 @@ theorem grow_exact {NEW : Nat} (s : State V S CAP) (live : List (Entry V))
 `hard` and `snapshot` (carried), from capacity `CAP` to `NEW`. -/
 theorem growth_representation {NEW : Nat} (s : State V S CAP) (live : List (Entry V))
     (slots : s.entries.toList = live.map some ++ List.replicate (CAP - live.length) none)
-    (length : s.len.val = live.length) (grows : CAP ≤ NEW) (word : NEW < 2 ^ 64) :
+    (length : s.len.val = live.length) (grows : CAP ≤ NEW) (word : NEW < 2 ^ Rust.usizeBits) :
     ∃ next : State V S NEW, State.grow s = pure next ∧
       next = { hard := s.hard, snapshot := s.snapshot, len := s.len,
                entries := ⟨(live.map some ++ List.replicate (NEW - live.length) none).toArray,
@@ -1659,7 +1674,7 @@ theorem growth_representation {NEW : Nat} (s : State V S CAP) (live : List (Entr
     rw [he]; simp
 
 theorem grow_preserves_shape {NEW : Nat} (s : State V S CAP) (shape : Shape s) (grows : CAP ≤ NEW)
-    (word : NEW < 2 ^ 64) :
+    (word : NEW < 2 ^ Rust.usizeBits) :
     ∃ next : State V S NEW, State.grow s = pure next ∧ Shape next ∧ next.len = s.len ∧
       (∀ i, i < s.len.val → next.entries.toList[i]? = s.entries.toList[i]?) := by
   have hl := (shape_iff_layout s).1 shape
@@ -1679,7 +1694,7 @@ new array receives exactly the live payloads (the typed form of the old
 initialized-moves account). -/
 theorem grow_initialized_moves {NEW : Nat} (s : State V S CAP) (live : List (Entry V))
     (slots : s.entries.toList = live.map some ++ List.replicate (CAP - live.length) none)
-    (length : s.len.val = live.length) (grows : CAP ≤ NEW) (word : NEW < 2 ^ 64) :
+    (length : s.len.val = live.length) (grows : CAP ≤ NEW) (word : NEW < 2 ^ Rust.usizeBits) :
     ∃ p : State V S CAP × Array (Option (Entry V)),
       forIn (List.range NEW) (({ s with snapshot := none } : State V S CAP), (#[] : Array (Option (Entry V))))
         growBody = pure p ∧
@@ -1703,7 +1718,7 @@ theorem grow_initialized_moves {NEW : Nat} (s : State V S CAP) (live : List (Ent
 
 /-- `grow` preserves the logical log representation. -/
 theorem growth_preserves_log {NEW : Nat} {hard : HardState} {base : LogId} (s : State V S CAP)
-    (valid : LogRep hard base s) (grows : CAP ≤ NEW) (word : NEW < 2 ^ 64) :
+    (valid : LogRep hard base s) (grows : CAP ≤ NEW) (word : NEW < 2 ^ Rust.usizeBits) :
     ∃ next : State V S NEW, State.grow s = pure next ∧ LogRep hard base next ∧ next.len = s.len := by
   obtain ⟨shape, entries, last, slots, length, chain⟩ := valid
   obtain ⟨next, h, he, hl, _, _⟩ := grow_exact (NEW := NEW) s entries (by rw [slots, length]) length grows word
@@ -1717,7 +1732,7 @@ def growStep : ∀ {c d : Nat}, State V S c → State V S d → Prop :=
   fun s next => State.grow s = pure next
 
 theorem growStep_shape {c d : Nat} (s : State V S c) (next : State V S d) (shape : Shape s) (grows : c ≤ d)
-    (word : d < 2 ^ 64) (step : growStep s next) : Shape next := by
+    (word : d < 2 ^ Rust.usizeBits) (step : growStep s next) : Shape next := by
   obtain ⟨next', h, nshape, _, _⟩ := grow_preserves_shape (NEW := d) s shape grows word
   unfold growStep at step
   rw [h] at step
@@ -1728,8 +1743,8 @@ theorem growStep_shape {c d : Nat} (s : State V S c) (next : State V S d) (shape
 shape-valid, and growing it to any larger word-sized capacity succeeds, keeping
 the live prefix. -/
 theorem history_supports_growth {NEW : Nat} (s : State V S CAP)
-    (history : StorageHistory growStep CAP s) (grows : CAP ≤ NEW) (word : NEW < 2 ^ 64) :
-    Shape s ∧ CAP < 2 ^ 64 ∧
+    (history : StorageHistory growStep CAP s) (grows : CAP ≤ NEW) (word : NEW < 2 ^ Rust.usizeBits) :
+    Shape s ∧ CAP < 2 ^ Rust.usizeBits ∧
       ∃ next : State V S NEW, State.grow s = pure next ∧ Shape next ∧ next.len = s.len ∧
         (∀ i, i < s.len.val → next.entries.toList[i]? = s.entries.toList[i]?) := by
   have valid := storage_history_valid growStep growStep_shape CAP s history

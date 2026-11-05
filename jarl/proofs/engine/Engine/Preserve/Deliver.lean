@@ -535,7 +535,7 @@ theorem replicated_rel2 (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids
           n'.extra_reply = m'.extra_reply ∧
           ∀ j : Fin N, n'.outbox[j] = m'.outbox[j] ∨
             (n'.outbox[j] = some .Replicate ∧ (j.val = p.val ∨ j.val ≠ n.local.val)) := by
-  have hN : N < 2 ^ 64 := by have := hf.n_lt; omega
+  have hN : N < 2 ^ Rust.usizeBits := by have := hf.n_lt; uomega
   have triv := replicated_trivial2 ids n hf p.val hp index rej (n.active.set p.val true hp) n.next n.outbox
     (fun _ => Or.inl rfl)
   unfold Node.replicated
@@ -665,8 +665,8 @@ theorem case_replicated (ids : Vector Id N) (cfg : Fin N → Config N) (C : Clus
     · exact ⟨h, h', h''⟩
     · rw [h] at hl; cases hl
   obtain ⟨hs1, hr1, hd1⟩ := hA1
-  have hN : N < 2 ^ 64 := by have := hF1.n_lt; omega
-  have hav : (Rust.ofNat a.val : Rust.usize).val = a.val := by simp [Rust.ofNat]; omega
+  have hN : N < 2 ^ Rust.usizeBits := by have := hF1.n_lt; uomega
+  have hav : (Rust.ofNat a.val : Rust.usize).val = a.val := by simp [Rust.ofNat]; uomega
   have hp : (Rust.ofNat a.val : Rust.usize).val < N := by rw [hav]; exact a.isLt
   obtain ⟨n'', hr', hF', m, hR, -, m', hA', hcf, hst, hro, hvo, hdi, hma, hlo, -, hob⟩ :=
     replicated_rel2 ids n1 hF1 _ hp index rej
@@ -1789,7 +1789,7 @@ theorem post_install (ids : Vector Id N) (C : Cluster V S N CAP) (G : Ghost V N)
       snap.last.index none := by
   have hs2 := hP.live
   obtain ⟨s'', hins', hsn, hhard, hr, hl'⟩ :=
-    install_spec n2.state snap (by have := hP.fixed.cap_lt; omega) hs2.layout hs2.contig
+    install_spec n2.state snap (by have := hP.fixed.cap_lt; uomega) hs2.layout hs2.contig
   rw [hins'] at hins
   have e : s'' = s' := pure_inj hins
   subst e

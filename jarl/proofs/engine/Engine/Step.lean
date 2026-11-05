@@ -119,19 +119,19 @@ theorem follow_some (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed ids n) 
     { hf with layout := hf.layout, contig := hf.contig, prevoting := rfl }
   exact ⟨n2, hfo, hT', fixed_timers ids _ _ hY hT'⟩
 
-theorem send_peer (n : Node V S N CAP) (a : Fin N) (o : Outbound) (hN : N < 2 ^ 64) :
+theorem send_peer (n : Node V S N CAP) (a : Fin N) (o : Outbound) (hN : N < 2 ^ Rust.usizeBits) :
     Node.send n (Rust.ofNat a.val) o = pure (queue n a o) := by
-  have hav : (Rust.ofNat a.val : Rust.usize).val = a.val := by simp [Rust.ofNat]; omega
+  have hav : (Rust.ofNat a.val : Rust.usize).val = a.val := by simp [Rust.ofNat]; uomega
   rw [send_eq n _ o hN (by rw [hav]; exact a.isLt)]
   unfold queue; simp only [hav]
 
-theorem reply_peer (n : Node V S N CAP) (a : Fin N) (i : Rust.u64) (rj : Option Rejection) (hN : N < 2 ^ 64) :
+theorem reply_peer (n : Node V S N CAP) (a : Fin N) (i : Rust.u64) (rj : Option Rejection) (hN : N < 2 ^ Rust.usizeBits) :
     Node.reply n (Rust.ofNat a.val) i rj = pure (queue n a (.Replicated i rj)) := by
   simp [Node.reply, send_peer n a _ hN]
 
-theorem set_peer {α : Type} (v : Vector α N) (a : Fin N) (x : α) (hN : N < 2 ^ 64) :
+theorem set_peer {α : Type} (v : Vector α N) (a : Fin N) (x : α) (hN : N < 2 ^ Rust.usizeBits) :
     Rust.Slice.set v (Rust.ofNat a.val) x = pure (v.set a.val x a.isLt) := by
-  have hav : (Rust.ofNat a.val : Rust.usize).val = a.val := by simp [Rust.ofNat]; omega
+  have hav : (Rust.ofNat a.val : Rust.usize).val = a.val := by simp [Rust.ofNat]; uomega
   rw [Rust.Slice.set_ok _ _ _ (by rw [hav]; exact a.isLt)]
   simp only [hav]
 
@@ -169,7 +169,7 @@ theorem step_rel [Rust.LawfulClone S] (ids : Vector Id N) (n : Node V S N CAP) (
     (env : Envelope V S) (hsrc : env.from = ids[a]) (hm : FixedMessage env.message)
     (r : Rust.Result Unit Error) (n' : Node V S N CAP) (h : Node.step n env = pure (r, n')) :
     Stepped n a env.from env.message n' := by
-  have hN : N < 2 ^ 64 := by have := hf.n_lt; omega
+  have hN : N < 2 ^ Rust.usizeBits := by have := hf.n_lt; uomega
   have hpos : Rust.Iter.position n.peers.toList (fun id => id == some env.from) = some (Rust.ofNat a.val) := by
     rw [hf.peers, hsrc]; exact position_member ids hf.nodup a.val a.isLt
   rcases env with ⟨src, dst, msg⟩
@@ -288,7 +288,7 @@ theorem step_rel [Rust.LawfulClone S] (ids : Vector Id N) (n : Node V S N CAP) (
           (n2.state.hard.commit.val < snap.last.index.val ∨ idAt n2.state snap.last.index.val = some snap.last)
       · rw [if_pos (by rw [id_at_eq _ hF2.layout]; simpa [Fin.lt_def] using c2)] at h
         obtain ⟨s', hins, hsn, hhard, hr, hl'⟩ :=
-          install_spec n2.state snap (by have := hF2.cap_lt; omega) hF2.layout hF2.contig
+          install_spec n2.state snap (by have := hF2.cap_lt; uomega) hF2.layout hF2.contig
         have hc' := install_contig n2.state s' _ hF2.layout hF2.contig hsn hr
         by_cases c3 : (State.id_at n2.state snap.last.index != some snap.last) = true
         · rw [if_pos c3] at h

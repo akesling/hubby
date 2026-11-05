@@ -59,7 +59,7 @@ theorem validated_append_preserves_log {N : Nat} [Rust.Clone V] [Rust.Clone S]
       (Message.Append term previous (some input) commit : Message V S) = pure true)
     (advancedTerm : term.val ≤ hard.term.val)
     (selected : s.base = base) (valid : LogRep hard base s)
-    (space : s.len.val < CAP) (word : CAP < 2 ^ 64)
+    (space : s.len.val < CAP) (word : CAP < 2 ^ Rust.usizeBits)
     (fetched : State.last s = pure previous) :
     ∃ next, State.push s input = pure (.Ok (), next) ∧ LogRep hard base next ∧
       next.len.val = s.len.val + 1 ∧
@@ -90,7 +90,7 @@ theorem replacement_prepares_append {hard : HardState} {base : LogId}
 
 theorem replacement_storage_succeeds {hard : HardState} {base : LogId}
     (s : State V S CAP) (f : Rust.u64) (commit : Nat) (input : Entry V)
-    (selected : s.base = base) (valid : LogRep hard base s) (word : CAP < 2 ^ 64)
+    (selected : s.base = base) (valid : LogRep hard base s) (word : CAP < 2 ^ Rust.usizeBits)
     (commitBounds : base.index.val ≤ commit ∧ commit ≤ base.index.val + s.len.val)
     (authorized : commit < f.val)
     (canStore : ¬(s.len.val = CAP ∧ f.val > base.index.val + s.len.val)) :
@@ -148,7 +148,7 @@ theorem predecessor_after_truncation {hard : HardState} {base last : LogId}
 an ordered log, the committed slots, and the exact length. -/
 theorem replacement_append_preserves_log {hard : HardState} {base last : LogId}
     (s shortened : State V S CAP) (f : Rust.u64) (commit : Nat) (input : Entry V)
-    (selected : s.base = base) (valid : LogRep hard base s) (word : CAP < 2 ^ 64)
+    (selected : s.base = base) (valid : LogRep hard base s) (word : CAP < 2 ^ Rust.usizeBits)
     (commitBounds : base.index.val ≤ commit ∧ commit ≤ base.index.val + s.len.val)
     (authorized : commit < f.val)
     (canStore : ¬(s.len.val = CAP ∧ f.val > base.index.val + s.len.val))
@@ -216,7 +216,7 @@ theorem lookup_retained_after_truncation {hard : HardState} {base last : LogId}
 free space and the retained predecessor are conclusions about the translation. -/
 theorem matched_replacement_preserves_log {hard : HardState} {base last : LogId}
     (s : State V S CAP) (previousIndex f : Rust.u64) (commit : Nat) (input : Entry V)
-    (selected : s.base = base) (valid : LogRep hard base s) (word : CAP < 2 ^ 64)
+    (selected : s.base = base) (valid : LogRep hard base s) (word : CAP < 2 ^ Rust.usizeBits)
     (next : f.val = previousIndex.val + 1)
     (commitBounds : base.index.val ≤ commit ∧ commit ≤ base.index.val + s.len.val)
     (authorized : commit < previousIndex.val + 1)

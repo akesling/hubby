@@ -83,7 +83,7 @@ theorem next_message_rel (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed id
       ∀ env, r = some env → n.dirty = false ∧ ∃ (k : Fin N) (o : Outbound),
         n.outbox[k] = some o ∧ n'.outbox = n.outbox.set k.val none k.isLt ∧
         env.from = n.config.id ∧ env.to = ids[k] ∧ Built n k o env.message := by
-  have hN : N < 2 ^ 64 := by have := hf.n_lt; omega
+  have hN : N < 2 ^ Rust.usizeBits := by have := hf.n_lt; uomega
   unfold Node.next_message at h
   by_cases hd : n.dirty = true
   · simp only [hd, if_true] at h
@@ -101,7 +101,7 @@ theorem next_message_rel (ids : Vector Id N) (n : Node V S N CAP) (hf : Fixed id
     obtain ⟨hjl, hjp, -⟩ := List.findIdx?_eq_some_iff_getElem.mp hfind
     have hj : j < N := by simpa using hjl
     have hv : (Rust.ofNat j : Rust.usize).val = j := by
-      simp [Rust.ofNat]; omega
+      simp [Rust.ofNat]; uomega
     obtain ⟨o, ho⟩ : ∃ o, n.outbox[j] = some o := by
       simp only [Vector.getElem_toList] at hjp
       exact Option.isSome_iff_exists.mp hjp

@@ -42,7 +42,7 @@ inductive Act (cfg : Fin N → Config N) (C : Cluster V S N CAP) : Cluster V S N
   | propose (k : Fin N) (v : V) (r : Rust.Result LogId Error) (n : Node V S N CAP) :
       Node.propose (C.live k) v = pure (r, n) → Act cfg C (C.setLive k n)
   | proposeBatch (k : Fin N) (vs : Array V) (r : Rust.Result ProposalRange Error) (n : Node V S N CAP) :
-      vs.size < 2 ^ 64 → Node.propose_batch (C.live k) vs = pure (r, n) → Act cfg C (C.setLive k n)
+      vs.size < 2 ^ Rust.usizeBits → Node.propose_batch (C.live k) vs = pure (r, n) → Act cfg C (C.setLive k n)
   | compact (k : Fin N) (index : Rust.u64) (v : S) (r : Rust.Result Unit Error) (n : Node V S N CAP) :
       Node.compact (C.live k) index v = pure (r, n) → Act cfg C (C.setLive k n)
   | persist (k : Fin N) (ready : Ready V S N CAP) :
