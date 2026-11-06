@@ -45,6 +45,7 @@ pub fn parse_lenient(text: &str, src: &SourceMap) -> Result<(Vec<Body>, Vec<Stri
     // Closure types carry their defining function's generic parameters: the
     // closure body's `_1` names its span.
     let mut closures = BTreeMap::new();
+    let mut captures: BTreeMap<String, Vec<(usize, String)>> = BTreeMap::new();
     for (r, o) in raws.iter().zip(&origins) {
         let (Some(o), Some(p0)) = (o, r.params.first()) else {
             continue;
@@ -70,15 +71,14 @@ pub fn parse_lenient(text: &str, src: &SourceMap) -> Result<(Vec<Body>, Vec<Stri
                 }
             })
             .collect();
-        closures.insert(
-            p0[i + "{closure@".len()..i + j].to_owned(),
-            (body_base(&r.name), args),
-        );
+        let span = p0[i + "{closure@".len()..i + j].to_owned();
+        captures.insert(span.clone(), capture_types(r));
+        closures.insert(span, (body_base(&r.name), args));
     }
     let mut bodies = vec![];
     for (r, o) in raws.iter().zip(&origins) {
         let Some(o) = o else { continue };
-        match body(r, o, &ix, &res, &closures).and_then(|mut b| {
+        match body(r, o, &ix, &res, &closures, &captures).and_then(|mut b| {
             foreign_closures(&mut b, &closures)?;
             Ok(b)
         }) {
@@ -693,6 +693,7 @@ fn body(
     ix: &Index,
     res: &Resolver,
     closures: &BTreeMap<String, (String, Vec<Ty>)>,
+    captures: &BTreeMap<String, Vec<(usize, String)>>,
 ) -> Result<Body, String> {
     let mut vars = vec![];
     let mut cx = Cx {
@@ -812,6 +813,7 @@ fn body(
         }
         out.push(Some(Block { stmts, term }));
     }
+    repair_captures(&mut out, &cx, captures).map_err(|e| at(r.line, e))?;
     Ok(Body {
         name: r.name.clone(),
         tparams: o
@@ -833,6 +835,171 @@ fn body(
         },
         closure: closure_param(r).map_err(|e| at(r.line, e))?,
     })
+}
+
+/// A closure body's captures, from its `debug` lines: each capture `k` of `_1`
+/// with its printed type (`debug x => (*((*_1).k: &T));`,
+/// `debug x => ((*_1).k: T);`, or `(_1.k: T)` for a closure taken by value).
+fn capture_types(r: &RawBody) -> Vec<(usize, String)> {
+    let mut out: Vec<(usize, String)> = vec![];
+    for &(_, line) in &r.lines {
+        let t = line.trim();
+        let Some(d) = t.strip_prefix("debug ") else { continue };
+        let Some((_, e)) = d.strip_suffix(';').and_then(|d| d.split_once(" => ")) else { continue };
+        for pat in ["((*_1).", "(_1."] {
+            let mut from = 0;
+            while let Some(i) = e[from..].find(pat) {
+                let start = from + i;
+                from = start + pat.len();
+                let rest = &e[start + pat.len()..];
+                let digits: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+                let Ok(k) = digits.parse::<usize>() else { continue };
+                let Some(ty_start) = rest[digits.len()..].strip_prefix(": ") else { continue };
+                let Some(close) = matching(e, start) else { continue };
+                let ty_from = e.len() - ty_start.len();
+                if close < ty_from {
+                    continue;
+                }
+                let ty = e[ty_from..close].to_owned();
+                if !out.iter().any(|(j, _)| *j == k) {
+                    out.push((k, ty));
+                }
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
+/// rustc's MIR printer shows a closure aggregate's operands by capture name,
+/// so captures sharing a name (`self.entries` and `self.len`, both `self`)
+/// collapse into one. When the closure's body shows more captures than the
+/// aggregate has operands, match each printed operand to the capture of its
+/// type, and take each missing capture from the one local of that type that
+/// the block assigns before the aggregate and the body uses nowhere else.
+/// Anything less certain is an error.
+fn repair_captures(
+    blocks: &mut [Option<Block>],
+    cx: &Cx,
+    captures: &BTreeMap<String, Vec<(usize, String)>>,
+) -> Result<(), String> {
+    let uses = local_uses(blocks);
+    for bi in 0..blocks.len() {
+        let Some(blk) = &blocks[bi] else { continue };
+        for si in 0..blk.stmts.len() {
+            let Stmt::Assign(_, Rvalue::Aggr(AggKind::Closure(span), ops)) = &blk.stmts[si] else { continue };
+            let Some(caps) = captures.get(span) else { continue };
+            if caps.len() <= ops.len() {
+                continue;
+            }
+            if caps.iter().enumerate().any(|(i, (k, _))| *k != i) {
+                return Err(format!("closure `{span}`: captures not numbered 0..{}", caps.len()));
+            }
+            let tys = caps
+                .iter()
+                .map(|(_, t)| cx.ty(t))
+                .collect::<Result<Vec<Ty>, String>>()
+                .map_err(|e| format!("closure `{span}` capture type: {e}"))?;
+            let op_local = |o: &Operand| match o {
+                Operand::Copy(p) | Operand::Move(p) if p.proj.is_empty() => Some(p.loc),
+                _ => None,
+            };
+            let mut slots: Vec<Option<Operand>> = vec![None; tys.len()];
+            for o in ops {
+                let l = op_local(o).ok_or_else(|| format!("closure `{span}`: operand `{o:?}` is not a local"))?;
+                let fits: Vec<usize> = (0..tys.len())
+                    .filter(|&i| slots[i].is_none() && cx.locals.get(l) == Some(&tys[i]))
+                    .collect();
+                match fits.as_slice() {
+                    [i] => slots[*i] = Some(o.clone()),
+                    _ => return Err(format!("closure `{span}`: cannot place operand _{l} among its captures")),
+                }
+            }
+            let printed: Vec<usize> = ops.iter().filter_map(op_local).collect();
+            for i in 0..tys.len() {
+                if slots[i].is_some() {
+                    continue;
+                }
+                let cands: Vec<usize> = (0..cx.locals.len())
+                    .filter(|&l| !printed.contains(&l) && cx.locals[l] == tys[i])
+                    .filter(|&l| {
+                        blk.stmts[..si].iter().any(|st| {
+                            matches!(st, Stmt::Assign(p, _) if p.loc == l && p.proj.is_empty())
+                        }) && uses.get(&l).copied().unwrap_or(0) == 1
+                    })
+                    .filter(|l| !slots.iter().flatten().any(|o| op_local(o) == Some(*l)))
+                    .collect();
+                match cands.as_slice() {
+                    [l] => slots[i] = Some(Operand::Move(Place { loc: *l, proj: vec![] })),
+                    _ => {
+                        return Err(format!(
+                            "closure `{span}`: capture {i} is missing from the printed aggregate and no unique local supplies it"
+                        ))
+                    }
+                }
+            }
+            let fixed: Vec<Operand> = slots.into_iter().map(|o| o.unwrap()).collect();
+            if let Some(Some(b)) = blocks.get_mut(bi) {
+                if let Stmt::Assign(_, Rvalue::Aggr(_, ops)) = &mut b.stmts[si] {
+                    *ops = fixed;
+                }
+            }
+            return repair_captures(blocks, cx, captures);
+        }
+    }
+    Ok(())
+}
+
+/// How many times each local is mentioned (assigned, read, borrowed, indexed).
+fn local_uses(blocks: &[Option<Block>]) -> BTreeMap<usize, usize> {
+    let mut n: BTreeMap<usize, usize> = BTreeMap::new();
+    fn place(n: &mut BTreeMap<usize, usize>, p: &Place) {
+        *n.entry(p.loc).or_default() += 1;
+        for e in &p.proj {
+            if let PElem::Index(l) = e {
+                *n.entry(*l).or_default() += 1;
+            }
+        }
+    }
+    fn op(n: &mut BTreeMap<usize, usize>, o: &Operand) {
+        if let Operand::Copy(p) | Operand::Move(p) = o {
+            place(n, p);
+        }
+    }
+    for b in blocks.iter().flatten() {
+        for st in &b.stmts {
+            match st {
+                Stmt::Assign(p, rv) => {
+                    place(&mut n, p);
+                    match rv {
+                        Rvalue::Use(o) | Rvalue::Unop(_, o) | Rvalue::Cast(o, _) | Rvalue::Coerce(_, o, _)
+                        | Rvalue::PtrMeta(o) | Rvalue::Rep(o, _) => op(&mut n, o),
+                        Rvalue::Binop(_, a, c) | Rvalue::Checked(_, a, c) => {
+                            op(&mut n, a);
+                            op(&mut n, c)
+                        }
+                        Rvalue::Ref(_, q) | Rvalue::Discr(q) => place(&mut n, q),
+                        Rvalue::Aggr(_, os) => os.iter().for_each(|o| op(&mut n, o)),
+                    }
+                }
+                Stmt::SetDiscr(p, _) => place(&mut n, p),
+                Stmt::Nop => {}
+            }
+        }
+        match &b.term {
+            Term::Switch(o, _, _) | Term::Assert(o, _, _) => op(&mut n, o),
+            Term::Drop(p, _) => place(&mut n, p),
+            Term::Call(c, args, dest, _) => {
+                if let Callee::Ptr(o) = c {
+                    op(&mut n, o);
+                }
+                args.iter().for_each(|o| op(&mut n, o));
+                place(&mut n, dest);
+            }
+            Term::Goto(_) | Term::Ret | Term::Unreachable => {}
+        }
+    }
+    n
 }
 
 /// A closure body's span and whether its `_1` is `&{closure@..}` or

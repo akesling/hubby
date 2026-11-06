@@ -1100,3 +1100,58 @@ fn canonical_paths() {
     let e = parse(&text, &src()).unwrap_err();
     assert!(e.contains("does not match the module"), "{e}");
 }
+
+/// A closure with two captures named `self` (`self.a`, `self.b`), as rustc
+/// prints them: the aggregate shows only one operand.
+fn two_capture_closure() -> String {
+    format!(
+        "fn {GET}::{{closure#1}}(_1: &{{closure@src/lib.rs:9:5: 9:10}}, _2: u64) -> u64 {{
+    debug x => _2;
+    debug self__a => (*((*_1).0: &u64));
+    debug self__b => (*((*_1).1: &bool));
+    let mut _0: u64;
+
+    bb0: {{
+        _0 = copy (*((*_1).0: &u64));
+        return;
+    }}
+}}
+
+"
+    )
+}
+
+#[test]
+fn collapsed_closure_captures_are_recovered() {
+    let text = mir(&format!(
+        "{}{}",
+        two_capture_closure(),
+        get_body(
+            "    let mut _3: &u64;\n    let mut _4: &bool;\n    let mut _5: bool;\n    let mut _6: {closure@src/lib.rs:9:5: 9:10};",
+            "    bb0: {\n        _3 = &((*_1).1: u64);\n        _4 = &_5;\n        _6 = {closure@src/lib.rs:9:5: 9:10} { self: move _3 };\n        _0 = const 0_u64;\n        return;\n    }"
+        )
+    ));
+    let bodies = parse(&text, &src()).unwrap();
+    let get = bodies.iter().find(|b| b.name == GET).unwrap();
+    match &block(get, 0).stmts[2] {
+        Stmt::Assign(_, Rvalue::Aggr(AggKind::Closure(_), ops)) => {
+            assert_eq!(ops, &vec![Operand::Move(local(3)), Operand::Move(local(4))])
+        }
+        s => panic!("{s:?}"),
+    }
+}
+
+#[test]
+fn ambiguous_lost_capture_is_an_error() {
+    // Two locals of the missing capture's type: the parser must not guess.
+    let text = mir(&format!(
+        "{}{}",
+        two_capture_closure(),
+        get_body(
+            "    let mut _3: &u64;\n    let mut _4: &bool;\n    let mut _5: bool;\n    let mut _6: {closure@src/lib.rs:9:5: 9:10};\n    let mut _7: &bool;",
+            "    bb0: {\n        _3 = &((*_1).1: u64);\n        _4 = &_5;\n        _7 = &_5;\n        _6 = {closure@src/lib.rs:9:5: 9:10} { self: move _3 };\n        _0 = const 0_u64;\n        return;\n    }"
+        )
+    ));
+    let e = parse(&text, &src()).unwrap_err();
+    assert!(e.contains("no unique local supplies it"), "{e}");
+}
