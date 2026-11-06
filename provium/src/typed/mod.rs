@@ -5,6 +5,7 @@ pub mod gen;
 pub mod lean;
 pub mod lib;
 pub mod load;
+pub mod mir;
 pub mod mircheck;
 pub mod types;
 pub mod verify;

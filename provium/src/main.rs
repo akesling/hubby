@@ -18,6 +18,10 @@ fn run() -> Result<(), String> {
         print!("{lean}");
         return Ok(());
     }
+    if args.first().map(String::as_str) == Some("mir-lean") {
+        // mir-lean <file.mir> --crate-root <lib.rs> --namespace <Ns> --out <file.lean> [--skip-unsupported]
+        return mir_lean(&args[1..]);
+    }
     if args.len() == 1 && matches!(args[0].as_str(), "--help" | "-h") {
         println!("provium capture-cargo <build.json> --out <directory>\nprovium inspect-cargo <build.json> --out <directory>\nprovium inventory <crate-directory> --out <directory>\nprovium audit-coverage <crate-directory>\nprovium verify-complete <crate-directory> (fails until complete proof support exists)\n");
         println!("provium <compile|verify|verify-methods|verify-project> <project.json> --out <directory>\n\ncompile: generate source-linked Lean and IR (no proof success claim)\nverify: regenerate, run pinned Lean with trust=0, audit all obligations\nverify-methods: check supported complete method bodies and state contracts\nverify-project: verify any project kind with the backend assert_proofs! selects\n\nSupported Rust: closed scalar unsigned/bool functions; checked arithmetic,\nif expressions, local lets/assignments, assertions, acyclic source-local calls.\nUnsupported Rust is rejected. See README.md for the trusted boundary.");
@@ -92,6 +96,37 @@ fn run() -> Result<(), String> {
         ),
         _ => return Err("unknown command; run provium --help".into()),
     }
+    Ok(())
+}
+fn mir_lean(args: &[String]) -> Result<(), String> {
+    let usage = "usage: provium mir-lean <file.mir> --crate-root <lib.rs> --namespace <Ns> --out <file.lean> [--skip-unsupported]";
+    let mir = args.first().ok_or(usage)?;
+    let (mut root, mut ns, mut out, mut skip) = (None, None, None, false);
+    let mut rest = args[1..].iter();
+    while let Some(a) = rest.next() {
+        match a.as_str() {
+            "--crate-root" => root = rest.next(),
+            "--namespace" => ns = rest.next(),
+            "--out" => out = rest.next(),
+            "--skip-unsupported" => skip = true,
+            _ => return Err(usage.into()),
+        }
+    }
+    let (root, ns, out) = (root.ok_or(usage)?, ns.ok_or(usage)?, out.ok_or(usage)?);
+    let text = std::fs::read_to_string(mir).map_err(|e| format!("{mir}: {e}"))?;
+    let src = provium::typed::mir::SourceMap::load(Path::new(root))?;
+    let bodies = if skip {
+        let (bodies, errors) = provium::typed::mir::parse_lenient(&text, &src)?;
+        for e in &errors {
+            eprintln!("provium: skipped {e}");
+        }
+        bodies
+    } else {
+        provium::typed::mir::parse(&text, &src)?
+    };
+    std::fs::write(out, provium::typed::mir::emit(&bodies, ns))
+        .map_err(|e| format!("{out}: {e}"))?;
+    println!("Emitted {} MIR bodies to {out}.", bodies.len());
     Ok(())
 }
 fn main() -> ExitCode {
