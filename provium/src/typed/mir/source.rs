@@ -146,6 +146,8 @@ pub(crate) struct ImplDecl {
     pub col: usize,
     pub self_name: String,
     pub trait_name: Option<String>,
+    /// The trait's path as written in the impl (`core::fmt::Display`).
+    pub trait_path: Option<String>,
     pub generics: Vec<Generic>,
     pub fns: Vec<FnDecl>,
 }
@@ -230,6 +232,7 @@ impl Index {
                             col: start.column + 1,
                             self_name: String::new(),
                             trait_name: None,
+                            trait_path: None,
                             generics: generics(&i.generics),
                             fns: vec![],
                         });
@@ -239,6 +242,13 @@ impl Index {
                         .trait_
                         .as_ref()
                         .and_then(|(_, p, _)| p.segments.last().map(|s| s.ident.to_string()));
+                    let trait_path = i.trait_.as_ref().map(|(_, p, _)| {
+                        p.segments
+                            .iter()
+                            .map(|s| s.ident.to_string())
+                            .collect::<Vec<_>>()
+                            .join("::")
+                    });
                     let fns = i
                         .items
                         .iter()
@@ -253,6 +263,7 @@ impl Index {
                         col: start.column + 1,
                         self_name,
                         trait_name,
+                        trait_path,
                         generics: generics(&i.generics),
                         fns,
                     });

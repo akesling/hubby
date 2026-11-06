@@ -259,4 +259,10 @@ pub struct Body {
     /// `<impl at ..>` (`State`, `Record_Clone`), used only to name the Lean
     /// definitions.
     pub owner: Option<String>,
+    /// Not part of the Lean `Body`: for a trait method, `(trait as printed
+    /// at call sites, method, canonical self type path)`.
+    pub trait_impl: Option<(String, String, String)>,
+    /// Not part of the Lean `Body`: for a closure body, its span and whether
+    /// `_1` is a reference to the closure.
+    pub closure: Option<(String, bool)>,
 }

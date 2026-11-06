@@ -94,6 +94,39 @@ pub fn parse_lenient(text: &str, src: &SourceMap) -> Result<(Vec<Body>, Vec<Stri
             Err(e) => errors.push(format!("body `{}`: {e}", b.name)),
         }
     }
+    // Trait impls: the trait as call sites print it (the one printed trait
+    // path with the same last segment), else as the source writes it; the
+    // self type by its canonical path.
+    let mut printed: Vec<String> = vec![];
+    for b in &out {
+        for blk in b.blocks.iter().flatten() {
+            if let Term::Call(Callee::Trait(t, _, _), ..) = &blk.term {
+                if !printed.contains(t) {
+                    printed.push(t.clone());
+                }
+            }
+        }
+    }
+    for b in &mut out {
+        let Some((tr, _, self_ty)) = b.trait_impl.as_mut() else {
+            continue;
+        };
+        let names: Vec<&String> = printed
+            .iter()
+            .filter(|p| last_seg(p) == last_seg(tr))
+            .collect();
+        match names.as_slice() {
+            [n] => *tr = (*n).clone(),
+            [] => {}
+            _ => errors.push(format!(
+                "body `{}`: trait `{tr}` is printed as {names:?}",
+                b.name
+            )),
+        }
+        if let Err(e) = canon.path(self_ty) {
+            errors.push(format!("body `{}`: {e}", b.name));
+        }
+    }
     errors.extend(canon.finish());
     Ok((out, errors))
 }
@@ -372,6 +405,8 @@ struct Origin {
     /// The impl's self type and trait (last path segments).
     self_name: Option<String>,
     trait_name: Option<String>,
+    /// The trait as written in the source (`core::fmt::Display`, `Clone`).
+    trait_path: Option<String>,
     /// Segments after the impl segment (`grow`, `{closure#0}`); for a free
     /// function or constructor, all segments.
     rest: Vec<String>,
@@ -475,6 +510,7 @@ fn origin(r: &RawBody, raws: &[RawBody], ix: &Index, src: &SourceMap) -> Result<
                 module,
                 self_name: Some(im.self_name.clone()),
                 trait_name: im.trait_name.clone(),
+                trait_path: im.trait_path.clone(),
                 rest,
                 nested,
                 tparams,
@@ -500,6 +536,7 @@ fn origin(r: &RawBody, raws: &[RawBody], ix: &Index, src: &SourceMap) -> Result<
             module,
             self_name: Some(t.name.clone()),
             trait_name: Some((*tr).clone()),
+            trait_path: Some((*tr).clone()),
             rest,
             nested,
             tparams: t.generics.clone(),
@@ -548,6 +585,7 @@ fn origin(r: &RawBody, raws: &[RawBody], ix: &Index, src: &SourceMap) -> Result<
         module: String::new(),
         self_name: None,
         trait_name: None,
+        trait_path: None,
         rest: segs.clone(),
         nested,
         tparams,
@@ -789,7 +827,38 @@ fn body(
             Some(tr) => format!("{t}_{tr}"),
             None => t.clone(),
         }),
+        trait_impl: match (&o.trait_path, &o.self_name, o.rest.as_slice(), o.nested) {
+            (Some(tr), Some(t), [m], false) => Some((tr.clone(), m.clone(), t.clone())),
+            _ => None,
+        },
+        closure: closure_param(r).map_err(|e| at(r.line, e))?,
     })
+}
+
+/// A closure body's span and whether its `_1` is `&{closure@..}` or
+/// `&mut {closure@..}` (rather than the closure by value).
+fn closure_param(r: &RawBody) -> Result<Option<(String, bool)>, String> {
+    let last = split_top(&r.name, "::").last().copied().unwrap_or("");
+    if !last.starts_with("{closure#") {
+        return Ok(None);
+    }
+    let p0 = r.params.first().ok_or("closure body without `_1`")?;
+    if !p0.contains("{closure@") {
+        // An `async fn` body's resume function (`Pin<&mut {async fn body ..}>`).
+        return Ok(None);
+    }
+    let (inner, by_ref) = match p0.strip_prefix("&mut ").or_else(|| p0.strip_prefix('&')) {
+        Some(i) => (i, true),
+        None => (p0.as_str(), false),
+    };
+    match inner
+        .strip_prefix("{closure@")
+        .and_then(|s| s.strip_suffix('}'))
+        .filter(|_| enclosed(inner))
+    {
+        Some(span) => Ok(Some((span.to_owned(), by_ref))),
+        None => Err(format!("closure body's `_1` is `{p0}`")),
+    }
 }
 
 fn targets(t: &Term) -> Vec<usize> {

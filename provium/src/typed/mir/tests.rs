@@ -257,6 +257,27 @@ fn derive_impls() {
     let bodies = parse(&text, &src()).unwrap();
     let b = bodies.iter().find(|b| b.name.ends_with("::clone")).unwrap();
     assert_eq!(b.owner.as_deref(), Some("Id_Clone"));
+    assert_eq!(
+        b.trait_impl,
+        Some(("Clone".to_owned(), "clone".to_owned(), "Id".to_owned()))
+    );
+    let get = bodies.iter().find(|b| b.name == GET).unwrap();
+    assert_eq!(get.trait_impl, None);
+    let closure = bodies
+        .iter()
+        .find(|b| b.name.ends_with("{closure#0}"))
+        .unwrap();
+    assert_eq!(
+        closure.closure,
+        Some(("src/lib.rs:8:5: 8:10".to_owned(), true))
+    );
+    let lean = emit(&bodies, "T");
+    assert!(lean.contains(
+        "def traitImpls : List ((String × String × String) × String) :=\n  [((\"Clone\", \"clone\", \"Id\"), \"<impl at src/lib.rs:2:10: 2:15>::clone\")]"
+    ), "{lean}");
+    assert!(lean.contains(
+        "def closureBodies : List (String × String × Bool) :=\n  [(\"src/lib.rs:8:5: 8:10\", \"<impl at src/lib.rs:7:1: 7:39>::get::{closure#0}\", true)]"
+    ));
     assert!(b.tparams.is_empty());
     assert_eq!(
         block(b, 0).stmts,

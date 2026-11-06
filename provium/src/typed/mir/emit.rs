@@ -94,6 +94,33 @@ pub fn emit(bodies: &[Body], namespace: &str) -> String {
     }
     out.push_str("/-- Every body, by name. -/\ndef bodies : List (String × Body) :=\n  ");
     out.push_str(&render(&list(index), 2, 0, 0));
+    let impls: Vec<Doc> = bodies
+        .iter()
+        .filter_map(|b| {
+            let (t, m, ty) = b.trait_impl.as_ref()?;
+            Some(Doc::Tuple(vec![
+                Doc::Tuple(vec![s(t), s(m), s(ty)]),
+                s(&b.name),
+            ]))
+        })
+        .collect();
+    out.push_str(
+        "\n\n/-- Crate trait method bodies: ((trait, method, self type path), body name). -/\n\
+         def traitImpls : List ((String × String × String) × String) :=\n  ",
+    );
+    out.push_str(&render(&list(impls), 2, 0, 0));
+    let closures: Vec<Doc> = bodies
+        .iter()
+        .filter_map(|b| {
+            let (span, by_ref) = b.closure.as_ref()?;
+            Some(Doc::Tuple(vec![s(span), s(&b.name), n(by_ref)]))
+        })
+        .collect();
+    out.push_str(
+        "\n\n/-- Closure bodies: (span, body name, whether `_1` is a reference to the closure). -/\n\
+         def closureBodies : List (String × String × Bool) :=\n  ",
+    );
+    out.push_str(&render(&list(closures), 2, 0, 0));
     let _ = writeln!(out, "\n\nend {namespace}.Mir");
     out
 }
