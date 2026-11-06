@@ -278,6 +278,106 @@
     {
       "name": "Engine.Host.Main",
       "path": "Engine/Host/Main.lean"
+    },
+    {
+      "name": "Engine.Dyn.Config",
+      "path": "Engine/Dyn/Config.lean"
+    },
+    {
+      "name": "Engine.Dyn.Ghost",
+      "path": "Engine/Dyn/Ghost.lean"
+    },
+    {
+      "name": "Engine.Dyn.GhostFacts",
+      "path": "Engine/Dyn/GhostFacts.lean"
+    },
+    {
+      "name": "Engine.Dyn.Util",
+      "path": "Engine/Dyn/Util.lean"
+    },
+    {
+      "name": "Engine.Dyn.Node",
+      "path": "Engine/Dyn/Node.lean"
+    },
+    {
+      "name": "Engine.Dyn.Refresh",
+      "path": "Engine/Dyn/Refresh.lean"
+    },
+    {
+      "name": "Engine.Dyn.Ops",
+      "path": "Engine/Dyn/Ops.lean"
+    },
+    {
+      "name": "Engine.Dyn.Spec",
+      "path": "Engine/Dyn/Spec.lean"
+    },
+    {
+      "name": "Engine.Dyn.OpAppend",
+      "path": "Engine/Dyn/OpAppend.lean"
+    },
+    {
+      "name": "Engine.Dyn.OpStep",
+      "path": "Engine/Dyn/OpStep.lean"
+    },
+    {
+      "name": "Engine.Dyn.OpTick",
+      "path": "Engine/Dyn/OpTick.lean"
+    },
+    {
+      "name": "Engine.Dyn.OpNext",
+      "path": "Engine/Dyn/OpNext.lean"
+    },
+    {
+      "name": "Engine.Dyn.OpPropose",
+      "path": "Engine/Dyn/OpPropose.lean"
+    },
+    {
+      "name": "Engine.Dyn.OpNew",
+      "path": "Engine/Dyn/OpNew.lean"
+    },
+    {
+      "name": "Engine.Dyn.World",
+      "path": "Engine/Dyn/World.lean"
+    },
+    {
+      "name": "Engine.Dyn.Frame",
+      "path": "Engine/Dyn/Frame.lean"
+    },
+    {
+      "name": "Engine.Dyn.Common",
+      "path": "Engine/Dyn/Common.lean"
+    },
+    {
+      "name": "Engine.Dyn.P.Persist",
+      "path": "Engine/Dyn/P/Persist.lean"
+    },
+    {
+      "name": "Engine.Dyn.P.Send",
+      "path": "Engine/Dyn/P/Send.lean"
+    },
+    {
+      "name": "Engine.Dyn.P.Tick",
+      "path": "Engine/Dyn/P/Tick.lean"
+    },
+    {
+      "name": "Engine.Dyn.P.Propose",
+      "path": "Engine/Dyn/P/Propose.lean"
+    },
+    {
+      "name": "Engine.Dyn.P.Elect",
+      "path": "Engine/Dyn/P/Elect.lean"
+    },
+    {
+      "name": "Engine.Dyn.P.Log",
+      "path": "Engine/Dyn/P/Log.lean"
+    },
+    {
+      "name": "Engine.Dyn.Preserve",
+      "path": "Engine/Dyn/Preserve.lean"
+    },
+    {
+      "name": "Engine.Dyn.Safety",
+      "path": "Engine/Dyn/Safety.lean"
     }
   ],
   "obligations": [
@@ -2476,6 +2576,150 @@
     {
       "theorem": "Jarl.Engine.Host.host_refinement",
       "function": "state::State::restore"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.election_safety",
+      "function": "cluster::Cluster::tick"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.election_safety",
+      "function": "cluster::Cluster::step"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.election_safety",
+      "function": "cluster::Cluster::propose"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.election_safety",
+      "function": "cluster::Cluster::propose_batch"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.election_safety",
+      "function": "cluster::Cluster::compact"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.election_safety",
+      "function": "cluster::Cluster::set_learners"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.election_safety",
+      "function": "cluster::Cluster::reconfigure"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.election_safety",
+      "function": "cluster::Cluster::finish_reconfiguration"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.election_safety",
+      "function": "cluster::Cluster::next_message"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.election_safety",
+      "function": "cluster::Cluster::ready"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.election_safety",
+      "function": "cluster::Cluster::new"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.election_safety",
+      "function": "cluster::ClusterState::restore"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.state_machine_safety",
+      "function": "cluster::Cluster::tick"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.state_machine_safety",
+      "function": "cluster::Cluster::step"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.state_machine_safety",
+      "function": "cluster::Cluster::propose"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.state_machine_safety",
+      "function": "cluster::Cluster::propose_batch"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.state_machine_safety",
+      "function": "cluster::Cluster::compact"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.state_machine_safety",
+      "function": "cluster::Cluster::set_learners"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.state_machine_safety",
+      "function": "cluster::Cluster::reconfigure"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.state_machine_safety",
+      "function": "cluster::Cluster::finish_reconfiguration"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.state_machine_safety",
+      "function": "cluster::Cluster::next_message"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.state_machine_safety",
+      "function": "cluster::Cluster::ready"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.state_machine_safety",
+      "function": "cluster::Cluster::new"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.state_machine_safety",
+      "function": "cluster::ClusterState::restore"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.snapshot_safety",
+      "function": "cluster::Cluster::tick"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.snapshot_safety",
+      "function": "cluster::Cluster::step"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.snapshot_safety",
+      "function": "cluster::Cluster::propose"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.snapshot_safety",
+      "function": "cluster::Cluster::propose_batch"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.snapshot_safety",
+      "function": "cluster::Cluster::compact"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.snapshot_safety",
+      "function": "cluster::Cluster::set_learners"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.snapshot_safety",
+      "function": "cluster::Cluster::reconfigure"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.snapshot_safety",
+      "function": "cluster::Cluster::finish_reconfiguration"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.snapshot_safety",
+      "function": "cluster::Cluster::next_message"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.snapshot_safety",
+      "function": "cluster::Cluster::ready"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.snapshot_safety",
+      "function": "cluster::Cluster::new"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.snapshot_safety",
+      "function": "cluster::ClusterState::restore"
     }
   ],
   "differential": {

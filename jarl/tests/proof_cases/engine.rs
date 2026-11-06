@@ -1,7 +1,8 @@
 use std::{fs, path::Path};
 
-/// M3: the fixed `Node` engine, translated by Provium's typed backend, is safe
-/// on every reachable cluster (`proofs/engine/Engine/Main.lean`).
+/// M3 and M4: the fixed `Node` engine and the dynamic `Cluster` engine,
+/// translated by Provium's typed backend, are safe on every reachable cluster
+/// (`proofs/engine/Engine/Main.lean`, `proofs/engine/Engine/Dyn/Safety.lean`).
 #[test]
 #[ignore = "requires pinned Lean; scripts/verify.sh runs this"]
 fn fixed_engine_safety_is_kernel_checked() {
@@ -17,6 +18,9 @@ fn fixed_engine_safety_is_kernel_checked() {
         "Jarl.Engine.raft_snapshot_safety",
         "Jarl.Engine.App.raft_snapshot_application_safety",
         "Jarl.Engine.Host.host_state_machine_safety",
+        "Jarl.Engine.Dyn.election_safety",
+        "Jarl.Engine.Dyn.state_machine_safety",
+        "Jarl.Engine.Dyn.snapshot_safety",
     ] {
         assert!(
             report.contains(&format!("PROVIUM_VERIFIED {theorem}")),

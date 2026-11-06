@@ -1848,3 +1848,30 @@ The translation also covers Jarl's remaining functions: `host::persist`
 cancellation) and `Display for Error`. The differential scenario's host
 persists through `host::persist` with its own `Storage` implementation.
 549 obligations verify on the host and on wasm32.
+
+## M4: dynamic-engine safety
+
+`engine/Engine/Dyn` proves election safety, state-machine safety and snapshot
+safety for the dynamic `Cluster` engine over every execution of the generated
+code: learner changes, joint reconfiguration and finalization in any number
+and order, removed leaders, stale views, peer slot reuse, snapshots carrying
+configurations, crashes and restarts, and an adversarial network (see
+[the engine README](engine/README.md#the-dynamic-engine)). The project now has
+585 obligations, checked on the host and on wasm32.
+
+The key lemma is leader completeness without assuming that all quorums
+intersect. A configuration record is one step from the one before it and is
+only followed by another once committed, so each committed prefix has a
+commitment whose configuration is near the configuration before its last
+entry; at the point a candidate's log diverges from a committed log, both
+configurations are near the same configuration and so share a voter.
+
+Findings while proving it:
+
+- A node in a single-voter configuration becomes leader before its new term is
+  saved. The code is safe (nothing is sent before saving), but the proof records
+  such a win only once the term is saved.
+- A reply's peer slot is looked up before `refresh_membership` may reassign
+  it, so after a snapshot install that removes the sender, the reply can go to
+  the slot's new identity (or to the node itself, which drops it). This is
+  safe; the original sender retries.
