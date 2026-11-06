@@ -21,6 +21,11 @@ fn fixed_engine_safety_is_kernel_checked() {
         "Jarl.Engine.Dyn.election_safety",
         "Jarl.Engine.Dyn.state_machine_safety",
         "Jarl.Engine.Dyn.snapshot_safety",
+        "Jarl.Engine.Host.persist_async_step",
+        "Jarl.Engine.DynHost.dhost_state_machine_safety",
+        "Jarl.Engine.DynHost.persist_async_dstep",
+        "Jarl.Engine.Dyn.errs_propose",
+        "Jarl.Engine.Dyn.inv_of_grow",
     ] {
         assert!(
             report.contains(&format!("PROVIUM_VERIFIED {theorem}")),

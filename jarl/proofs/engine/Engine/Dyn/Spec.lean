@@ -306,16 +306,6 @@ def CompactD (n : DNode V S MAX CAP) (index : Rust.u64) (value : Unit → Rust.M
         ((n.role ≠ .Leader ∧ n' = n1) ∨
           (n.role = .Leader ∧ ∃ n2, BarrierD n1 n2 ∧ n' = bcastD n2)))
 
-/-- The facts `change_available` checks: an idle leader whose latest configuration
-    is stable and committed, and whose commit index is an entry of its own term. -/
-def ChangeOk (n : DNode V S MAX CAP) : Prop :=
-  Idle n ∧ n.role = .Leader ∧ Membership.is_joint (memAt n.state n.bootstrap (lastId n.state).index).2 = false ∧
-    (memAt n.state n.bootstrap (lastId n.state).index).1 ≤ n.state.hard.commit ∧
-    ((ret n.state).find? (fun e => e.id.index == n.state.hard.commit)).map (fun e => e.id.term) =
-      some n.state.hard.term ∨
-    (((ret n.state).find? (fun e => e.id.index == n.state.hard.commit)) = none ∧
-      (n.state.snapshot.filter (fun s => s.last.index == n.state.hard.commit)).map (fun s => s.last.term) = some n.state.hard.term)
-
 /-- A configuration has distinct identities and voters. -/
 def MemOk (m : Membership MAX) : Prop :=
   Jarl.Contracts.Membership.UniqueIdentities m ∧ m.voters ≠ []

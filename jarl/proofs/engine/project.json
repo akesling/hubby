@@ -280,6 +280,14 @@
       "path": "Engine/Host/Main.lean"
     },
     {
+      "name": "Engine.Host.Adapters",
+      "path": "Engine/Host/Adapters.lean"
+    },
+    {
+      "name": "Engine.Host.Adapted",
+      "path": "Engine/Host/Adapted.lean"
+    },
+    {
       "name": "Engine.Dyn.Config",
       "path": "Engine/Dyn/Config.lean"
     },
@@ -378,6 +386,30 @@
     {
       "name": "Engine.Dyn.Safety",
       "path": "Engine/Dyn/Safety.lean"
+    },
+    {
+      "name": "Engine.Dyn.Errors",
+      "path": "Engine/Dyn/Errors.lean"
+    },
+    {
+      "name": "Engine.Dyn.Grow",
+      "path": "Engine/Dyn/Grow.lean"
+    },
+    {
+      "name": "Engine.Dyn.Host.Ops",
+      "path": "Engine/Dyn/Host/Ops.lean"
+    },
+    {
+      "name": "Engine.Dyn.Host.Refine",
+      "path": "Engine/Dyn/Host/Refine.lean"
+    },
+    {
+      "name": "Engine.Dyn.Host.Main",
+      "path": "Engine/Dyn/Host/Main.lean"
+    },
+    {
+      "name": "Engine.Dyn.Host.Adapted",
+      "path": "Engine/Dyn/Host/Adapted.lean"
     }
   ],
   "obligations": [
@@ -2720,6 +2752,106 @@
     {
       "theorem": "Jarl.Engine.Dyn.snapshot_safety",
       "function": "cluster::ClusterState::restore"
+    },
+    {
+      "theorem": "Jarl.Engine.Host.persist_step",
+      "function": "host::persist"
+    },
+    {
+      "theorem": "Jarl.Engine.Host.persist_async_step",
+      "function": "host::persist_async"
+    },
+    {
+      "theorem": "Jarl.Engine.DynHost.persist_dstep",
+      "function": "host::persist"
+    },
+    {
+      "theorem": "Jarl.Engine.DynHost.persist_async_dstep",
+      "function": "host::persist_async"
+    },
+    {
+      "theorem": "Jarl.Engine.DynHost.dhost_election_safety",
+      "function": "state::State::write"
+    },
+    {
+      "theorem": "Jarl.Engine.DynHost.dhost_election_safety",
+      "function": "state::State::restore"
+    },
+    {
+      "theorem": "Jarl.Engine.DynHost.dhost_election_safety",
+      "function": "cluster::Cluster::new"
+    },
+    {
+      "theorem": "Jarl.Engine.DynHost.dhost_state_machine_safety",
+      "function": "state::State::write"
+    },
+    {
+      "theorem": "Jarl.Engine.DynHost.dhost_state_machine_safety",
+      "function": "state::State::restore"
+    },
+    {
+      "theorem": "Jarl.Engine.DynHost.dhost_state_machine_safety",
+      "function": "cluster::Cluster::new"
+    },
+    {
+      "theorem": "Jarl.Engine.DynHost.dhost_snapshot_safety",
+      "function": "state::State::write"
+    },
+    {
+      "theorem": "Jarl.Engine.DynHost.dhost_snapshot_safety",
+      "function": "state::State::restore"
+    },
+    {
+      "theorem": "Jarl.Engine.DynHost.dhost_snapshot_safety",
+      "function": "cluster::Cluster::new"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.inv_of_grow",
+      "function": "cluster::Cluster::grow"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.inv_of_grow",
+      "function": "state::State::grow"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.errs_propose",
+      "function": "cluster::Cluster::propose"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.errs_propose_batch",
+      "function": "cluster::Cluster::propose_batch"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.errs_compact",
+      "function": "cluster::Cluster::compact"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.errs_set_learners",
+      "function": "cluster::Cluster::set_learners"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.errs_reconfigure",
+      "function": "cluster::Cluster::reconfigure"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.errs_finish",
+      "function": "cluster::Cluster::finish_reconfiguration"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.errs_tick",
+      "function": "cluster::Cluster::tick"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.errs_step",
+      "function": "cluster::Cluster::step"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.errs_restore",
+      "function": "cluster::ClusterState::restore"
+    },
+    {
+      "theorem": "Jarl.Engine.Dyn.errs_new",
+      "function": "cluster::Cluster::new"
     }
   ],
   "differential": {

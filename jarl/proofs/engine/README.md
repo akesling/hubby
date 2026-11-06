@@ -47,6 +47,28 @@ theorems for it. The core is `DeltaOk`: Jarl's dirty tracking (`log_from`,
 what was last saved, so applying the write reproduces the live state
 (`host_write_exact`).
 
+A save may also become durable without being acknowledged: a cancelled
+`persist_async` whose storage finished the write, or a save that reported an
+error after writing (`HAct.save`). Such a node is still dirty, so every
+operation except acknowledging and restarting leaves it unchanged, and the
+refinement matches the save with the model's `persist` while the model waits
+(`Unacked`); repeating the write is idempotent.
+
+### The host adapters
+
+`Engine/Host/Adapters.lean`: the storage is consumer code, so `host.rs`'s
+contract is an assumption stated against a durable view of it (`StorageOk`,
+`AsyncStorageOk`): a successful save has made the whole transaction durable; a
+failed save, or a dropped asynchronous one, applied it in full or not at all
+and never later. From the generated bodies, every run of `persist`, and of
+`persist_async` completed or dropped after any number of awaits, is
+acknowledged with the write durable, or unacknowledged with the write applied
+in full or not at all (`persist_outcome`, `persist_async_outcome`). These are
+exactly the host steps above (`persist_step`, `persist_async_step` in
+`Engine/Host/Adapted.lean`), so the host theorems cover hosts that persist
+through either adapter, synchronously or asynchronously, with failed and
+cancelled saves.
+
 ### Snapshot application state
 
 `Engine/App`: with the application given as `init : S` and
@@ -144,6 +166,26 @@ between leaves no trace. A leader removed from its configuration can step down
 with unsaved entries and keep replicating them (`Leading` holds of any
 role).
 
+### Hosts, errors and growth
+
+- `Dyn/Host`: the delta-persisting host refinement for the dynamic engine, with
+  unacknowledged saves and both adapters: `dhost_refinement`,
+  `dhost_write_exact`, and `dhost_election_safety`,
+  `dhost_state_machine_safety`, `dhost_snapshot_safety` over reachable host
+  clusters; `persist_dstep`, `persist_async_dstep`.
+- `Dyn/Errors`: what every public `Cluster` operation's errors mean. Every error
+  of `propose`, `propose_batch`, `compact`, `set_learners`, `reconfigure`,
+  `finish_reconfiguration` and `step` leaves the cluster unchanged, with the
+  exact condition for each error variant; `Busy` is returned exactly when a save
+  or message is pending; `tick`'s `Exhausted` (the term cannot be incremented)
+  changes only the elapsed time and leader age; `ClusterState::restore` and
+  `Cluster::new` fail exactly on a joint genesis and on invalid capacity or
+  timers. Successful proposals and membership changes append exactly their
+  record at the returned identity (`errs_*_ok`).
+- `Dyn/Grow`: `Cluster::grow` keeps every field except capacity, and the
+  invariant holds of a cluster whose nodes and checkpoints are all grown
+  (`inv_of_grow`), so growth composes with every theorem above.
+
 ### Proof structure
 
 | Module | Content |
@@ -170,7 +212,9 @@ role).
 - The host persists each write atomically before acknowledging it
   (`Ready::persisted`), and compacts with the application state it actually
   reached (the honest-compaction premise of `Engine/App`).
-- The dynamic engine's theorems are about the model cluster: delta-persisting
-  hosts and application state (above) are proved for the fixed engine only.
+- Application state (`Engine/App`) is proved for the fixed engine only.
+- Storage meets the adapter contract above: atomic, durable before success,
+  and after a failure or cancellation either fully applied or not at all, with
+  no older write applied after a later one.
 - Panics and divergence are crashes; an unwinding panic caught by the host is not
   modelled (the shared limitation of the typed backend).

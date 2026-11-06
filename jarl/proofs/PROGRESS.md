@@ -1875,3 +1875,25 @@ Findings while proving it:
   it, so after a snapshot install that removes the sender, the reply can go to
   the slot's new identity (or to the node itself, which drops it). This is
   safe; the original sender retries.
+
+## M5: host and API refinement
+
+- **Unacknowledged saves** (`engine/Engine/Host/Refine.lean`, `engine/Engine/Dyn/Host`): a
+  write that became durable without acknowledgment is refined by the model's
+  `persist` while the model waits, for both engines.
+- **Sync and async adapters** (`engine/Engine/Host/Adapters.lean`, `Adapted.lean`,
+  `engine/Engine/Dyn/Host/Adapted.lean`): under the storage contract, every run of
+  `persist` and `persist_async` (completed, failed, or dropped after any number
+  of awaits) is a host step or nothing, so the safety theorems hold for hosts
+  using either adapter.
+- **Dynamic-engine host refinement** (`engine/Engine/Dyn/Host`): `DeltaOk` for every
+  dynamic operation and the three safety theorems over host clusters.
+- **Error outcomes** (`engine/Engine/Dyn/Errors.lean`): every `Cluster` error's exact
+  condition and effect, and the result of each successful proposal and
+  membership change.
+- **Growth** (`engine/Engine/Dyn/Grow.lean`): `grow` preserves everything but capacity,
+  and the invariant transfers to grown clusters.
+
+Not covered: panics that unwind and are caught by the host (`BatchRollback`'s
+cleanup); a panic is a crash in the model. Covering it needs the typed
+backend to model unwinding.
