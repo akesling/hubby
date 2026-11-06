@@ -118,6 +118,8 @@ pub(crate) enum TypeKind {
 #[derive(Clone, Debug)]
 pub(crate) struct TypeDecl {
     pub name: String,
+    /// The declaring module (`node`, empty at the crate root).
+    pub module: String,
     pub generics: Vec<Generic>,
     pub kind: TypeKind,
     pub file: String,
@@ -184,6 +186,7 @@ impl Index {
                     let fields = fields(&s.fields);
                     self.types.push(TypeDecl {
                         name: s.ident.to_string(),
+                        module: module.to_owned(),
                         generics: generics(&s.generics),
                         kind: TypeKind::Struct(fields),
                         file: file.to_owned(),
@@ -202,6 +205,7 @@ impl Index {
                         .collect();
                     self.types.push(TypeDecl {
                         name: e.ident.to_string(),
+                        module: module.to_owned(),
                         generics: generics(&e.generics),
                         kind: TypeKind::Enum(variants),
                         file: file.to_owned(),

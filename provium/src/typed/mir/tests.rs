@@ -14,9 +14,10 @@ impl<T: Clone, const N: usize> S<T, N> {
 }
 pub fn free(x: u64) -> u64 { x }
 pub struct Unit;
+pub fn user() {}
 ";
 
-const M: &str = "pub fn helper() {}\n";
+const M: &str = "pub fn helper() {}\npub struct Q;\n";
 
 fn src() -> SourceMap {
     SourceMap::from_files(
@@ -215,7 +216,18 @@ fn items_headers_and_generics() {
     let closure = by(&format!("{GET}::{{closure#0}}"));
     assert_eq!(
         closure.locals[1],
-        Ty::Ref(false, Box::new(Ty::Closure("src/lib.rs:8:5: 8:10".into())))
+        Ty::Ref(
+            false,
+            Box::new(Ty::Closure(
+                "src/lib.rs:8:5: 8:10".into(),
+                vec![
+                    Ty::Param("T".into()),
+                    Ty::Cparam("N".into()),
+                    Ty::Param("U".into()),
+                    Ty::Param("impl Fn(u64) -> u64".into())
+                ]
+            ))
+        )
     );
     assert_eq!(
         block(by(&format!("{GET}::{{constant#0}}")), 0).stmts[0],
@@ -283,7 +295,7 @@ fn types() {
     let _17: core::array::IntoIter<(&[u64], u8), 3>;";
     let b = parse_get(lets, "    bb0: {\n        return;\n    }").unwrap();
     let u64t = Ty::Int(IntTy::U64);
-    let opt = |t: Ty| Ty::Adt("Option".into(), vec![t]);
+    let opt = |t: Ty| Ty::Adt("core::option::Option".into(), vec![t]);
     assert_eq!(
         b.locals[3..],
         [
@@ -519,7 +531,7 @@ fn places_operands_and_rvalues() {
         st[17],
         a(
             16,
-            Rvalue::Use(Operand::Const(Const::Adt("Option".into(), 0)))
+            Rvalue::Use(Operand::Const(Const::Adt("core::option::Option".into(), 0)))
         )
     );
     assert_eq!(
@@ -562,7 +574,7 @@ fn places_operands_and_rvalues() {
     );
     assert_eq!(st[23], a(23, Rvalue::Ref(true, local(20))));
     assert!(
-        matches!(&st[24], Stmt::Assign(_, Rvalue::Coerce(k, Operand::Const(Const::Zst(Ty::Closure(_))), Ty::FnPtr(..))) if k == "ClosureFnPointer")
+        matches!(&st[24], Stmt::Assign(_, Rvalue::Coerce(k, Operand::Const(Const::Zst(Ty::Closure(..))), Ty::FnPtr(..))) if k == "ClosureFnPointer")
     );
     assert_eq!(
         st[25],
@@ -797,10 +809,6 @@ fn unsupported_is_an_error() {
         "unsupported statement",
     );
     has(
-        get_err("    let _3: &[u8; 2];", "        _3 = const b\"ab\";"),
-        "byte string",
-    );
-    has(
         get_err("    let _3: D;", "        _3 = D::Q;"),
         "explicit discriminants",
     );
@@ -825,13 +833,6 @@ fn unsupported_is_an_error() {
     has(
         get_err("    let _3: u64;", "        _3 = Offset(copy _3, copy _3);"),
         "unsupported rvalue",
-    );
-    has(
-        get_err(
-            "    let _3: E;",
-            "        _3 = {coroutine@src/lib.rs:1:1: 1:2 (#0)} { a: const 1_u64 };",
-        ),
-        "no AggKind",
     );
     let e = parse_get(
         "",
@@ -866,8 +867,8 @@ fn ordering_is_a_library_enum() {
 #[test]
 fn lenient_parse_leaves_out_failing_bodies() {
     let text = mir(&get_body(
-        "    let _3: &[u8; 2];",
-        "    bb0: {\n        _3 = const b\"ab\";\n        return;\n    }",
+        "    let _3: u64;",
+        "    bb0: {\n        Deinit(_3);\n        return;\n    }",
     ));
     let (bodies, errors) = parse_lenient(&text, &src()).unwrap();
     assert_eq!(bodies.len(), 7);
@@ -916,14 +917,165 @@ fn whole_sample() {
     let text = std::fs::read_to_string(&path).unwrap();
     let src = SourceMap::load(std::path::Path::new(&root)).unwrap();
     let (bodies, errors) = parse_lenient(&text, &src).unwrap();
-    // The only failures allowed are constructs Syntax.lean cannot express:
-    // an `async fn`'s coroutine aggregate and a byte-string constant
-    // (`format_args!` with a runtime argument).
-    for e in &errors {
-        assert!(e.contains("no AggKind") || e.contains("byte string"), "{e}");
-    }
-    assert!(errors.len() <= 2, "{errors:?}");
+    assert!(errors.is_empty(), "{errors:?}");
     assert!(!bodies.is_empty());
     let lean = emit(&bodies, "Sample");
     assert!(lean.lines().all(|l| l.chars().count() <= 140));
+}
+
+#[test]
+fn bytes_coroutines_and_vars() {
+    let b = parse_get(
+        "    let _3: &[u8; 3];\n    let _4: E;\n    scope 1 {\n        debug x => _3;\n        debug y => (*_3);\n        debug z => const 1_u64;\n        debug w => _4;\n    }",
+        "    bb0: {\n        _3 = const b\"a\\xc0\\x00\";\n        _4 = {coroutine@src/lib.rs:1:1: 1:2 (#0)} { a: const 1_u64 };\n        return;\n    }",
+    )
+    .unwrap();
+    let st = &block(&b, 0).stmts;
+    assert_eq!(
+        st[0],
+        Stmt::Assign(
+            local(3),
+            Rvalue::Use(Operand::Const(Const::Bytes(vec![b'a', 0xc0, 0])))
+        )
+    );
+    assert_eq!(
+        st[1],
+        Stmt::Assign(
+            local(4),
+            Rvalue::Aggr(
+                AggKind::Coroutine("src/lib.rs:1:1: 1:2".into()),
+                vec![Operand::Const(Const::Int(false, 1, IntTy::U64))]
+            )
+        )
+    );
+    assert_eq!(b.vars, vec![("x".to_owned(), 3), ("w".to_owned(), 4)]);
+    let lean = emit(&[b], "T");
+    assert!(lean.contains("Const.bytes [97, 192, 0]"), "{lean}");
+    assert!(lean.contains("AggKind.coroutine \"src/lib.rs:1:1: 1:2\""));
+    assert!(lean.contains("  vars := [(\"x\", 3), (\"w\", 4)]\n"));
+}
+
+/// A closure of `get` seen from `user` (through `get`'s result) carries
+/// `user`'s instantiation of `get`.
+#[test]
+fn foreign_closures_are_instantiated() {
+    let text = mir("fn user() -> () {
+    let mut _0: ();
+    let mut _1: &S<u64, 3>;
+    let mut _2: fn(u64) -> u64;
+    let mut _3: u64;
+    let mut _4: core::option::Option<{closure@src/lib.rs:8:5: 8:10}>;
+
+    bb0: {
+        _3 = S::<u64, 3>::get::<bool, fn(u64) -> u64>(move _1, move _2) -> [return: bb1, unwind continue];
+    }
+
+    bb1: {
+        return;
+    }
+}
+");
+    let text = text + &get_body("", "    bb0: {\n        return;\n    }");
+    let bodies = parse(&text, &src()).unwrap();
+    let user = bodies.iter().find(|b| b.name == "user").unwrap();
+    let u64t = Ty::Int(IntTy::U64);
+    assert_eq!(
+        user.locals[4],
+        Ty::Adt(
+            "core::option::Option".into(),
+            vec![Ty::Closure(
+                "src/lib.rs:8:5: 8:10".into(),
+                vec![
+                    u64t.clone(),
+                    Ty::Cnst(3),
+                    Ty::Bool,
+                    Ty::FnPtr(vec![u64t.clone()], Box::new(u64t))
+                ]
+            )]
+        )
+    );
+    // Without a call to `get` the instantiation is unknown.
+    let text = mir("fn user() -> () {
+    let mut _0: ();
+    let mut _1: core::option::Option<{closure@src/lib.rs:8:5: 8:10}>;
+
+    bb0: {
+        return;
+    }
+}
+") + &get_body("", "    bb0: {\n        return;\n    }");
+    let e = parse(&text, &src()).unwrap_err();
+    assert!(e.contains("without a call"), "{e}");
+}
+
+#[test]
+fn canonical_paths() {
+    let text = mir("fn user() -> () {
+    let mut _0: ();
+    let mut _1: m::Q;
+    let mut _2: (Q, core::option::Option<Q>);
+    let mut _3: RangeTo<usize>;
+
+    bb0: {
+        _1 = Q;
+        _3 = RangeTo::<usize> { end: const 1_usize };
+        return;
+    }
+}
+") + &get_body("", "    bb0: {\n        return;\n    }");
+    let bodies = parse(&text, &src()).unwrap();
+    let user = bodies.iter().find(|b| b.name == "user").unwrap();
+    let q = Ty::Adt("m::Q".into(), vec![]);
+    assert_eq!(user.locals[1], q);
+    assert_eq!(
+        user.locals[2],
+        Ty::Tuple(vec![
+            q.clone(),
+            Ty::Adt("core::option::Option".into(), vec![q])
+        ])
+    );
+    assert_eq!(
+        block(user, 0).stmts,
+        vec![
+            Stmt::Assign(
+                local(1),
+                Rvalue::Aggr(AggKind::Adt("m::Q".into(), 0), vec![])
+            ),
+            Stmt::Assign(
+                local(3),
+                Rvalue::Aggr(
+                    AggKind::Adt("core::ops::RangeTo".into(), 0),
+                    vec![Operand::Const(Const::Int(false, 1, IntTy::Usize))]
+                )
+            ),
+        ]
+    );
+    // An unlisted library type printed both bare and qualified.
+    let text = mir("fn user() -> () {
+    let mut _0: ();
+    let mut _1: core::cell::Cell<u64>;
+    let mut _2: &Cell<u64>;
+
+    bb0: {
+        return;
+    }
+}
+") + &get_body("", "    bb0: {\n        return;\n    }");
+    let e = parse(&text, &src()).unwrap_err();
+    assert!(
+        e.contains("printed both bare and as `core::cell::Cell`"),
+        "{e}"
+    );
+    // A crate type printed under a module it is not declared in.
+    let text = mir("fn user() -> () {
+    let mut _0: ();
+    let mut _1: n::Q;
+
+    bb0: {
+        return;
+    }
+}
+") + &get_body("", "    bb0: {\n        return;\n    }");
+    let e = parse(&text, &src()).unwrap_err();
+    assert!(e.contains("does not match the module"), "{e}");
 }

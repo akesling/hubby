@@ -103,7 +103,8 @@ pub enum Ty {
     Slice(Box<Ty>),
     Ref(bool, Box<Ty>),
     Param(String),
-    Closure(String),
+    /// A closure by span, with its defining function's generic parameters.
+    Closure(String, Vec<Ty>),
     FnPtr(Vec<Ty>, Box<Ty>),
     Assoc(Box<Ty>, String, String),
     Other(String),
@@ -138,6 +139,8 @@ pub enum Const {
     Cparam(String),
     Zst(Ty),
     Adt(String, usize),
+    /// A byte string literal's bytes.
+    Bytes(Vec<u8>),
     Promoted(String),
 }
 
@@ -184,6 +187,8 @@ pub enum AggKind {
     Array,
     Adt(String, usize),
     Closure(String),
+    /// An `async fn`'s coroutine, by span.
+    Coroutine(String),
 }
 
 /// `Provium.Mir.Rvalue`.
@@ -248,6 +253,8 @@ pub struct Body {
     pub locals: Vec<Ty>,
     pub nargs: usize,
     pub blocks: Vec<Option<Block>>,
+    /// `debug name => _n` bindings to plain locals, in order.
+    pub vars: Vec<(String, usize)>,
     /// Not part of the Lean `Body`: the self type and trait of the body's
     /// `<impl at ..>` (`State`, `Record_Clone`), used only to name the Lean
     /// definitions.

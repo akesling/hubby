@@ -1,6 +1,8 @@
 //! `--emit=mir` text to [`Body`]s. See `Provium/Mir/Syntax.lean` for the
 //! target and the module documentation for what comes from the sources.
 use super::source::{Fields, Generic, Index, SourceMap, TypeKind};
+use std::collections::{BTreeMap, BTreeSet};
+
 use super::{
     AggKind, BinOp, Block, Body, Callee, Const, IntTy, Operand, PElem, Place, Rvalue, Stmt, Term,
     Ty, UnOp,
@@ -40,15 +42,60 @@ pub fn parse_lenient(text: &str, src: &SourceMap) -> Result<(Vec<Body>, Vec<Stri
             .filter_map(|(r, o)| o.as_ref().map(|o| (r.name.clone(), o.clone())))
             .collect(),
     };
+    // Closure types carry their defining function's generic parameters: the
+    // closure body's `_1` names its span.
+    let mut closures = BTreeMap::new();
+    for (r, o) in raws.iter().zip(&origins) {
+        let (Some(o), Some(p0)) = (o, r.params.first()) else {
+            continue;
+        };
+        let last = split_top(&r.name, "::").last().copied().unwrap_or("");
+        if !last.starts_with("{closure#") {
+            continue;
+        }
+        let Some(i) = p0.find("{closure@") else {
+            continue;
+        };
+        let Some(j) = matching(&p0[i..], 0) else {
+            continue;
+        };
+        let args = o
+            .tparams
+            .iter()
+            .map(|g| {
+                if g.is_const {
+                    Ty::Cparam(g.name.clone())
+                } else {
+                    Ty::Param(g.name.clone())
+                }
+            })
+            .collect();
+        closures.insert(
+            p0[i + "{closure@".len()..i + j].to_owned(),
+            (body_base(&r.name), args),
+        );
+    }
     let mut bodies = vec![];
     for (r, o) in raws.iter().zip(&origins) {
         let Some(o) = o else { continue };
-        match body(r, o, &ix, &res) {
+        match body(r, o, &ix, &res, &closures).and_then(|mut b| {
+            foreign_closures(&mut b, &closures)?;
+            Ok(b)
+        }) {
             Ok(b) => bodies.push(b),
             Err(e) => errors.push(format!("body `{}`: {e}", r.name)),
         }
     }
-    Ok((bodies, errors))
+    let mut canon = Canon::new(&ix, &bodies);
+    let mut out = vec![];
+    for mut b in bodies {
+        match canon.body(&mut b) {
+            Ok(()) => out.push(b),
+            Err(e) => errors.push(format!("body `{}`: {e}", b.name)),
+        }
+    }
+    errors.extend(canon.finish());
+    Ok((out, errors))
 }
 
 // ---------------------------------------------------------------------------
@@ -596,14 +643,23 @@ type RawBlock<'a> = (bool, usize, Vec<(usize, &'a str)>);
 
 struct Cx<'a> {
     tparams: &'a [Generic],
+    closures: &'a BTreeMap<String, (String, Vec<Ty>)>,
     locals: Vec<Ty>,
     ix: &'a Index,
     res: &'a Resolver,
 }
 
-fn body(r: &RawBody, o: &Origin, ix: &Index, res: &Resolver) -> Result<Body, String> {
+fn body(
+    r: &RawBody,
+    o: &Origin,
+    ix: &Index,
+    res: &Resolver,
+    closures: &BTreeMap<String, (String, Vec<Ty>)>,
+) -> Result<Body, String> {
+    let mut vars = vec![];
     let mut cx = Cx {
         tparams: &o.tparams,
+        closures,
         locals: vec![],
         ix,
         res,
@@ -640,7 +696,16 @@ fn body(r: &RawBody, o: &Origin, ix: &Index, res: &Resolver) -> Result<Body, Str
             }
             continue;
         }
-        if t.starts_with("debug ") || t == "}" || (t.starts_with("scope ") && t.ends_with(" {")) {
+        if let Some(d) = t.strip_prefix("debug ") {
+            // `debug name => _n;` (projections and constants are skipped).
+            if let Some((name, slot)) = d.strip_suffix(';').and_then(|d| d.split_once(" => ")) {
+                if let Some(k) = local_index(slot) {
+                    vars.push((name.to_owned(), k));
+                }
+            }
+            continue;
+        }
+        if t == "}" || (t.starts_with("scope ") && t.ends_with(" {")) {
             continue;
         }
         if let Some(rest) = t.strip_prefix("let ") {
@@ -719,6 +784,7 @@ fn body(r: &RawBody, o: &Origin, ix: &Index, res: &Resolver) -> Result<Body, Str
         locals: cx.locals,
         nargs: r.params.len(),
         blocks: out,
+        vars,
         owner: o.self_name.as_ref().map(|t| match &o.trait_name {
             Some(tr) => format!("{t}_{tr}"),
             None => t.clone(),
@@ -797,7 +863,11 @@ impl Cx<'_> {
             .and_then(|r| r.strip_suffix('}'))
         {
             if enclosed(s) {
-                return Ok(Ty::Closure(span.to_owned()));
+                let args = self
+                    .closures
+                    .get(span)
+                    .ok_or_else(|| format!("no MIR body defines the closure `{s}`"))?;
+                return Ok(Ty::Closure(span.to_owned(), args.1.clone()));
             }
         }
         if s.starts_with('{') && enclosed(s) {
@@ -1095,10 +1165,10 @@ impl Cx<'_> {
             "()" => return Ok(Const::Unit),
             _ => {}
         }
-        if s.starts_with("b\"") {
-            return Err(format!(
-                "byte string constant `{s}` (Syntax.lean has no byte-string Const)"
-            ));
+        if let Some(b) = s.strip_prefix('b') {
+            if b.starts_with('"') {
+                return Ok(Const::Bytes(unescape_bytes(b)?));
+            }
         }
         if s.starts_with('"') {
             return Ok(Const::Str(unescape_str(s)?));
@@ -1334,10 +1404,25 @@ impl Cx<'_> {
             };
             return Ok(Rvalue::Aggr(AggKind::Closure(span.to_owned()), ops));
         }
+        if s.starts_with("{coroutine@") {
+            // `{coroutine@span (#n)} { upvar: op, .. }`: the syntax-context
+            // marker ` (#n)` is not part of the span.
+            let close = matching(s, 0).ok_or_else(|| format!("coroutine `{s}`"))?;
+            let inner = &s["{coroutine@".len()..close];
+            let span = match inner.rfind(" (#") {
+                Some(i) if inner.ends_with(')') => &inner[..i],
+                _ => inner,
+            };
+            let rest = s[close + 1..].trim();
+            let ops = if rest.is_empty() {
+                vec![]
+            } else {
+                self.named_ops(rest)?.into_iter().map(|x| x.1).collect()
+            };
+            return Ok(Rvalue::Aggr(AggKind::Coroutine(span.to_owned()), ops));
+        }
         if s.starts_with('{') {
-            return Err(format!(
-                "unsupported aggregate `{s}` (Syntax.lean has no AggKind for it)"
-            ));
+            return Err(format!("unsupported aggregate `{s}`"));
         }
         self.adt_aggregate(s, dest)
     }
@@ -1859,6 +1944,41 @@ fn int_assoc_const(imp: &str, item: &str) -> Result<Const, String> {
     })
 }
 
+/// A Rust-escaped byte string literal without its `b` (`"ab\xc0\x00"`).
+fn unescape_bytes(s: &str) -> Result<Vec<u8>, String> {
+    let inner = s
+        .strip_prefix('"')
+        .and_then(|r| r.strip_suffix('"'))
+        .ok_or_else(|| format!("byte string constant `b{s}`"))?;
+    let bad = || format!("escape in `b{s}`");
+    let mut out = vec![];
+    let mut cs = inner.chars();
+    while let Some(c) = cs.next() {
+        if c != '\\' {
+            if c == '"' || !c.is_ascii() {
+                return Err(bad());
+            }
+            out.push(c as u8);
+            continue;
+        }
+        out.push(match cs.next().ok_or_else(bad)? {
+            'n' => b'\n',
+            'r' => b'\r',
+            't' => b'\t',
+            '0' => 0,
+            '\\' => b'\\',
+            '"' => b'"',
+            '\'' => b'\'',
+            'x' => {
+                let hex: String = cs.by_ref().take(2).collect();
+                u8::from_str_radix(&hex, 16).map_err(|_| bad())?
+            }
+            _ => return Err(bad()),
+        });
+    }
+    Ok(out)
+}
+
 /// A Rust-escaped string literal (`"a\n\"b\""`).
 fn unescape_str(s: &str) -> Result<String, String> {
     let inner = s
@@ -1921,4 +2041,409 @@ fn unescape(inner: &str, whole: &str) -> Result<String, String> {
         }
     }
     Ok(out)
+}
+
+// ---------------------------------------------------------------------------
+// Closures of other functions.
+
+/// The header name of the function a body belongs to (without closure,
+/// promoted and inline-constant suffixes).
+fn body_base(name: &str) -> String {
+    let segs = split_top(name, "::");
+    let k = segs.iter().position(|s| is_suffix(s)).unwrap_or(segs.len());
+    segs[..k].join("::")
+}
+
+/// Visit every type in a body (locals, projections, constants, coercions,
+/// call generic arguments); `f` recurses itself.
+fn tys_mut(b: &mut Body, f: &mut dyn FnMut(&mut Ty) -> Result<(), String>) -> Result<(), String> {
+    fn place(
+        p: &mut Place,
+        f: &mut dyn FnMut(&mut Ty) -> Result<(), String>,
+    ) -> Result<(), String> {
+        for e in &mut p.proj {
+            if let PElem::Field(_, t) = e {
+                f(t)?;
+            }
+        }
+        Ok(())
+    }
+    fn operand(
+        o: &mut Operand,
+        f: &mut dyn FnMut(&mut Ty) -> Result<(), String>,
+    ) -> Result<(), String> {
+        match o {
+            Operand::Copy(p) | Operand::Move(p) => place(p, f),
+            Operand::Const(Const::Zst(t)) => f(t),
+            Operand::Const(_) => Ok(()),
+        }
+    }
+    b.locals.iter_mut().try_for_each(&mut *f)?;
+    for blk in b.blocks.iter_mut().flatten() {
+        for s in &mut blk.stmts {
+            match s {
+                Stmt::Assign(p, r) => {
+                    place(p, f)?;
+                    match r {
+                        Rvalue::Use(o)
+                        | Rvalue::Unop(_, o)
+                        | Rvalue::Cast(o, _)
+                        | Rvalue::PtrMeta(o) => operand(o, f)?,
+                        Rvalue::Rep(o, _) => operand(o, f)?,
+                        Rvalue::Ref(_, p) | Rvalue::Discr(p) => place(p, f)?,
+                        Rvalue::Binop(_, a, c) | Rvalue::Checked(_, a, c) => {
+                            operand(a, f)?;
+                            operand(c, f)?
+                        }
+                        Rvalue::Aggr(_, ops) => ops.iter_mut().try_for_each(|o| operand(o, f))?,
+                        Rvalue::Coerce(_, o, t) => {
+                            operand(o, f)?;
+                            f(t)?
+                        }
+                    }
+                }
+                Stmt::SetDiscr(p, _) => place(p, f)?,
+                Stmt::Nop => {}
+            }
+        }
+        match &mut blk.term {
+            Term::Switch(o, _, _) | Term::Assert(o, _, _) => operand(o, f)?,
+            Term::Drop(p, _) => place(p, f)?,
+            Term::Call(c, args, dest, _) => {
+                match c {
+                    Callee::Fn(_, a) | Callee::Trait(_, _, a) => {
+                        a.iter_mut().try_for_each(&mut *f)?
+                    }
+                    Callee::Ptr(o) => operand(o, f)?,
+                }
+                args.iter_mut().try_for_each(|o| operand(o, f))?;
+                place(dest, f)?;
+            }
+            Term::Goto(_) | Term::Ret | Term::Unreachable => {}
+        }
+    }
+    Ok(())
+}
+
+/// A closure defined in another function `F` (reached through an iterator
+/// `F` returned) gets `F`'s generic arguments as this body instantiates
+/// them: the generic arguments of its calls to `F`, which must all agree.
+fn foreign_closures(
+    b: &mut Body,
+    closures: &BTreeMap<String, (String, Vec<Ty>)>,
+) -> Result<(), String> {
+    let base = body_base(&b.name);
+    let mut calls: Vec<(String, Vec<Ty>)> = vec![];
+    for blk in b.blocks.iter().flatten() {
+        if let Term::Call(Callee::Fn(k, a), ..) = &blk.term {
+            if !calls.iter().any(|(k2, a2)| k2 == k && a2 == a) {
+                calls.push((k.clone(), a.clone()));
+            }
+        }
+    }
+    fn fix(
+        t: &mut Ty,
+        base: &str,
+        calls: &[(String, Vec<Ty>)],
+        closures: &BTreeMap<String, (String, Vec<Ty>)>,
+    ) -> Result<(), String> {
+        let rec = |v: &mut [Ty]| v.iter_mut().try_for_each(|x| fix(x, base, calls, closures));
+        match t {
+            Ty::Closure(span, args) => {
+                if let Some((def, _)) = closures.get(span.as_str()) {
+                    if def != base {
+                        let insts: Vec<&Vec<Ty>> = calls
+                            .iter()
+                            .filter(|(k, _)| k == def)
+                            .map(|x| &x.1)
+                            .collect();
+                        match insts.as_slice() {
+                            [a] if a.len() == args.len() => *args = (*a).clone(),
+                            [] => {
+                                return Err(format!(
+                                    "closure `{span}` of `{def}` appears without a call to `{def}`"
+                                ))
+                            }
+                            _ => {
+                                return Err(format!(
+                                    "closure `{span}` of `{def}`: `{def}` is called with different generic arguments"
+                                ))
+                            }
+                        }
+                    }
+                }
+                rec(args)
+            }
+            Ty::Adt(_, v) | Ty::Tuple(v) => rec(v),
+            Ty::Array(x, y) => {
+                fix(x, base, calls, closures)?;
+                fix(y, base, calls, closures)
+            }
+            Ty::Slice(x) | Ty::Ref(_, x) | Ty::Assoc(x, _, _) => fix(x, base, calls, closures),
+            Ty::FnPtr(v, r) => {
+                rec(v)?;
+                fix(r, base, calls, closures)
+            }
+            _ => Ok(()),
+        }
+    }
+    tys_mut(b, &mut |t| fix(t, &base, &calls, closures))
+}
+
+// ---------------------------------------------------------------------------
+// Canonical type paths.
+
+/// Library types always named by these full paths.
+const LIB_PATHS: &[&str] = &[
+    "core::option::Option",
+    "core::result::Result",
+    "core::slice::Iter",
+    "core::slice::IterMut",
+    "core::iter::Flatten",
+    "core::iter::Filter",
+    "core::iter::Map",
+    "core::iter::Enumerate",
+    "core::iter::Cloned",
+    "core::iter::TakeWhile",
+    "core::iter::OnceWith",
+    "core::iter::FilterMap",
+    "core::ops::Range",
+    "core::ops::RangeTo",
+    "core::ops::RangeFrom",
+    "core::ops::ControlFlow",
+    "core::convert::Infallible",
+    "core::task::Poll",
+    "core::array::IntoIter",
+    "core::fmt::Formatter",
+    "core::fmt::Arguments",
+    // Beyond the coordinator's list: printed both ways in Jarl's MIR.
+    "core::task::Context",
+    "core::pin::Pin",
+    "core::num::TryFromIntError",
+];
+
+/// Rewrites every ADT path (`Ty.adt`, `AggKind.adt`, `Const.adt`) to one
+/// form per type: a crate type as rustc prints it in `let` declarations
+/// (`node::Node`, or bare at the crate root), a listed library type by its
+/// full path. Other library paths stay as printed; one printed both bare and
+/// qualified is an error.
+struct Canon<'a> {
+    ix: &'a Index,
+    /// Crate type name to its `let` form.
+    krate: BTreeMap<String, String>,
+    bare: BTreeSet<String>,
+    qualified: BTreeMap<String, String>,
+    errors: Vec<String>,
+}
+
+impl<'a> Canon<'a> {
+    fn new(ix: &'a Index, bodies: &[Body]) -> Canon<'a> {
+        let mut forms: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+        fn walk(t: &Ty, ix: &Index, forms: &mut BTreeMap<String, BTreeSet<String>>) {
+            match t {
+                Ty::Adt(p, a) => {
+                    let name = last_seg(p);
+                    if !is_library_path(p) && !ix.types_named(name).is_empty() {
+                        forms.entry(name.to_owned()).or_default().insert(p.clone());
+                    }
+                    a.iter().for_each(|x| walk(x, ix, forms));
+                }
+                Ty::Tuple(v) | Ty::Closure(_, v) => v.iter().for_each(|x| walk(x, ix, forms)),
+                Ty::Array(x, y) => {
+                    walk(x, ix, forms);
+                    walk(y, ix, forms);
+                }
+                Ty::Slice(x) | Ty::Ref(_, x) | Ty::Assoc(x, _, _) => walk(x, ix, forms),
+                Ty::FnPtr(v, r) => {
+                    v.iter().for_each(|x| walk(x, ix, forms));
+                    walk(r, ix, forms);
+                }
+                _ => {}
+            }
+        }
+        for b in bodies {
+            // `let` declarations: `_0` and the locals after the parameters.
+            let lets = b
+                .locals
+                .iter()
+                .take(1)
+                .chain(b.locals.iter().skip(b.nargs + 1));
+            lets.for_each(|t| walk(t, ix, &mut forms));
+        }
+        let mut errors = vec![];
+        let mut krate = BTreeMap::new();
+        for (name, fs) in forms {
+            let qualified: Vec<&String> = fs.iter().filter(|f| f.contains("::")).collect();
+            let form = match qualified.as_slice() {
+                [] => name.clone(),
+                [q] => (*q).clone(),
+                _ => {
+                    errors.push(format!("crate type `{name}` is declared as {qualified:?}"));
+                    continue;
+                }
+            };
+            let module = form.rsplit_once("::").map(|x| x.0).unwrap_or("");
+            let decls = ix.types_named(&name);
+            if !module.is_empty() && !decls.iter().any(|t| t.module == module) {
+                errors.push(format!(
+                    "`{form}` does not match the module of any `{name}` in the source"
+                ));
+            }
+            krate.insert(name, form);
+        }
+        Canon {
+            ix,
+            krate,
+            bare: BTreeSet::new(),
+            qualified: BTreeMap::new(),
+            errors,
+        }
+    }
+
+    fn path(&mut self, p: &mut String) -> Result<(), String> {
+        let name = last_seg(p).to_owned();
+        if !is_library_path(p) && !self.ix.types_named(&name).is_empty() {
+            let form = self
+                .krate
+                .get(&name)
+                .cloned()
+                .unwrap_or_else(|| name.clone());
+            if p.contains("::") && *p != form {
+                return Err(format!(
+                    "`{p}` is printed differently from its declaration `{form}`"
+                ));
+            }
+            *p = form;
+            return Ok(());
+        }
+        if let Some(full) = LIB_PATHS.iter().find(|f| last_seg(f) == name) {
+            if p.contains("::") && p != full {
+                return Err(format!("`{p}` is not the library type `{full}`"));
+            }
+            *p = (*full).to_owned();
+            return Ok(());
+        }
+        if p.contains("::") {
+            self.qualified.insert(name, p.clone());
+        } else {
+            self.bare.insert(name);
+        }
+        Ok(())
+    }
+
+    fn ty(&mut self, t: &mut Ty) -> Result<(), String> {
+        match t {
+            Ty::Adt(p, a) => {
+                self.path(p)?;
+                a.iter_mut().try_for_each(|x| self.ty(x))
+            }
+            Ty::Tuple(v) | Ty::Closure(_, v) => v.iter_mut().try_for_each(|x| self.ty(x)),
+            Ty::Array(x, y) => {
+                self.ty(x)?;
+                self.ty(y)
+            }
+            Ty::Slice(x) | Ty::Ref(_, x) | Ty::Assoc(x, _, _) => self.ty(x),
+            Ty::FnPtr(v, r) => {
+                v.iter_mut().try_for_each(|x| self.ty(x))?;
+                self.ty(r)
+            }
+            _ => Ok(()),
+        }
+    }
+
+    fn place(&mut self, p: &mut Place) -> Result<(), String> {
+        for e in &mut p.proj {
+            if let PElem::Field(_, t) = e {
+                self.ty(t)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn constant(&mut self, c: &mut Const) -> Result<(), String> {
+        match c {
+            Const::Zst(t) => self.ty(t),
+            Const::Adt(p, _) => self.path(p),
+            _ => Ok(()),
+        }
+    }
+
+    fn operand(&mut self, o: &mut Operand) -> Result<(), String> {
+        match o {
+            Operand::Copy(p) | Operand::Move(p) => self.place(p),
+            Operand::Const(c) => self.constant(c),
+        }
+    }
+
+    fn rvalue(&mut self, r: &mut Rvalue) -> Result<(), String> {
+        match r {
+            Rvalue::Use(o) | Rvalue::Unop(_, o) | Rvalue::Cast(o, _) | Rvalue::PtrMeta(o) => {
+                self.operand(o)
+            }
+            Rvalue::Ref(_, p) | Rvalue::Discr(p) => self.place(p),
+            Rvalue::Binop(_, a, b) | Rvalue::Checked(_, a, b) => {
+                self.operand(a)?;
+                self.operand(b)
+            }
+            Rvalue::Aggr(k, ops) => {
+                if let AggKind::Adt(p, _) = k {
+                    self.path(p)?;
+                }
+                ops.iter_mut().try_for_each(|o| self.operand(o))
+            }
+            Rvalue::Rep(o, c) => {
+                self.operand(o)?;
+                self.constant(c)
+            }
+            Rvalue::Coerce(_, o, t) => {
+                self.operand(o)?;
+                self.ty(t)
+            }
+        }
+    }
+
+    fn body(&mut self, b: &mut Body) -> Result<(), String> {
+        b.locals.iter_mut().try_for_each(|t| self.ty(t))?;
+        for blk in b.blocks.iter_mut().flatten() {
+            for s in &mut blk.stmts {
+                match s {
+                    Stmt::Assign(p, r) => {
+                        self.place(p)?;
+                        self.rvalue(r)?;
+                    }
+                    Stmt::SetDiscr(p, _) => self.place(p)?,
+                    Stmt::Nop => {}
+                }
+            }
+            match &mut blk.term {
+                Term::Switch(o, _, _) | Term::Assert(o, _, _) => self.operand(o)?,
+                Term::Drop(p, _) => self.place(p)?,
+                Term::Call(f, args, dest, _) => {
+                    match f {
+                        Callee::Fn(_, a) | Callee::Trait(_, _, a) => {
+                            a.iter_mut().try_for_each(|t| self.ty(t))?
+                        }
+                        Callee::Ptr(o) => self.operand(o)?,
+                    }
+                    args.iter_mut().try_for_each(|o| self.operand(o))?;
+                    self.place(dest)?;
+                }
+                Term::Goto(_) | Term::Ret | Term::Unreachable => {}
+            }
+        }
+        Ok(())
+    }
+
+    /// Errors found across bodies: crate types declared inconsistently, and
+    /// unlisted library types printed both bare and qualified.
+    fn finish(mut self) -> Vec<String> {
+        for (name, q) in &self.qualified {
+            if self.bare.contains(name) {
+                self.errors.push(format!(
+                    "library type `{name}` is printed both bare and as `{q}`; add it to the canonical list"
+                ));
+            }
+        }
+        self.errors
+    }
 }

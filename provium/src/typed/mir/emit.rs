@@ -53,6 +53,16 @@ pub fn emit(bodies: &[Body], namespace: &str) -> String {
         );
         field(&mut out, "locals", &locals);
         field(&mut out, "nargs", &Doc::Atom(b.nargs.to_string()));
+        field(
+            &mut out,
+            "vars",
+            &list(
+                b.vars
+                    .iter()
+                    .map(|(v, k)| Doc::Tuple(vec![Doc::Atom(lean_str(v)), n(k)]))
+                    .collect(),
+            ),
+        );
         out.push_str("  blocks\n");
         for (k, blk) in b.blocks.iter().enumerate() {
             if blk.is_some() {
@@ -390,7 +400,7 @@ fn ty(t: &Ty) -> Doc {
         Ty::Slice(t) => app("Ty.slice", vec![ty(t)]),
         Ty::Ref(m, t) => app("Ty.ref", vec![n(m), ty(t)]),
         Ty::Param(p) => app("Ty.param", vec![s(p)]),
-        Ty::Closure(p) => app("Ty.closure", vec![s(p)]),
+        Ty::Closure(p, a) => app("Ty.closure", vec![s(p), list(a.iter().map(ty).collect())]),
         Ty::FnPtr(a, r) => app("Ty.fnPtr", vec![list(a.iter().map(ty).collect()), ty(r)]),
         Ty::Assoc(t, tr, nm) => app("Ty.assoc", vec![ty(t), s(tr), s(nm)]),
         Ty::Other(x) => app("Ty.other", vec![s(x)]),
@@ -425,6 +435,7 @@ fn constant(c: &Const) -> Doc {
         Const::Cparam(p) => app("Const.cparam", vec![s(p)]),
         Const::Zst(t) => app("Const.zst", vec![ty(t)]),
         Const::Adt(p, v) => app("Const.adt", vec![s(p), n(v)]),
+        Const::Bytes(bs) => app("Const.bytes", vec![list(bs.iter().map(n).collect())]),
         Const::Promoted(b) => app("Const.promoted", vec![s(b)]),
     }
 }
@@ -482,6 +493,7 @@ fn rvalue(r: &Rvalue) -> Doc {
                 AggKind::Array => atom("AggKind.array"),
                 AggKind::Adt(p, i) => app("AggKind.adt", vec![s(p), n(i)]),
                 AggKind::Closure(sp) => app("AggKind.closure", vec![s(sp)]),
+                AggKind::Coroutine(sp) => app("AggKind.coroutine", vec![s(sp)]),
             };
             app("Rvalue.aggr", vec![k, ops(v)])
         }
