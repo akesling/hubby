@@ -18,6 +18,8 @@ pub struct Generated {
     /// Crate function path to Lean name, for every translated function.
     pub functions: BTreeMap<String, String>,
     pub pure: BTreeSet<String>,
+    /// Crate paths of the emitted types, in the order they are declared.
+    pub types: Vec<String>,
 }
 
 struct Emitted {
@@ -39,7 +41,7 @@ pub struct Facts {
     pub locals: Vec<(String, Ty)>,
 }
 
-fn generic_binders(g: &Generics, bounds: &[(String, String)]) -> String {
+pub(super) fn generic_binders(g: &Generics, bounds: &[(String, String)]) -> String {
     let mut s = String::new();
     if !g.types.is_empty() {
         s.push_str(&format!(
@@ -266,12 +268,10 @@ fn len_deps(t: &Ty, out: &mut BTreeSet<String>) {
     }
 }
 
-fn emit_types(
-    k: &Krate,
-    names: &Names,
-    needed: &BTreeSet<String>,
-    manual_eqs: &BTreeMap<String, String>,
-) -> R<(String, BTreeSet<String>)> {
+/// The crate types reachable from `needed` through field types, in
+/// dependency order (a type after every type its fields name), and the crate
+/// constants their array lengths use.
+pub fn type_order(k: &Krate, needed: &BTreeSet<String>) -> R<(Vec<String>, BTreeSet<String>)> {
     // Close over field types.
     let mut all = needed.clone();
     let mut work: Vec<String> = needed.iter().cloned().collect();
@@ -320,6 +320,16 @@ fn emit_types(
     for p in deps.keys() {
         visit(p, &deps, &mut done, &mut vec![], &mut order)?;
     }
+    Ok((order, consts))
+}
+
+fn emit_types(
+    k: &Krate,
+    names: &Names,
+    needed: &BTreeSet<String>,
+    manual_eqs: &BTreeMap<String, String>,
+) -> R<(String, BTreeSet<String>, Vec<String>)> {
+    let (order, consts) = type_order(k, needed)?;
     let mut out = String::new();
     for p in &order {
         let mut g = Generics::default();
@@ -452,7 +462,7 @@ fn emit_types(
             ));
         }
     }
-    Ok((out, consts))
+    Ok((out, consts, order))
 }
 
 /// The local name of an `async fn`'s await budget (not a Rust identifier).
@@ -1212,7 +1222,7 @@ pub fn generate(k: &Krate, roots: &[String], opts: &Options) -> R<Generated> {
         eq_texts.insert(t.clone(), e.text.clone());
     }
     order.retain(|p| !manual.values().any(|f| f == p));
-    let (types, mut consts) = emit_types(k, &names, &needed, &eq_texts)?;
+    let (types, mut consts, type_order) = emit_types(k, &names, &needed, &eq_texts)?;
     for p in &order {
         for (path, lean) in &names.consts {
             if mentions(&emitted[p].text, lean) {
@@ -1299,6 +1309,7 @@ pub fn generate(k: &Krate, roots: &[String], opts: &Options) -> R<Generated> {
             .into_iter()
             .filter(|p| emitted.contains_key(p))
             .collect(),
+        types: type_order,
     })
 }
 

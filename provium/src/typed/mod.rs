@@ -7,6 +7,7 @@ pub mod lib;
 pub mod load;
 pub mod mir;
 pub mod mircheck;
+pub mod mirenc;
 pub mod types;
 pub mod verify;
 
@@ -28,6 +29,23 @@ pub fn translate_host(
     roots: &[String],
     namespace: &str,
 ) -> Result<(load::Krate, gen::Generated), String> {
+    let configuration = host_configuration()?;
+    let k = load::Krate::load(crate_root, Some(configuration))?;
+    let g = gen::generate(
+        &k,
+        roots,
+        &gen::Options {
+            namespace: namespace.to_owned(),
+            overflow_checks: true,
+            debug_assertions: true,
+        },
+    )?;
+    Ok((k, g))
+}
+
+/// The host's `cfg` with overflow checks and debug assertions on; sets the
+/// translation's pointer width to the host's.
+pub fn host_configuration() -> Result<crate::cfg::Configuration, String> {
     let cfg = std::process::Command::new("rustc")
         .args([
             "--print",
@@ -46,15 +64,5 @@ pub fn translate_host(
         _ => return Err("the typed backend supports 32- and 64-bit targets only".into()),
     };
     types::set_pointer_width(width);
-    let k = load::Krate::load(crate_root, Some(configuration))?;
-    let g = gen::generate(
-        &k,
-        roots,
-        &gen::Options {
-            namespace: namespace.to_owned(),
-            overflow_checks: true,
-            debug_assertions: true,
-        },
-    )?;
-    Ok((k, g))
+    Ok(configuration)
 }
